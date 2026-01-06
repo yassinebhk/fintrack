@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinTrack - Dashboard Financiero Personal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-icon">◈</span>
+                    <span class="logo-text">FinTrack</span>
+                </div>
+                <span class="version">v2.0</span>
+            </div>
+            
+            <ul class="nav-menu">
+                <li class="nav-item active" data-page="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">Dashboard</span>
+                </li>
+                <li class="nav-item" data-page="analysis">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-label">Análisis</span>
+                </li>
+                <li class="nav-item" data-page="transactions">
+                    <span class="nav-icon">💸</span>
+                    <span class="nav-label">Transacciones</span>
+                </li>
+                <li class="nav-item" data-page="goals">
+                    <span class="nav-icon">🎯</span>
+                    <span class="nav-label">Objetivos</span>
+                </li>
+                <li class="nav-item" data-page="portfolio-manager">
+                    <span class="nav-icon">💼</span>
+                    <span class="nav-label">Gestionar Cartera</span>
+                </li>
+                <li class="nav-item" data-page="alerts">
+                    <span class="nav-icon">🔔</span>
+                    <span class="nav-label">Alertas</span>
+                </li>
+                <li class="nav-item" data-page="calculators">
+                    <span class="nav-icon">🧮</span>
+                    <span class="nav-label">Calculadoras</span>
+                </li>
+                <li class="nav-item" data-page="ai-advisor">
+                    <span class="nav-icon">🤖</span>
+                    <span class="nav-label">Asesor IA</span>
+                </li>
+                <li class="nav-item" data-page="news">
+                    <span class="nav-icon">📰</span>
+                    <span class="nav-label">Noticias</span>
+                </li>
+                <li class="nav-item" data-page="learn">
+                    <span class="nav-icon">📚</span>
+                    <span class="nav-label">Aprender</span>
+                </li>
+                <li class="nav-item" data-page="docs">
+                    <span class="nav-icon">📖</span>
+                    <span class="nav-label">Documentación</span>
+                </li>
+            </ul>
+            
+            <div class="sidebar-footer">
+                <button class="btn-settings" title="Configuración">
+                    <span>⚙️</span>
+                </button>
+                <div class="connection-status">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Conectando...</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <div class="main-wrapper">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <button class="btn-menu-toggle" id="menuToggle">☰</button>
+                    <h1 class="page-title" id="pageTitle">Dashboard</h1>
+                </div>
+                <div class="header-right">
+                    <div class="last-update">
+                        <span class="update-label">Última actualización</span>
+                        <span class="update-time" id="lastUpdate">--:--</span>
+                    </div>
+                    <button class="btn-refresh" id="btnRefresh" title="Actualizar datos">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <main class="main" id="mainContent">
+                <!-- Dashboard Page (default) -->
+                <div class="page page-dashboard active" id="page-dashboard">
+                    <!-- Portfolio Summary Cards -->
+                    <section class="summary-section">
+                        <div class="card card-total">
+                            <div class="card-header">
+                                <span class="card-label">Valor Total de Cartera</span>
+                                <span class="card-currency" id="baseCurrency">EUR</span>
+                            </div>
+                            <div class="card-value" id="totalValue">
+                                <span class="value-loading">Cargando...</span>
+                            </div>
+                            <div class="card-change">
+                                <span class="change-daily" id="dailyChange">--</span>
+                                <span class="change-separator">|</span>
+                                <span class="change-total" id="totalGainLoss">--</span>
+                            </div>
+                        </div>
+
+                        <div class="card card-kpi">
+                            <div class="kpi-item" title="CAGR = Crecimiento Anual Compuesto. Mide el rendimiento medio anual de tu cartera. Un CAGR del 7-10% es excelente para inversiones a largo plazo.">
+                                <span class="kpi-label">📈 CAGR</span>
+                                <span class="kpi-value" id="cagr">--%</span>
+                                <span class="kpi-help">Rendimiento anual medio</span>
+                            </div>
+                            <div class="kpi-item" title="Drawdown = La mayor caída desde el máximo histórico de tu cartera. Por ejemplo, si tu cartera llegó a 1000€ y bajó a 800€, el drawdown es -20%.">
+                                <span class="kpi-label">📉 Max Drawdown</span>
+                                <span class="kpi-value negative" id="maxDrawdown">--%</span>
+                                <span class="kpi-help">Mayor caída desde máximo</span>
+                            </div>
+                            <div class="kpi-item" title="Volatilidad = Cuánto sube y baja tu cartera. Mayor volatilidad = más riesgo. Cryptos suelen tener volatilidad alta (>50%), acciones media (15-25%).">
+                                <span class="kpi-label">📊 Volatilidad</span>
+                                <span class="kpi-value" id="volatility">--%</span>
+                                <span class="kpi-help">Variación del valor</span>
+                            </div>
+                            <div class="kpi-item" title="Sharpe Ratio = Rentabilidad ajustada al riesgo. Mayor que 1 = bueno, mayor que 2 = muy bueno. Compara tu rendimiento con el riesgo que tomas.">
+                                <span class="kpi-label">⚖️ Sharpe</span>
+                                <span class="kpi-value" id="sharpeRatio">--</span>
+                                <span class="kpi-help">Rendimiento vs Riesgo</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Quick Stats -->
+                    <section class="quick-stats">
+                        <div class="stat-card">
+                            <span class="stat-icon">📈</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="bestPerformer">--</span>
+                                <span class="stat-label">Mejor rendimiento</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-icon">📉</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="worstPerformer">--</span>
+                                <span class="stat-label">Peor rendimiento</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-icon">💰</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="dividendsYTD">0 €</span>
+                                <span class="stat-label">Dividendos YTD</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-icon">📊</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="positionsCount">0</span>
+                                <span class="stat-label">Posiciones</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Charts Section -->
+                    <section class="charts-section">
+                        <div class="card card-chart">
+                            <div class="card-header">
+                                <h3>Evolución de la Cartera</h3>
+                                <div class="chart-controls">
+                                    <button class="chart-btn active" data-period="30">1M</button>
+                                    <button class="chart-btn" data-period="90">3M</button>
+                                    <button class="chart-btn" data-period="180">6M</button>
+                                    <button class="chart-btn" data-period="365">1A</button>
+                                    <button class="chart-btn" data-period="all">Todo</button>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="portfolioChart"></canvas>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Distributions Section -->
+                    <section class="distributions-section">
+                        <div class="card card-distribution">
+                            <h3>Por Tipo de Activo</h3>
+                            <div class="distribution-chart">
+                                <canvas id="typeChart"></canvas>
+                            </div>
+                            <div class="distribution-legend" id="typeLegend"></div>
+                        </div>
+                        
+                        <div class="card card-distribution">
+                            <h3>Por Broker</h3>
+                            <div class="distribution-chart">
+                                <canvas id="brokerChart"></canvas>
+                            </div>
+                            <div class="distribution-legend" id="brokerLegend"></div>
+                        </div>
+                        
+                        <div class="card card-distribution">
+                            <h3>Por Divisa</h3>
+                            <div class="distribution-chart">
+                                <canvas id="currencyChart"></canvas>
+                            </div>
+                            <div class="distribution-legend" id="currencyLegend"></div>
+                        </div>
+                    </section>
+
+                    <!-- Positions Table -->
+                    <section class="positions-section">
+                        <div class="card card-positions">
+                            <div class="card-header">
+                                <h3>Posiciones</h3>
+                                <div class="positions-controls">
+                                    <input type="text" class="search-input" id="searchPositions" placeholder="Buscar...">
+                                    <select id="filterType" class="select-filter">
+                                        <option value="all">Todos los tipos</option>
+                                        <option value="stock">Acciones</option>
+                                        <option value="etf">ETFs</option>
+                                        <option value="crypto">Crypto</option>
+                                    </select>
+                                    <select id="filterBroker" class="select-filter">
+                                        <option value="all">Todos los brokers</option>
+                                    </select>
+                                    <button class="btn-export" id="btnExportCSV" title="Exportar CSV">📥</button>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <table class="positions-table">
+                                    <thead>
+                                        <tr>
+                                            <th data-sort="ticker">Activo ↕</th>
+                                            <th data-sort="type">Tipo</th>
+                                            <th data-sort="broker">Broker</th>
+                                            <th class="text-right" data-sort="quantity">Cantidad</th>
+                                            <th class="text-right" data-sort="avg_price">Coste/Unidad</th>
+                                            <th class="text-right" data-sort="current_price">Precio Actual</th>
+                                            <th class="text-right" data-sort="market_value">Valor</th>
+                                            <th class="text-right" data-sort="gain_loss">P/L</th>
+                                            <th class="text-right" data-sort="gain_loss_pct">P/L %</th>
+                                            <th class="text-right" data-sort="day_change_pct">Día %</th>
+                                            <th class="text-right" data-sort="weight">Peso</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="positionsBody">
+                                        <tr>
+                                            <td colspan="11" class="loading-row">Cargando posiciones...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Analysis Page -->
+                <div class="page page-analysis" id="page-analysis">
+                    <section class="analysis-header">
+                        <h2>📈 Análisis de Activos</h2>
+                        <p>Ve la evolución de cada inversión y decide cuándo comprar o vender</p>
+                    </section>
+
+                    <!-- Asset Charts Section -->
+                    <section class="asset-analysis-section">
+                        <div class="card asset-chart-card">
+                            <div class="asset-chart-header">
+                                <div class="asset-selector">
+                                    <label>Selecciona un activo:</label>
+                                    <select id="assetSelector" onchange="loadAssetChart()">
+                                        <option value="">-- Elige un activo --</option>
+                                    </select>
+                                </div>
+                                <div class="period-buttons" id="assetPeriodButtons">
+                                    <button class="period-btn" data-period="1d">1D</button>
+                                    <button class="period-btn" data-period="5d">1S</button>
+                                    <button class="period-btn" data-period="1mo">1M</button>
+                                    <button class="period-btn active" data-period="3mo">3M</button>
+                                    <button class="period-btn" data-period="1y">1A</button>
+                                    <button class="period-btn" data-period="max">Max</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Asset Info -->
+                            <div class="asset-info-panel" id="assetInfoPanel" style="display: none;">
+                                <div class="asset-main-info">
+                                    <div class="asset-icon-large" id="assetIconLarge">📊</div>
+                                    <div class="asset-details">
+                                        <h3 id="assetName">-</h3>
+                                        <span class="asset-ticker-badge" id="assetTickerBadge">-</span>
+                                    </div>
+                                    <div class="asset-price-info">
+                                        <div class="current-price" id="assetCurrentPrice">-</div>
+                                        <div class="price-change" id="assetPriceChange">-</div>
+                                    </div>
+                                </div>
+                                <div class="asset-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Tu posición</span>
+                                        <span class="stat-value" id="assetPosition">-</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Valor actual</span>
+                                        <span class="stat-value" id="assetValue">-</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Ganancia/Pérdida</span>
+                                        <span class="stat-value" id="assetGainLoss">-</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">% de tu cartera</span>
+                                        <span class="stat-value" id="assetWeight">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Chart Container -->
+                            <div class="asset-chart-container" id="assetChartContainer">
+                                <div class="chart-placeholder">
+                                    <span class="placeholder-icon">📊</span>
+                                    <p>Selecciona un activo para ver su evolución</p>
+                                </div>
+                                <canvas id="assetHistoryChart" style="display: none;"></canvas>
+                            </div>
+
+                            <!-- Quick Actions -->
+                            <div class="asset-actions" id="assetActions" style="display: none;">
+                                <button class="btn-action btn-buy" onclick="showBuyAdvice()">
+                                    💰 ¿Debería comprar más?
+                                </button>
+                                <button class="btn-action btn-analyze" onclick="showDetailedAnalysis()">
+                                    🔍 Análisis detallado
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Quick Asset Cards -->
+                    <section class="asset-quick-cards">
+                        <h3>📊 Resumen Rápido de tus Activos</h3>
+                        <div class="asset-cards-grid" id="assetCardsGrid">
+                            <!-- Cards will be populated by JavaScript -->
+                        </div>
+                    </section>
+
+                    <section class="analysis-metrics">
+                        <div class="card metric-card">
+                            <h4>Rendimiento vs Benchmark</h4>
+                            <div class="chart-container-sm">
+                                <canvas id="benchmarkChart"></canvas>
+                            </div>
+                            <div class="metric-footer">
+                                <span>Tu cartera vs S&P 500</span>
+                            </div>
+                        </div>
+
+                        <div class="card metric-card">
+                            <h4>Distribución de Riesgo</h4>
+                            <div class="risk-bars">
+                                <div class="risk-item">
+                                    <span class="risk-label">Bajo riesgo</span>
+                                    <div class="risk-bar"><div class="risk-fill low" style="width: 30%"></div></div>
+                                    <span class="risk-pct" id="riskLow">30%</span>
+                                </div>
+                                <div class="risk-item">
+                                    <span class="risk-label">Medio riesgo</span>
+                                    <div class="risk-bar"><div class="risk-fill medium" style="width: 45%"></div></div>
+                                    <span class="risk-pct" id="riskMedium">45%</span>
+                                </div>
+                                <div class="risk-item">
+                                    <span class="risk-label">Alto riesgo</span>
+                                    <div class="risk-bar"><div class="risk-fill high" style="width: 25%"></div></div>
+                                    <span class="risk-pct" id="riskHigh">25%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card metric-card">
+                            <h4>Correlación de Activos</h4>
+                            <div class="correlation-matrix" id="correlationMatrix">
+                                <p class="text-muted">Matriz de correlación basada en rendimientos históricos</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="analysis-details">
+                        <div class="card">
+                            <h4>Top Movers (30 días)</h4>
+                            <div class="movers-list" id="topMovers">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h4>Estadísticas de Rendimiento</h4>
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-name">Mejor día</span>
+                                    <span class="stat-value positive" id="bestDay">+0.00%</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-name">Peor día</span>
+                                    <span class="stat-value negative" id="worstDay">-0.00%</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-name">Días positivos</span>
+                                    <span class="stat-value" id="positiveDays">0%</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-name">Rendimiento YTD</span>
+                                    <span class="stat-value" id="ytdReturn">0.00%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Transactions Page -->
+                <div class="page page-transactions" id="page-transactions">
+                    <section class="transactions-header">
+                        <h2>Registro de Transacciones</h2>
+                        <button class="btn-primary" id="btnAddTransaction">+ Nueva Transacción</button>
+                    </section>
+
+                    <div class="card">
+                        <div class="transactions-filters">
+                            <input type="date" id="txDateFrom" class="input-date">
+                            <span>hasta</span>
+                            <input type="date" id="txDateTo" class="input-date">
+                            <select id="txType" class="select-filter">
+                                <option value="all">Todas</option>
+                                <option value="buy">Compras</option>
+                                <option value="sell">Ventas</option>
+                                <option value="dividend">Dividendos</option>
+                            </select>
+                        </div>
+
+                        <table class="transactions-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Activo</th>
+                                    <th class="text-right">Cantidad</th>
+                                    <th class="text-right">Precio</th>
+                                    <th class="text-right">Total</th>
+                                    <th>Broker</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionsBody">
+                                <tr>
+                                    <td colspan="8" class="text-muted text-center">
+                                        No hay transacciones registradas. Haz clic en "Nueva Transacción" para añadir una.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Transaction Modal -->
+                    <div class="modal" id="transactionModal">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3>Nueva Transacción</h3>
+                                <button class="modal-close" id="closeTransactionModal">×</button>
+                            </div>
+                            <form id="transactionForm">
+                                <div class="form-group">
+                                    <label>Tipo de transacción</label>
+                                    <select name="type" required>
+                                        <option value="buy">Compra</option>
+                                        <option value="sell">Venta</option>
+                                        <option value="dividend">Dividendo</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Activo (ticker)</label>
+                                    <input type="text" name="ticker" placeholder="AAPL, BTC, VWCE.DE..." required>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Cantidad</label>
+                                        <input type="number" name="quantity" step="any" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Precio unitario</label>
+                                        <input type="number" name="price" step="any" required>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Fecha</label>
+                                        <input type="date" name="date" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Broker</label>
+                                        <select name="broker">
+                                            <option value="TradeRepublic">Trade Republic</option>
+                                            <option value="MyInvestor">MyInvestor</option>
+                                            <option value="Kraken">Kraken</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Notas (opcional)</label>
+                                    <textarea name="notes" rows="2"></textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn-secondary" id="cancelTransaction">Cancelar</button>
+                                    <button type="submit" class="btn-primary">Guardar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Goals Page -->
+                <div class="page page-goals" id="page-goals">
+                    <section class="goals-header">
+                        <h2>Objetivos Financieros</h2>
+                        <button class="btn-primary" id="btnAddGoal">+ Nuevo Objetivo</button>
+                    </section>
+
+                    <div class="goals-grid" id="goalsContainer">
+                        <!-- Example goals -->
+                        <div class="goal-card">
+                            <div class="goal-icon">🏠</div>
+                            <h4>Entrada casa</h4>
+                            <div class="goal-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 35%"></div>
+                                </div>
+                                <div class="progress-info">
+                                    <span>17.500 € / 50.000 €</span>
+                                    <span>35%</span>
+                                </div>
+                            </div>
+                            <div class="goal-details">
+                                <span>📅 Meta: Dic 2027</span>
+                                <span>💰 400 €/mes necesarios</span>
+                            </div>
+                        </div>
+
+                        <div class="goal-card">
+                            <div class="goal-icon">🚗</div>
+                            <h4>Coche nuevo</h4>
+                            <div class="goal-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 60%"></div>
+                                </div>
+                                <div class="progress-info">
+                                    <span>12.000 € / 20.000 €</span>
+                                    <span>60%</span>
+                                </div>
+                            </div>
+                            <div class="goal-details">
+                                <span>📅 Meta: Jun 2026</span>
+                                <span>💰 500 €/mes necesarios</span>
+                            </div>
+                        </div>
+
+                        <div class="goal-card goal-add">
+                            <span class="add-icon">+</span>
+                            <span>Añadir objetivo</span>
+                        </div>
+                    </div>
+
+                    <section class="goals-projection">
+                        <div class="card">
+                            <h4>Proyección de Patrimonio</h4>
+                            <div class="chart-container">
+                                <canvas id="projectionChart"></canvas>
+                            </div>
+                            <div class="projection-controls">
+                                <div class="form-group inline">
+                                    <label>Aportación mensual:</label>
+                                    <input type="number" id="monthlyContribution" value="500" step="50">
+                                    <span>€</span>
+                                </div>
+                                <div class="form-group inline">
+                                    <label>Rentabilidad esperada:</label>
+                                    <input type="number" id="expectedReturn" value="7" step="0.5">
+                                    <span>%</span>
+                                </div>
+                                <button class="btn-secondary" id="updateProjection">Actualizar</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Portfolio Manager Page -->
+                <div class="page page-portfolio-manager" id="page-portfolio-manager">
+                    <section class="manager-header">
+                        <div>
+                            <h2>💼 Gestionar Mi Cartera</h2>
+                            <p>Añade, edita o importa tus posiciones de inversión</p>
+                        </div>
+                    </section>
+
+                    <!-- Action Cards -->
+                    <div class="manager-actions">
+                        <button type="button" class="action-card" onclick="showAddPositionModal()">
+                            <span class="action-icon">➕</span>
+                            <h4>Añadir Posición</h4>
+                            <p>Añade una nueva posición manualmente</p>
+                        </button>
+                        <button type="button" class="action-card" onclick="showImportModal()">
+                            <span class="action-icon">📤</span>
+                            <h4>Importar CSV</h4>
+                            <p>Importa desde Trade Republic, MyInvestor, Kraken...</p>
+                        </button>
+                        <button type="button" class="action-card" onclick="showQuickAddModal()">
+                            <span class="action-icon">⚡</span>
+                            <h4>Añadir Rápido</h4>
+                            <p>Añade múltiples posiciones a la vez</p>
+                        </button>
+                    </div>
+
+                    <!-- Current Positions -->
+                    <div class="card manager-positions">
+                        <div class="card-header">
+                            <h3>📊 Mis Posiciones Actuales</h3>
+                            <div class="positions-actions">
+                                <button class="btn-secondary" onclick="exportPositions()">📥 Exportar CSV</button>
+                                <button class="btn-secondary btn-danger" onclick="confirmClearAll()">🗑️ Limpiar Todo</button>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="manager-table">
+                                <thead>
+                                    <tr>
+                                        <th>Ticker</th>
+                                        <th>Tipo</th>
+                                        <th>Broker</th>
+                                        <th class="text-right">Cantidad</th>
+                                        <th class="text-right">Coste/Unidad</th>
+                                        <th class="text-right">Divisa</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="managerPositionsBody">
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted">Cargando posiciones...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Import History -->
+                    <div class="card">
+                        <h3>📜 Historial de Importaciones</h3>
+                        <div id="importHistory" class="import-history">
+                            <p class="text-muted">No hay importaciones recientes</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Position Modal -->
+                <div class="modal" id="addPositionModal">
+                    <div class="modal-content modal-lg">
+                        <div class="modal-header">
+                            <h3>➕ Añadir Nueva Posición</h3>
+                            <button class="modal-close" onclick="closeModal('addPositionModal')">×</button>
+                        </div>
+                        <form id="addPositionForm" onsubmit="handleAddPosition(event)">
+                            <!-- Tipo de activo primero -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Tipo de Activo *</label>
+                                    <select name="type" id="addType" required onchange="toggleISINField()">
+                                        <option value="crypto">🪙 Criptomoneda</option>
+                                        <option value="etf">📊 ETF / Fondo</option>
+                                        <option value="stock">📈 Acción</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Broker *</label>
+                                    <select name="broker" required>
+                                        <option value="Kraken">Kraken</option>
+                                        <option value="TradeRepublic">Trade Republic</option>
+                                        <option value="MyInvestor">MyInvestor</option>
+                                        <option value="DEGIRO">DEGIRO</option>
+                                        <option value="Interactive Brokers">Interactive Brokers</option>
+                                        <option value="Otro">Otro</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Ticker o ISIN -->
+                            <div class="form-row">
+                                <div class="form-group" id="tickerGroup">
+                                    <label>Ticker / Símbolo *</label>
+                                    <input type="text" name="ticker" id="addTicker" placeholder="BTC, ETH, AAPL..." required>
+                                    <small class="form-help">El símbolo que ves en la plataforma (BTC, ETH, SOL...)</small>
+                                </div>
+                                <div class="form-group" id="isinGroup" style="display:none;">
+                                    <label>ISIN (opcional)</label>
+                                    <input type="text" name="isin" id="addISIN" placeholder="IE00B4ND3602">
+                                    <small class="form-help">Lo encuentras en los detalles del ETF/fondo</small>
+                                </div>
+                            </div>
+
+                            <!-- NUEVA FORMA: Importe invertido -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>💰 Importe Invertido (€) *</label>
+                                    <input type="number" name="amount_invested" id="addAmount" step="any" min="0" placeholder="50" required oninput="calculateQuantity()">
+                                    <small class="form-help">¿Cuántos euros metiste?</small>
+                                </div>
+                                <div class="form-group">
+                                    <label>📉 Precio por Unidad (€) *</label>
+                                    <input type="number" name="unit_price" id="addUnitPrice" step="any" min="0" placeholder="74.68" required oninput="calculateQuantity()">
+                                    <small class="form-help">¿A cuánto estaba cuando compraste?</small>
+                                </div>
+                            </div>
+
+                            <!-- Cantidad calculada automáticamente -->
+                            <div class="calculated-result" id="calculatedResult" style="display:none;">
+                                <div class="result-box">
+                                    <span class="result-label">📊 Cantidad calculada:</span>
+                                    <span class="result-value" id="calculatedQuantity">0</span>
+                                    <span class="result-unit" id="calculatedUnit">unidades</span>
+                                </div>
+                            </div>
+
+                            <!-- Campo oculto para la cantidad real -->
+                            <input type="hidden" name="quantity" id="addQuantity">
+                            <input type="hidden" name="avg_price" id="addAvgPrice">
+                            <input type="hidden" name="currency" value="EUR">
+
+                            <div class="form-actions">
+                                <button type="button" class="btn-secondary" onclick="closeModal('addPositionModal')">Cancelar</button>
+                                <button type="submit" class="btn-primary">Añadir Posición</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Import CSV Modal -->
+                <div class="modal" id="importModal">
+                    <div class="modal-content modal-lg">
+                        <div class="modal-header">
+                            <h3>📤 Importar desde CSV</h3>
+                            <button class="modal-close" onclick="closeModal('importModal')">×</button>
+                        </div>
+                        <div class="import-steps">
+                            <!-- Step 1: Upload -->
+                            <div class="import-step active" id="importStep1">
+                                <h4>Paso 1: Selecciona el archivo</h4>
+                                <div class="upload-zone" id="uploadZone">
+                                    <span class="upload-icon">📁</span>
+                                    <p>Arrastra un archivo CSV aquí o haz clic para seleccionar</p>
+                                    <input type="file" id="csvFileInput" accept=".csv,.txt" hidden>
+                                    <small>Formatos soportados: Trade Republic, MyInvestor, Kraken, CSV genérico</small>
+                                </div>
+                                <div class="form-group" style="margin-top: 1rem;">
+                                    <label>Broker de origen</label>
+                                    <select id="importBroker">
+                                        <option value="TradeRepublic">Trade Republic</option>
+                                        <option value="MyInvestor">MyInvestor</option>
+                                        <option value="Kraken">Kraken</option>
+                                        <option value="DEGIRO">DEGIRO</option>
+                                        <option value="Manual">Otro / Manual</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Step 2: Preview -->
+                            <div class="import-step" id="importStep2">
+                                <h4>Paso 2: Revisa los datos</h4>
+                                <div class="preview-info">
+                                    <span id="previewFormat">Formato detectado: --</span>
+                                    <span id="previewRows">Filas: --</span>
+                                </div>
+                                <div class="preview-table-container">
+                                    <table class="preview-table" id="previewTable">
+                                        <thead id="previewHead"></thead>
+                                        <tbody id="previewBody"></tbody>
+                                    </table>
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="mergeExisting" checked>
+                                        Combinar con posiciones existentes (recomendado)
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- Step 3: Confirm -->
+                            <div class="import-step" id="importStep3">
+                                <h4>Paso 3: Importación completada</h4>
+                                <div class="import-result" id="importResult">
+                                    <!-- Filled by JS -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeModal('importModal')">Cancelar</button>
+                            <button type="button" class="btn-secondary" id="importBackBtn" onclick="importBack()" style="display:none;">← Atrás</button>
+                            <button type="button" class="btn-primary" id="importNextBtn" onclick="importNext()">Siguiente →</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Add Modal -->
+                <div class="modal" id="quickAddModal">
+                    <div class="modal-content modal-lg">
+                        <div class="modal-header">
+                            <h3>⚡ Añadir Múltiples Posiciones</h3>
+                            <button class="modal-close" onclick="closeModal('quickAddModal')">×</button>
+                        </div>
+                        <div class="quick-add-instructions">
+                            <p>Pega tus posiciones en formato: <code>TICKER, CANTIDAD, PRECIO, TIPO, BROKER</code></p>
+                            <small>Ejemplo: AAPL, 10, 150, stock, TradeRepublic</small>
+                        </div>
+                        <div class="form-group">
+                            <textarea id="quickAddText" rows="10" placeholder="AAPL, 10, 150, stock, TradeRepublic
+MSFT, 5, 280, stock, MyInvestor
+BTC, 0.5, 40000, crypto, Kraken
+VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeModal('quickAddModal')">Cancelar</button>
+                            <button type="button" class="btn-primary" onclick="handleQuickAdd()">Importar Todo</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Position Modal -->
+                <div class="modal" id="editPositionModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>✏️ Editar Posición</h3>
+                            <button class="modal-close" onclick="closeModal('editPositionModal')">×</button>
+                        </div>
+                        <form id="editPositionForm" onsubmit="handleEditPosition(event)">
+                            <input type="hidden" name="original_ticker" id="editOriginalTicker">
+                            <div class="form-group">
+                                <label>Ticker</label>
+                                <input type="text" name="ticker" id="editTicker" readonly class="readonly">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Cantidad</label>
+                                    <input type="number" name="quantity" id="editQuantity" step="any" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Coste/Unidad</label>
+                                    <input type="number" name="avg_price" id="editAvgPrice" step="any" required>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="btn-secondary" onclick="closeModal('editPositionModal')">Cancelar</button>
+                                <button type="submit" class="btn-primary">Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Alerts Page -->
+                <div class="page page-alerts" id="page-alerts">
+                    <section class="alerts-header">
+                        <h2>Alertas de Precio</h2>
+                        <button class="btn-primary" id="btnAddAlert">+ Nueva Alerta</button>
+                    </section>
+
+                    <div class="alerts-list" id="alertsList">
+                        <div class="alert-item">
+                            <div class="alert-info">
+                                <span class="alert-ticker">AAPL</span>
+                                <span class="alert-condition">Precio &gt; $200</span>
+                            </div>
+                            <div class="alert-status active">Activa</div>
+                            <button class="btn-icon btn-delete">🗑️</button>
+                        </div>
+                        <div class="alert-item">
+                            <div class="alert-info">
+                                <span class="alert-ticker">BTC</span>
+                                <span class="alert-condition">Precio &lt; $40,000</span>
+                            </div>
+                            <div class="alert-status active">Activa</div>
+                            <button class="btn-icon btn-delete">🗑️</button>
+                        </div>
+                        <div class="alert-item triggered">
+                            <div class="alert-info">
+                                <span class="alert-ticker">NVDA</span>
+                                <span class="alert-condition">Cambio diario &gt; 5%</span>
+                            </div>
+                            <div class="alert-status triggered">¡Disparada!</div>
+                            <button class="btn-icon btn-delete">🗑️</button>
+                        </div>
+                    </div>
+
+                    <!-- Alert Modal -->
+                    <div class="modal" id="alertModal">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3>Nueva Alerta</h3>
+                                <button class="modal-close" id="closeAlertModal">×</button>
+                            </div>
+                            <form id="alertForm">
+                                <div class="form-group">
+                                    <label>Activo</label>
+                                    <input type="text" name="ticker" placeholder="AAPL, BTC, etc." required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Condición</label>
+                                    <select name="condition">
+                                        <option value="price_above">Precio mayor que</option>
+                                        <option value="price_below">Precio menor que</option>
+                                        <option value="change_above">Cambio diario mayor que %</option>
+                                        <option value="change_below">Cambio diario menor que %</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Valor</label>
+                                    <input type="number" name="value" step="any" required>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn-secondary" id="cancelAlert">Cancelar</button>
+                                    <button type="submit" class="btn-primary">Crear Alerta</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calculators Page -->
+                <div class="page page-calculators" id="page-calculators">
+                    <section class="calculators-header">
+                        <h2>Calculadoras Financieras</h2>
+                        <p>Herramientas para planificar tu futuro financiero</p>
+                    </section>
+
+                    <div class="calculators-grid">
+                        <!-- Compound Interest Calculator -->
+                        <div class="card calculator-card">
+                            <h4>🔄 Interés Compuesto</h4>
+                            <p class="calc-description">Calcula el crecimiento de tu inversión con el poder del interés compuesto</p>
+                            <form id="compoundForm" class="calc-form">
+                                <div class="form-group">
+                                    <label>Capital inicial (€)</label>
+                                    <input type="number" id="ci_initial" value="10000" step="100">
+                                </div>
+                                <div class="form-group">
+                                    <label>Aportación mensual (€)</label>
+                                    <input type="number" id="ci_monthly" value="500" step="50">
+                                </div>
+                                <div class="form-group">
+                                    <label>Tasa anual (%)</label>
+                                    <input type="number" id="ci_rate" value="7" step="0.1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Años</label>
+                                    <input type="number" id="ci_years" value="20" step="1">
+                                </div>
+                                <button type="button" class="btn-primary" onclick="calculateCompound()">Calcular</button>
+                            </form>
+                            <div class="calc-result" id="compoundResult">
+                                <div class="result-main">
+                                    <span class="result-label">Valor final</span>
+                                    <span class="result-value">--</span>
+                                </div>
+                                <div class="result-details">
+                                    <div><span>Aportado:</span><span id="ci_contributed">--</span></div>
+                                    <div><span>Intereses:</span><span id="ci_interest">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- FIRE Calculator -->
+                        <div class="card calculator-card">
+                            <h4>🔥 Calculadora FIRE</h4>
+                            <p class="calc-description">¿Cuánto necesitas para alcanzar la independencia financiera?</p>
+                            <form id="fireForm" class="calc-form">
+                                <div class="form-group">
+                                    <label>Gastos anuales (€)</label>
+                                    <input type="number" id="fire_expenses" value="24000" step="1000">
+                                </div>
+                                <div class="form-group">
+                                    <label>Tasa de retiro segura (%)</label>
+                                    <input type="number" id="fire_swr" value="4" step="0.1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Tu patrimonio actual (€)</label>
+                                    <input type="number" id="fire_current" value="50000" step="1000">
+                                </div>
+                                <div class="form-group">
+                                    <label>Ahorro mensual (€)</label>
+                                    <input type="number" id="fire_savings" value="1000" step="100">
+                                </div>
+                                <button type="button" class="btn-primary" onclick="calculateFIRE()">Calcular</button>
+                            </form>
+                            <div class="calc-result" id="fireResult">
+                                <div class="result-main">
+                                    <span class="result-label">Número FIRE necesario</span>
+                                    <span class="result-value">--</span>
+                                </div>
+                                <div class="result-details">
+                                    <div><span>Años hasta FIRE:</span><span id="fire_years">--</span></div>
+                                    <div><span>Progreso actual:</span><span id="fire_progress">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DCA Calculator -->
+                        <div class="card calculator-card">
+                            <h4>📊 Simulador DCA</h4>
+                            <p class="calc-description">Dollar Cost Averaging: inversión periódica automática</p>
+                            <form id="dcaForm" class="calc-form">
+                                <div class="form-group">
+                                    <label>Inversión mensual (€)</label>
+                                    <input type="number" id="dca_amount" value="200" step="50">
+                                </div>
+                                <div class="form-group">
+                                    <label>Periodo (meses)</label>
+                                    <input type="number" id="dca_months" value="24" step="1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Rentabilidad anual esperada (%)</label>
+                                    <input type="number" id="dca_return" value="8" step="0.5">
+                                </div>
+                                <button type="button" class="btn-primary" onclick="calculateDCA()">Calcular</button>
+                            </form>
+                            <div class="calc-result" id="dcaResult">
+                                <div class="result-main">
+                                    <span class="result-label">Valor estimado</span>
+                                    <span class="result-value">--</span>
+                                </div>
+                                <div class="result-details">
+                                    <div><span>Total invertido:</span><span id="dca_invested">--</span></div>
+                                    <div><span>Ganancia estimada:</span><span id="dca_gain">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dividend Calculator -->
+                        <div class="card calculator-card">
+                            <h4>💵 Calculadora de Dividendos</h4>
+                            <p class="calc-description">Estima tus ingresos pasivos por dividendos</p>
+                            <form id="divForm" class="calc-form">
+                                <div class="form-group">
+                                    <label>Capital invertido (€)</label>
+                                    <input type="number" id="div_capital" value="100000" step="1000">
+                                </div>
+                                <div class="form-group">
+                                    <label>Yield promedio (%)</label>
+                                    <input type="number" id="div_yield" value="4" step="0.1">
+                                </div>
+                                <div class="form-group">
+                                    <label>Crecimiento anual dividendo (%)</label>
+                                    <input type="number" id="div_growth" value="5" step="0.5">
+                                </div>
+                                <div class="form-group">
+                                    <label>Años</label>
+                                    <input type="number" id="div_years" value="10" step="1">
+                                </div>
+                                <button type="button" class="btn-primary" onclick="calculateDividends()">Calcular</button>
+                            </form>
+                            <div class="calc-result" id="divResult">
+                                <div class="result-main">
+                                    <span class="result-label">Dividendos anuales (año final)</span>
+                                    <span class="result-value">--</span>
+                                </div>
+                                <div class="result-details">
+                                    <div><span>Mensual:</span><span id="div_monthly">--</span></div>
+                                    <div><span>Total acumulado:</span><span id="div_total">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Advisor Page -->
+                <div class="page page-ai-advisor" id="page-ai-advisor">
+                    <section class="ai-header">
+                        <div class="ai-intro">
+                            <span class="ai-avatar">🤖</span>
+                            <div>
+                                <h2>FinBot - Tu Asesor Financiero IA</h2>
+                                <p>Pregúntame sobre inversiones, tu cartera, estrategias, o cualquier duda financiera</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="chat-message bot">
+                                <div class="message-avatar">🤖</div>
+                                <div class="message-content">
+                                    <p>¡Hola! Soy <strong>FinBot</strong>, tu asesor financiero virtual. 👋</p>
+                                    <p>Puedo ayudarte con:</p>
+                                    <ul>
+                                        <li>📊 Analizar tu cartera actual</li>
+                                        <li>📚 Explicar conceptos de inversión</li>
+                                        <li>💡 Sugerir estrategias generales</li>
+                                        <li>⚠️ Identificar riesgos en tu portafolio</li>
+                                    </ul>
+                                    <p><em>Recuerda: Soy una herramienta educativa, no un asesor financiero regulado.</em></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="chat-suggestions">
+                            <button class="suggestion-btn" onclick="askSuggestion('¿Cómo está diversificada mi cartera?')">📊 Analizar mi cartera</button>
+                            <button class="suggestion-btn" onclick="askSuggestion('¿Qué es el interés compuesto y cómo me beneficia?')">💰 Interés compuesto</button>
+                            <button class="suggestion-btn" onclick="askSuggestion('¿Qué estrategia de inversión me recomiendas para empezar?')">🎯 Estrategias para empezar</button>
+                            <button class="suggestion-btn" onclick="askSuggestion('¿Cuáles son los principales riesgos de mi cartera actual?')">⚠️ Riesgos de mi cartera</button>
+                        </div>
+
+                        <form class="chat-input-form" id="chatForm" onsubmit="sendMessage(event)">
+                            <div class="chat-input-wrapper">
+                                <input type="text" id="chatInput" placeholder="Escribe tu pregunta..." autocomplete="off">
+                                <label class="include-portfolio-toggle">
+                                    <input type="checkbox" id="includePortfolio" checked>
+                                    <span>Incluir datos de mi cartera</span>
+                                </label>
+                            </div>
+                            <button type="submit" class="btn-send" id="btnSend">
+                                <span>Enviar</span>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                                </svg>
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="ai-disclaimer">
+                        <p>⚠️ <strong>Disclaimer:</strong> FinBot proporciona información educativa general. No constituye asesoramiento financiero personalizado. Consulta siempre con un profesional antes de tomar decisiones de inversión.</p>
+                    </div>
+                </div>
+
+                <!-- News Page -->
+                <div class="page page-news" id="page-news">
+                    <section class="news-header">
+                        <h2>📰 Noticias Financieras</h2>
+                        <p>Últimas noticias que pueden afectar a tus inversiones</p>
+                        <div class="news-filters">
+                            <button class="chart-btn active" data-filter="all">Todas</button>
+                            <button class="chart-btn" data-filter="stocks">Acciones</button>
+                            <button class="chart-btn" data-filter="crypto">Crypto</button>
+                            <button class="chart-btn" data-filter="economy">Economía</button>
+                            <button class="chart-btn" data-filter="politics">Política</button>
+                        </div>
+                    </section>
+                    
+                    <div class="news-grid" id="newsGrid">
+                        <!-- News loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Learn Page -->
+                <div class="page page-learn" id="page-learn">
+                    <!-- Content loaded from learn.html -->
+                </div>
+
+                <!-- Documentation Page -->
+                <div class="page page-docs" id="page-docs">
+                    <!-- Content loaded from docs.html -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <span>Actualizando datos...</span>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="js/app.js"></script>
+    <script src="js/calculators.js"></script>
+    <script src="js/news.js"></script>
+    <script src="js/portfolio-manager.js"></script>
+    <script src="js/ai-advisor.js"></script>
+    <script src="js/asset-analysis.js"></script>
+    <script src="js/pages.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+# Render Blueprint for FinTrack
+# https://render.com/docs/blueprint-spec
+
+services:
+  # Backend API
+  - type: web
+    name: fintrack-api
+    env: python
+    buildCommand: cd backend && pip install -r requirements.txt && pip install httpx
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.11.0
+
+  # Frontend Static Site
+  - type: web
+    name: fintrack-frontend
+    env: static
+    staticPublishPath: ./frontend
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    envVars:
+      - key: API_URL
+        fromService:
+          type: web
+          name: fintrack-api
+          property: url
+

@@ -1,0 +1,9 @@
+ticker,quantity,avg_price,type,currency,broker
+BTC,0.00155,90738.77,crypto,EUR,Kraken
+PEPE,1355888,0.000004415,crypto,EUR,Kraken
+ETH,0.0005629,3043.33,crypto,EUR,Kraken
+SOL,0.006467,132.70,crypto,EUR,Kraken
+DOGE,1.25,0.1709,crypto,EUR,Kraken
+SGLD.L,0.667903,69.55,etf,EUR,TradeRepublic
+LYX0F.DE,0.512411,89.77,etf,EUR,TradeRepublic
+IE00BYX5NX33,1.02,98.03,fund,EUR,MyInvestor
