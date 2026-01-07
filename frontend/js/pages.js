@@ -328,6 +328,7 @@ const pageContent = {
     <div class="table-of-contents">
         <h4>Índice</h4>
         <ul>
+            <li><a href="#arquitectura">🏗️ Arquitectura del Sistema</a></li>
             <li><a href="#inicio-rapido">1. Inicio Rápido</a></li>
             <li><a href="#configuracion">2. Configuración</a></li>
             <li><a href="#añadir-posiciones">3. Añadir Posiciones</a></li>
@@ -336,6 +337,302 @@ const pageContent = {
             <li><a href="#faq">6. Preguntas Frecuentes</a></li>
         </ul>
     </div>
+
+    <!-- ==================== ARQUITECTURA DEL SISTEMA ==================== -->
+    <section id="arquitectura" class="architecture-section">
+        <h2>🏗️ Arquitectura del Sistema</h2>
+        
+        <p>FinTrack es una aplicación de <strong>arquitectura cliente-servidor</strong> que consta de un frontend web estático y un backend API en Python.</p>
+        
+        <!-- Diagrama Visual de Arquitectura -->
+        <div class="architecture-diagram">
+            <h3>📊 Diagrama General</h3>
+            <pre class="diagram-box">
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              🌐 INTERNET                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  CoinGecko  │  │Yahoo Finance│  │    Groq     │  │  RSS Feeds  │        │
+│  │  (Crypto)   │  │(Stocks/ETFs)│  │    (IA)     │  │  (Noticias) │        │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘        │
+│         │                │                │                │               │
+└─────────┼────────────────┼────────────────┼────────────────┼───────────────┘
+          │                │                │                │
+          ▼                ▼                ▼                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        🔧 BACKEND (FastAPI + Python)                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                         main.py (API REST)                          │   │
+│  │   /api/portfolio  /api/positions  /api/news  /api/ai/chat          │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐       │
+│  │ portfolio.py │ │coingecko.py  │ │yahoo_finance │ │   news.py    │       │
+│  │  (Cálculos)  │ │  (Precios)   │ │   (Precios)  │ │  (Noticias)  │       │
+│  └──────┬───────┘ └──────────────┘ └──────────────┘ └──────────────┘       │
+│         │                                                                   │
+│  ┌──────▼───────────────────────────────────────────────────────────────┐  │
+│  │                    📁 DATA (Almacenamiento Local)                    │  │
+│  │  positions.csv (Cartera)  │  historical_values.json (Histórico)     │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                               Puerto: 8000                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ HTTP/JSON
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      🎨 FRONTEND (HTML + CSS + JS)                         │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐       │
+│  │  index.html  │ │  styles.css  │ │    app.js    │ │   pages.js   │       │
+│  │  (Estructura)│ │   (Estilos)  │ │   (Lógica)   │ │ (Contenido)  │       │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘       │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                        │
+│  │  Chart.js    │ │portfolio-mgr │ │ ai-advisor   │                        │
+│  │  (Gráficos)  │ │  (Cartera)   │ │   (Chat IA)  │                        │
+│  └──────────────┘ └──────────────┘ └──────────────┘                        │
+│                            Puerto: 3000 (local) / Render (prod)            │
+└─────────────────────────────────────────────────────────────────────────────┘
+            </pre>
+        </div>
+        
+        <!-- Servicios y APIs Externos -->
+        <div class="services-section">
+            <h3>🔌 APIs y Servicios Externos</h3>
+            
+            <table class="services-table" style="width: 100%; margin: 20px 0; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--accent-primary);">
+                        <th style="padding: 12px; text-align: left;">Servicio</th>
+                        <th style="padding: 12px; text-align: left;">Uso</th>
+                        <th style="padding: 12px; text-align: left;">Límites Gratis</th>
+                        <th style="padding: 12px; text-align: left;">Coste</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom: 1px solid var(--border-primary);">
+                        <td style="padding: 12px;">🪙 <strong>CoinGecko</strong></td>
+                        <td style="padding: 12px;">Precios de criptomonedas (BTC, ETH, SOL...)</td>
+                        <td style="padding: 12px;">10-50 peticiones/min</td>
+                        <td style="padding: 12px; color: var(--success-color);">✅ Gratis</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-primary);">
+                        <td style="padding: 12px;">📈 <strong>Yahoo Finance</strong></td>
+                        <td style="padding: 12px;">Precios de acciones y ETFs</td>
+                        <td style="padding: 12px;">~2000 peticiones/hora</td>
+                        <td style="padding: 12px; color: var(--success-color);">✅ Gratis</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-primary);">
+                        <td style="padding: 12px;">🤖 <strong>Groq API</strong></td>
+                        <td style="padding: 12px;">Asesor IA (LLaMA 3.3 70B)</td>
+                        <td style="padding: 12px;">14,400 peticiones/día</td>
+                        <td style="padding: 12px; color: var(--success-color);">✅ Gratis</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-primary);">
+                        <td style="padding: 12px;">📰 <strong>RSS Feeds</strong></td>
+                        <td style="padding: 12px;">Noticias financieras</td>
+                        <td style="padding: 12px;">Sin límite</td>
+                        <td style="padding: 12px; color: var(--success-color);">✅ Gratis</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px;">☁️ <strong>Render.com</strong></td>
+                        <td style="padding: 12px;">Hosting del backend y frontend</td>
+                        <td style="padding: 12px;">750 horas/mes, spin-down tras 15min</td>
+                        <td style="padding: 12px; color: var(--success-color);">✅ Gratis</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Stack Tecnológico -->
+        <div class="tech-stack">
+            <h3>🛠️ Stack Tecnológico</h3>
+            
+            <div class="tech-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin: 20px 0;">
+                <div class="tech-card" style="background: var(--bg-secondary); padding: 20px; border-radius: 12px; border-left: 4px solid #3776ab;">
+                    <h4>🐍 Backend</h4>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li><strong>Python 3.11</strong> - Lenguaje principal</li>
+                        <li><strong>FastAPI</strong> - Framework web async</li>
+                        <li><strong>Uvicorn</strong> - Servidor ASGI</li>
+                        <li><strong>Pandas</strong> - Procesamiento de datos</li>
+                        <li><strong>yfinance</strong> - API Yahoo Finance</li>
+                        <li><strong>httpx</strong> - Cliente HTTP async</li>
+                        <li><strong>feedparser</strong> - Parsing RSS</li>
+                    </ul>
+                </div>
+                
+                <div class="tech-card" style="background: var(--bg-secondary); padding: 20px; border-radius: 12px; border-left: 4px solid #f0db4f;">
+                    <h4>🎨 Frontend</h4>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li><strong>HTML5</strong> - Estructura</li>
+                        <li><strong>CSS3</strong> - Estilos (variables CSS)</li>
+                        <li><strong>JavaScript ES6+</strong> - Lógica</li>
+                        <li><strong>Chart.js</strong> - Gráficos interactivos</li>
+                        <li><strong>Fetch API</strong> - Peticiones HTTP</li>
+                    </ul>
+                </div>
+                
+                <div class="tech-card" style="background: var(--bg-secondary); padding: 20px; border-radius: 12px; border-left: 4px solid #06b6d4;">
+                    <h4>💾 Almacenamiento</h4>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li><strong>CSV</strong> - Posiciones de cartera</li>
+                        <li><strong>JSON</strong> - Histórico y caché</li>
+                        <li><strong>LocalStorage</strong> - Preferencias (futuro)</li>
+                    </ul>
+                </div>
+                
+                <div class="tech-card" style="background: var(--bg-secondary); padding: 20px; border-radius: 12px; border-left: 4px solid #46e3b7;">
+                    <h4>☁️ Despliegue</h4>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li><strong>Render.com</strong> - Hosting gratuito</li>
+                        <li><strong>GitHub</strong> - Control de versiones</li>
+                        <li><strong>CI/CD</strong> - Deploy automático</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Flujo de Datos -->
+        <div class="data-flow">
+            <h3>🔄 Flujo de Datos</h3>
+            
+            <h4>1. Carga del Dashboard</h4>
+            <pre class="flow-diagram" style="background: var(--bg-tertiary); padding: 15px; border-radius: 8px; overflow-x: auto;">
+Usuario abre web → Frontend carga → Llama GET /api/portfolio
+                                              ↓
+                        Backend lee positions.csv
+                                              ↓
+                        Obtiene precios de CoinGecko (crypto) + Yahoo Finance (stocks)
+                                              ↓
+                        Calcula: valor actual, P/L, métricas
+                                              ↓
+                        Responde JSON → Frontend renderiza gráficos y tablas
+            </pre>
+            
+            <h4>2. Añadir Nueva Posición</h4>
+            <pre class="flow-diagram" style="background: var(--bg-tertiary); padding: 15px; border-radius: 8px; overflow-x: auto;">
+Usuario completa formulario → POST /api/positions {ticker, cantidad, precio}
+                                              ↓
+                        Backend valida datos
+                                              ↓
+                        Añade línea a positions.csv
+                                              ↓
+                        Responde éxito → Frontend actualiza vista
+            </pre>
+            
+            <h4>3. Consulta al Asesor IA</h4>
+            <pre class="flow-diagram" style="background: var(--bg-tertiary); padding: 15px; border-radius: 8px; overflow-x: auto;">
+Usuario escribe pregunta → POST /api/ai/chat {pregunta, incluir_cartera}
+                                              ↓
+                        Backend obtiene datos de cartera (opcional)
+                                              ↓
+                        Llama a Groq API con contexto + pregunta
+                                              ↓
+                        Groq responde → Backend formatea → Frontend muestra respuesta
+            </pre>
+        </div>
+        
+        <!-- Estructura de Archivos -->
+        <div class="file-structure">
+            <h3>📁 Estructura de Archivos</h3>
+            <pre style="background: var(--bg-tertiary); padding: 20px; border-radius: 8px; overflow-x: auto; font-size: 13px;">
+personal-finance-dashboard/
+├── 📁 backend/
+│   ├── main.py                 # 🚀 API principal (FastAPI)
+│   ├── requirements.txt        # 📦 Dependencias Python
+│   ├── .env                    # 🔐 Variables de entorno (API keys)
+│   ├── .python-version         # 🐍 Versión de Python
+│   │
+│   ├── 📁 services/            # Lógica de negocio
+│   │   ├── portfolio.py        # 💼 Cálculos de cartera
+│   │   ├── coingecko.py        # 🪙 Precios crypto
+│   │   ├── yahoo_finance.py    # 📈 Precios stocks/ETFs
+│   │   ├── exchange_rate.py    # 💱 Conversión de divisas
+│   │   └── news.py             # 📰 Noticias RSS
+│   │
+│   └── 📁 data/                # Almacenamiento
+│       ├── positions.csv       # 📊 Tu cartera
+│       └── historical_values.json  # 📈 Histórico
+│
+├── 📁 frontend/
+│   ├── index.html              # 🏠 Página principal
+│   │
+│   ├── 📁 css/
+│   │   └── styles.css          # 🎨 Estilos
+│   │
+│   └── 📁 js/
+│       ├── app.js              # ⚙️ Lógica principal
+│       ├── pages.js            # 📄 Contenido de páginas
+│       ├── portfolio-manager.js # 💼 Gestión cartera
+│       ├── ai-advisor.js       # 🤖 Chat IA
+│       ├── news.js             # 📰 Noticias
+│       └── asset-analysis.js   # 📊 Análisis activos
+│
+├── render.yaml                 # ☁️ Configuración Render
+├── .gitignore                  # 🚫 Archivos ignorados
+└── README.md                   # 📖 Documentación
+            </pre>
+        </div>
+        
+        <!-- Caché y Rendimiento -->
+        <div class="cache-section">
+            <h3>⚡ Caché y Rendimiento</h3>
+            
+            <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--accent-primary);">
+                        <th style="padding: 12px; text-align: left;">Dato</th>
+                        <th style="padding: 12px; text-align: left;">Tiempo de Caché</th>
+                        <th style="padding: 12px; text-align: left;">Razón</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom: 1px solid var(--border-primary);">
+                        <td style="padding: 12px;">Precios Crypto (CoinGecko)</td>
+                        <td style="padding: 12px;">10 minutos</td>
+                        <td style="padding: 12px;">Evitar rate limiting (50 req/min)</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-primary);">
+                        <td style="padding: 12px;">Precios Stocks (Yahoo)</td>
+                        <td style="padding: 12px;">15 minutos</td>
+                        <td style="padding: 12px;">Mercados se actualizan cada 15min</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border-primary);">
+                        <td style="padding: 12px;">Histórico de activos</td>
+                        <td style="padding: 12px;">30 minutos</td>
+                        <td style="padding: 12px;">Datos diarios, no cambian frecuentemente</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px;">Noticias RSS</td>
+                        <td style="padding: 12px;">30 minutos</td>
+                        <td style="padding: 12px;">Las noticias no cambian cada segundo</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Seguridad -->
+        <div class="security-section">
+            <h3>🔒 Seguridad</h3>
+            
+            <div class="security-info" style="background: var(--bg-secondary); padding: 20px; border-radius: 12px; margin: 20px 0;">
+                <h4>Estado Actual</h4>
+                <ul style="padding-left: 20px;">
+                    <li>✅ Datos almacenados localmente (no en la nube)</li>
+                    <li>✅ API keys en variables de entorno (.env)</li>
+                    <li>✅ No se almacenan contraseñas de brokers</li>
+                    <li>✅ Conexiones HTTPS en producción</li>
+                    <li>⚠️ Sin autenticación (cualquiera con la URL puede ver/editar)</li>
+                </ul>
+                
+                <h4 style="margin-top: 15px;">Recomendaciones Futuras</h4>
+                <ul style="padding-left: 20px;">
+                    <li>🔜 Añadir autenticación OAuth (Google/GitHub)</li>
+                    <li>🔜 Encriptar datos sensibles</li>
+                    <li>🔜 Añadir rate limiting propio</li>
+                </ul>
+            </div>
+        </div>
+    </section>
 
     <section id="inicio-rapido">
         <h2>1. Inicio Rápido</h2>

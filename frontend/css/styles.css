@@ -1748,6 +1748,127 @@ body::before {
 }
 
 /* ============================================
+   Architecture Documentation Styles
+   ============================================ */
+
+.architecture-section {
+    margin-bottom: var(--spacing-xl);
+}
+
+.architecture-diagram {
+    margin: var(--spacing-xl) 0;
+}
+
+.diagram-box {
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, #0d1520 100%) !important;
+    border: 2px solid var(--border-secondary) !important;
+    border-radius: var(--radius-lg) !important;
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+    color: var(--text-secondary) !important;
+    overflow-x: auto;
+    padding: var(--spacing-xl) !important;
+}
+
+.diagram-box strong,
+.diagram-box b {
+    color: var(--accent-primary);
+}
+
+.services-table {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.services-table th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.services-table td,
+.services-table th {
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.tech-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    border-left: 4px solid var(--accent-primary);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.tech-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.tech-card h4 {
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-md);
+    font-size: 1.1rem;
+}
+
+.tech-card ul {
+    margin: 0;
+    padding-left: var(--spacing-md);
+}
+
+.tech-card li {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+    font-size: 0.9rem;
+}
+
+.flow-diagram {
+    font-size: 12px !important;
+    line-height: 1.6 !important;
+    color: var(--text-secondary) !important;
+}
+
+.file-structure pre {
+    background: linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-card) 100%) !important;
+    border: 1px solid var(--border-secondary) !important;
+}
+
+.security-info {
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+}
+
+.security-info h4 {
+    color: var(--accent-primary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.security-info ul {
+    margin-bottom: var(--spacing-md);
+}
+
+.security-info li {
+    margin-bottom: var(--spacing-xs);
+}
+
+.cache-section table {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.cache-section th {
+    background: var(--bg-tertiary);
+}
+
+/* ============================================
    Learn Page Enhanced Styles
    ============================================ */
 .intro-text {
