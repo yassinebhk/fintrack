@@ -13,8 +13,9 @@ from concurrent.futures import ThreadPoolExecutor
 # Mapping for European ETFs that don't work with standard tickers
 TICKER_MAPPING = {
     # Trade Republic / MyInvestor problematic tickers
-    'LYX0F.DE': 'UST.PA',           # Amundi Nasdaq-100 -> Paris listing
-    'IE00BYX5NX33': 'IE00BYX5NX33.SG',  # Fidelity MSCI World -> Stuttgart
+    'LYX0F.DE': 'UST.PA',           # Amundi Nasdaq-100 -> Paris listing (~89€)
+    'IE00BYX5NX33': '0P0001CLDK.F',  # Fidelity MSCI World P-ACC-EUR -> Frankfurt (~12.43€/unit)
+    'SGLD.L': 'JE00B1VS3770.SG',    # Physical Gold -> WisdomTree Stuttgart
     
     # Alternative mappings
     'SWDA.L': 'SWDA.L',             # iShares MSCI World (works)
@@ -83,13 +84,8 @@ class YahooFinanceService:
                 previous_close = meta.get('chartPreviousClose', current_price)
                 currency = meta.get('currency', 'USD')
                 
-                # Convert USD to EUR for SGLD.L (listed in USD but we want EUR)
-                if ticker == 'SGLD.L' and currency == 'USD':
-                    # Approximate EUR conversion (you could fetch live rate)
-                    usd_to_eur = 0.92
-                    current_price = current_price * usd_to_eur
-                    previous_close = previous_close * usd_to_eur
-                    currency = 'EUR'
+                # Handle currency conversion if needed
+                # (Prices should now be in EUR from the mapped tickers)
                 
                 print(f"[DEBUG] Yahoo API: {ticker} -> {mapped_ticker} = {current_price} {currency}")
                 
