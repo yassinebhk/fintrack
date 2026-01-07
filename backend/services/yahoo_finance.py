@@ -81,22 +81,66 @@ class YahooFinanceService:
         """Fetch historical data synchronously"""
         try:
             stock = yf.Ticker(ticker)
-            hist = stock.history(period=period)
             
-            if hist.empty:
+            # Try with different methods
+            hist = None
+            
+            # Method 1: Direct history call
+            try:
+                hist = stock.history(period=period, timeout=30)
+            except Exception as e1:
+                print(f"Method 1 failed for {ticker}: {e1}")
+            
+            # Method 2: Try with auto_adjust=False
+            if hist is None or hist.empty:
+                try:
+                    hist = stock.history(period=period, auto_adjust=False, timeout=30)
+                except Exception as e2:
+                    print(f"Method 2 failed for {ticker}: {e2}")
+            
+            # Method 3: Try downloading directly
+            if hist is None or hist.empty:
+                try:
+                    import yfinance as yf_direct
+                    hist = yf_direct.download(ticker, period=period, progress=False, timeout=30)
+                except Exception as e3:
+                    print(f"Method 3 failed for {ticker}: {e3}")
+            
+            if hist is None or hist.empty:
+                print(f"No data found for {ticker} after all methods")
                 return None
             
-            return [
-                {
-                    'date': date.strftime('%Y-%m-%d'),
-                    'open': float(row['Open']),
-                    'high': float(row['High']),
-                    'low': float(row['Low']),
-                    'close': float(row['Close']),
-                    'volume': int(row['Volume'])
-                }
-                for date, row in hist.iterrows()
-            ]
+            # Handle both single and multi-level column names
+            close_col = 'Close' if 'Close' in hist.columns else ('Close', ticker) if ('Close', ticker) in hist.columns else None
+            open_col = 'Open' if 'Open' in hist.columns else ('Open', ticker) if ('Open', ticker) in hist.columns else None
+            high_col = 'High' if 'High' in hist.columns else ('High', ticker) if ('High', ticker) in hist.columns else None
+            low_col = 'Low' if 'Low' in hist.columns else ('Low', ticker) if ('Low', ticker) in hist.columns else None
+            vol_col = 'Volume' if 'Volume' in hist.columns else ('Volume', ticker) if ('Volume', ticker) in hist.columns else None
+            
+            result = []
+            for date, row in hist.iterrows():
+                try:
+                    close_val = float(row[close_col]) if close_col and close_col in row else 0
+                    open_val = float(row[open_col]) if open_col and open_col in row else close_val
+                    high_val = float(row[high_col]) if high_col and high_col in row else close_val
+                    low_val = float(row[low_col]) if low_col and low_col in row else close_val
+                    vol_val = int(row[vol_col]) if vol_col and vol_col in row else 0
+                    
+                    if close_val > 0:  # Only add valid data points
+                        result.append({
+                            'date': date.strftime('%Y-%m-%d'),
+                            'open': open_val,
+                            'high': high_val,
+                            'low': low_val,
+                            'close': close_val,
+                            'volume': vol_val
+                        })
+                except Exception as row_err:
+                    print(f"Error processing row for {ticker}: {row_err}")
+                    continue
+            
+            return result if result else None
+            
         except Exception as e:
             print(f"Error fetching history for {ticker}: {e}")
             return None
