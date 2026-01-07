@@ -114,7 +114,7 @@ async function loadAssetChart() {
         
     } catch (error) {
         console.error('Error loading asset chart:', error);
-        showChartError(error.message);
+        showChartError(error.message, ticker);
     }
 }
 
@@ -419,10 +419,36 @@ function showChartLoading() {
     }
 }
 
-function showChartError(message) {
+function showChartError(message, ticker = null) {
     const placeholder = document.querySelector('.chart-placeholder');
     if (placeholder) {
-        placeholder.innerHTML = `<span class="placeholder-icon">❌</span><p>Error: ${message}</p>`;
+        // Check if it's a data availability issue for ETFs
+        const isDataUnavailable = message.includes('No historical data') || message.includes('Failed to fetch');
+        const isEtfOrFund = ticker && ['SGLD.L', 'LYX0F.DE', 'IE00BYX5NX33'].includes(ticker.toUpperCase());
+        
+        if (isDataUnavailable && isEtfOrFund) {
+            placeholder.innerHTML = `
+                <span class="placeholder-icon">📊</span>
+                <p style="font-weight: 600; margin-bottom: 8px;">Historial no disponible para ${ticker}</p>
+                <p style="font-size: 0.9em; color: var(--text-muted); max-width: 400px; text-align: center;">
+                    Los datos históricos de ETFs europeos no están disponibles temporalmente. 
+                    El precio actual se muestra correctamente en el Dashboard.
+                </p>
+                <p style="font-size: 0.85em; color: var(--text-muted); margin-top: 12px;">
+                    💡 Las criptos (BTC, ETH, etc.) sí tienen gráficas disponibles.
+                </p>
+            `;
+        } else if (isDataUnavailable) {
+            placeholder.innerHTML = `
+                <span class="placeholder-icon">⏳</span>
+                <p style="font-weight: 600; margin-bottom: 8px;">Cargando datos de ${ticker || 'activo'}...</p>
+                <p style="font-size: 0.9em; color: var(--text-muted);">
+                    Puede tardar hasta 60 segundos debido a límites de la API.
+                </p>
+            `;
+        } else {
+            placeholder.innerHTML = `<span class="placeholder-icon">❌</span><p>Error: ${message}</p>`;
+        }
         placeholder.style.display = 'flex';
     }
 }
