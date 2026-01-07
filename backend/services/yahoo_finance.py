@@ -15,7 +15,8 @@ TICKER_MAPPING = {
     # Trade Republic / MyInvestor problematic tickers
     'LYX0F.DE': 'UST.PA',           # Amundi Nasdaq-100 -> Paris listing (~89€)
     'IE00BYX5NX33': '0P0001CLDK.F',  # Fidelity MSCI World P-ACC-EUR -> Frankfurt (~12.43€/unit)
-    'SGLD.L': 'JE00B1VS3770.SG',    # Physical Gold -> WisdomTree Stuttgart
+    'SGLD.L': 'PPFB.DE',             # iShares Physical Gold ETC -> Xetra ~74€
+    'IE00B4ND3602': 'PPFB.DE',       # iShares Physical Gold ETC (direct ISIN) -> Xetra ~74€
     
     # Alternative mappings
     'SWDA.L': 'SWDA.L',             # iShares MSCI World (works)
