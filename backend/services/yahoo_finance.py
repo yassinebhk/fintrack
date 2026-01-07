@@ -1,16 +1,39 @@
 """
 Yahoo Finance Service
-Fetches stock and ETF prices using yfinance library (free, no API key)
+Fetches stock and ETF prices using Yahoo Finance API directly
+Includes ticker mapping for problematic European ETFs
 """
+import httpx
 import yfinance as yf
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
+# Mapping for European ETFs that don't work with standard tickers
+TICKER_MAPPING = {
+    # Trade Republic / MyInvestor problematic tickers
+    'LYX0F.DE': 'UST.PA',           # Amundi Nasdaq-100 -> Paris listing
+    'IE00BYX5NX33': 'IE00BYX5NX33.SG',  # Fidelity MSCI World -> Stuttgart
+    
+    # Alternative mappings
+    'SWDA.L': 'SWDA.L',             # iShares MSCI World (works)
+    'VWCE.DE': 'VWCE.DE',           # Vanguard FTSE All-World
+    'EUNL.DE': 'EUNL.DE',           # iShares MSCI World EUR
+}
+
+# Headers to mimic browser requests
+YAHOO_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+    'Accept-Language': 'en-US,en;q=0.9',
+}
+
 
 class YahooFinanceService:
     """Service to fetch stock/ETF data from Yahoo Finance"""
+    
+    BASE_URL = "https://query1.finance.yahoo.com"
     
     def __init__(self):
         self._executor = ThreadPoolExecutor(max_workers=5)
@@ -24,14 +47,78 @@ class YahooFinanceService:
             return False
         return datetime.now() < self._cache_expiry[ticker]
     
-    def _fetch_ticker_sync(self, ticker: str) -> Optional[dict]:
-        """Synchronous fetch of ticker data"""
+    def _get_mapped_ticker(self, ticker: str) -> str:
+        """Get the correct Yahoo Finance ticker for problematic symbols"""
+        return TICKER_MAPPING.get(ticker, ticker)
+    
+    async def _fetch_ticker_api(self, ticker: str) -> Optional[dict]:
+        """Fetch ticker data directly from Yahoo Finance API"""
+        mapped_ticker = self._get_mapped_ticker(ticker)
+        url = f"{self.BASE_URL}/v8/finance/chart/{mapped_ticker}"
+        
+        params = {
+            'interval': '1d',
+            'range': '5d'
+        }
+        
         try:
-            stock = yf.Ticker(ticker)
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url, headers=YAHOO_HEADERS, params=params)
+                
+                if response.status_code != 200:
+                    print(f"[WARN] Yahoo API returned {response.status_code} for {ticker}")
+                    return None
+                
+                data = response.json()
+                
+                result = data.get('chart', {}).get('result')
+                if not result:
+                    error = data.get('chart', {}).get('error', {})
+                    print(f"[WARN] No data for {ticker} ({mapped_ticker}): {error.get('description', 'Unknown error')}")
+                    return None
+                
+                meta = result[0].get('meta', {})
+                
+                current_price = meta.get('regularMarketPrice', 0)
+                previous_close = meta.get('chartPreviousClose', current_price)
+                currency = meta.get('currency', 'USD')
+                
+                # Convert USD to EUR for SGLD.L (listed in USD but we want EUR)
+                if ticker == 'SGLD.L' and currency == 'USD':
+                    # Approximate EUR conversion (you could fetch live rate)
+                    usd_to_eur = 0.92
+                    current_price = current_price * usd_to_eur
+                    previous_close = previous_close * usd_to_eur
+                    currency = 'EUR'
+                
+                print(f"[DEBUG] Yahoo API: {ticker} -> {mapped_ticker} = {current_price} {currency}")
+                
+                return {
+                    'ticker': ticker,  # Return original ticker
+                    'price': float(current_price),
+                    'previous_close': float(previous_close),
+                    'change': float(current_price - previous_close),
+                    'change_percent': float((current_price - previous_close) / previous_close * 100) if previous_close else 0,
+                    'currency': currency,
+                    'name': meta.get('shortName', meta.get('longName', ticker)),
+                    'market_cap': 0,
+                    'last_updated': datetime.now().isoformat()
+                }
+                
+        except Exception as e:
+            print(f"[ERROR] Yahoo API error for {ticker}: {e}")
+            return None
+    
+    def _fetch_ticker_yfinance(self, ticker: str) -> Optional[dict]:
+        """Fallback: Synchronous fetch using yfinance library"""
+        mapped_ticker = self._get_mapped_ticker(ticker)
+        
+        try:
+            stock = yf.Ticker(mapped_ticker)
             info = stock.info
             hist = stock.history(period="1d")
             
-            if hist.empty:
+            if hist.empty and not info.get('regularMarketPrice'):
                 return None
             
             current_price = hist['Close'].iloc[-1] if not hist.empty else info.get('regularMarketPrice', 0)
@@ -49,7 +136,7 @@ class YahooFinanceService:
                 'last_updated': datetime.now().isoformat()
             }
         except Exception as e:
-            print(f"Error fetching {ticker}: {e}")
+            print(f"[ERROR] yfinance fallback error for {ticker}: {e}")
             return None
     
     async def get_price(self, ticker: str) -> Optional[dict]:
@@ -57,8 +144,18 @@ class YahooFinanceService:
         if self._is_cache_valid(ticker):
             return self._cache[ticker]
         
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(self._executor, self._fetch_ticker_sync, ticker)
+        # Try API first
+        result = await self._fetch_ticker_api(ticker)
+        
+        # Fallback to yfinance if API fails
+        if not result:
+            print(f"[INFO] Trying yfinance fallback for {ticker}")
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                self._executor, 
+                self._fetch_ticker_yfinance, 
+                ticker
+            )
         
         if result:
             self._cache[ticker] = result
@@ -77,90 +174,116 @@ class YahooFinanceService:
             if result is not None
         }
     
-    def _fetch_history_sync(self, ticker: str, period: str = "1y") -> Optional[List[dict]]:
-        """Fetch historical data synchronously"""
+    async def _fetch_history_api(self, ticker: str, period: str = "1y") -> Optional[List[dict]]:
+        """Fetch historical data from Yahoo Finance API"""
+        mapped_ticker = self._get_mapped_ticker(ticker)
+        url = f"{self.BASE_URL}/v8/finance/chart/{mapped_ticker}"
+        
+        # Map period to Yahoo format
+        period_map = {
+            '1m': '1mo',
+            '3m': '3mo', 
+            '6m': '6mo',
+            '1y': '1y',
+            '5y': '5y',
+            'max': 'max'
+        }
+        yahoo_period = period_map.get(period, '1y')
+        
+        params = {
+            'interval': '1d',
+            'range': yahoo_period
+        }
+        
         try:
-            stock = yf.Ticker(ticker)
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url, headers=YAHOO_HEADERS, params=params)
+                
+                if response.status_code != 200:
+                    return None
+                
+                data = response.json()
+                result = data.get('chart', {}).get('result')
+                
+                if not result:
+                    return None
+                
+                timestamps = result[0].get('timestamp', [])
+                quotes = result[0].get('indicators', {}).get('quote', [{}])[0]
+                
+                history = []
+                for i, ts in enumerate(timestamps):
+                    try:
+                        close = quotes.get('close', [])[i]
+                        if close is not None:
+                            history.append({
+                                'date': datetime.fromtimestamp(ts).strftime('%Y-%m-%d'),
+                                'open': quotes.get('open', [])[i] or close,
+                                'high': quotes.get('high', [])[i] or close,
+                                'low': quotes.get('low', [])[i] or close,
+                                'close': close,
+                                'volume': quotes.get('volume', [])[i] or 0
+                            })
+                    except (IndexError, TypeError):
+                        continue
+                
+                return history if history else None
+                
+        except Exception as e:
+            print(f"[ERROR] Yahoo API history error for {ticker}: {e}")
+            return None
+    
+    def _fetch_history_yfinance(self, ticker: str, period: str = "1y") -> Optional[List[dict]]:
+        """Fallback: Fetch historical data using yfinance"""
+        mapped_ticker = self._get_mapped_ticker(ticker)
+        
+        try:
+            stock = yf.Ticker(mapped_ticker)
+            hist = stock.history(period=period, timeout=30)
             
-            # Try with different methods
-            hist = None
-            
-            # Method 1: Direct history call
-            try:
-                hist = stock.history(period=period, timeout=30)
-            except Exception as e1:
-                print(f"Method 1 failed for {ticker}: {e1}")
-            
-            # Method 2: Try with auto_adjust=False
-            if hist is None or hist.empty:
-                try:
-                    hist = stock.history(period=period, auto_adjust=False, timeout=30)
-                except Exception as e2:
-                    print(f"Method 2 failed for {ticker}: {e2}")
-            
-            # Method 3: Try downloading directly
-            if hist is None or hist.empty:
-                try:
-                    import yfinance as yf_direct
-                    hist = yf_direct.download(ticker, period=period, progress=False, timeout=30)
-                except Exception as e3:
-                    print(f"Method 3 failed for {ticker}: {e3}")
-            
-            if hist is None or hist.empty:
-                print(f"No data found for {ticker} after all methods")
+            if hist.empty:
                 return None
-            
-            # Handle both single and multi-level column names
-            close_col = 'Close' if 'Close' in hist.columns else ('Close', ticker) if ('Close', ticker) in hist.columns else None
-            open_col = 'Open' if 'Open' in hist.columns else ('Open', ticker) if ('Open', ticker) in hist.columns else None
-            high_col = 'High' if 'High' in hist.columns else ('High', ticker) if ('High', ticker) in hist.columns else None
-            low_col = 'Low' if 'Low' in hist.columns else ('Low', ticker) if ('Low', ticker) in hist.columns else None
-            vol_col = 'Volume' if 'Volume' in hist.columns else ('Volume', ticker) if ('Volume', ticker) in hist.columns else None
             
             result = []
             for date, row in hist.iterrows():
-                try:
-                    close_val = float(row[close_col]) if close_col and close_col in row else 0
-                    open_val = float(row[open_col]) if open_col and open_col in row else close_val
-                    high_val = float(row[high_col]) if high_col and high_col in row else close_val
-                    low_val = float(row[low_col]) if low_col and low_col in row else close_val
-                    vol_val = int(row[vol_col]) if vol_col and vol_col in row else 0
-                    
-                    if close_val > 0:  # Only add valid data points
-                        result.append({
-                            'date': date.strftime('%Y-%m-%d'),
-                            'open': open_val,
-                            'high': high_val,
-                            'low': low_val,
-                            'close': close_val,
-                            'volume': vol_val
-                        })
-                except Exception as row_err:
-                    print(f"Error processing row for {ticker}: {row_err}")
-                    continue
+                close_val = float(row['Close']) if 'Close' in row else 0
+                if close_val > 0:
+                    result.append({
+                        'date': date.strftime('%Y-%m-%d'),
+                        'open': float(row.get('Open', close_val)),
+                        'high': float(row.get('High', close_val)),
+                        'low': float(row.get('Low', close_val)),
+                        'close': close_val,
+                        'volume': int(row.get('Volume', 0))
+                    })
             
             return result if result else None
             
         except Exception as e:
-            print(f"Error fetching history for {ticker}: {e}")
+            print(f"[ERROR] yfinance history fallback error for {ticker}: {e}")
             return None
     
     async def get_history(self, ticker: str, period: str = "1y") -> Optional[List[dict]]:
         """Get historical prices for a ticker"""
-        # Check cache first
         cache_key = f"history_{ticker}_{period}"
+        
         if cache_key in self._cache_expiry and datetime.now() < self._cache_expiry[cache_key]:
             return self._cache.get(cache_key)
         
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            self._executor, 
-            self._fetch_history_sync, 
-            ticker, 
-            period
-        )
+        # Try API first
+        result = await self._fetch_history_api(ticker, period)
         
-        # Cache for 30 minutes
+        # Fallback to yfinance
+        if not result:
+            print(f"[INFO] Trying yfinance history fallback for {ticker}")
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                self._executor,
+                self._fetch_history_yfinance,
+                ticker,
+                period
+            )
+        
         if result:
             self._cache[cache_key] = result
             self._cache_expiry[cache_key] = datetime.now() + timedelta(minutes=30)
@@ -177,4 +300,3 @@ class YahooFinanceService:
             for ticker, result in zip(tickers, results)
             if result is not None
         }
-
