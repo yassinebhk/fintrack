@@ -6,7 +6,7 @@
 // Configuration - Auto-detects production vs development
 const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 const API_BASE_URL = isProduction 
-    ? `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}/api`
+    ? 'https://fintrack-vnvx.onrender.com/api'
     : 'http://localhost:8000/api';
 
 const CONFIG = {
