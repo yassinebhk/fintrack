@@ -180,8 +180,11 @@ class CoinGeckoService:
                         results[ticker] = result
                         
         except Exception as e:
-            print(f"Error fetching crypto prices: {e}")
+            print(f"[ERROR] Error fetching crypto prices: {e}")
+            import traceback
+            traceback.print_exc()
         
+        print(f"[DEBUG] CoinGecko returning {len(results)} prices: {list(results.keys())}")
         return results
     
     async def get_history(self, ticker: str, days: int = 365, vs_currency: str = "usd") -> Optional[List[dict]]:

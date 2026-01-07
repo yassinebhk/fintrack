@@ -125,6 +125,11 @@ class PortfolioService:
         # Fetch all prices
         prices = await self.fetch_all_prices(positions)
         
+        # Debug: Log fetched prices
+        print(f"[DEBUG] Fetched prices for {len(prices)} assets: {list(prices.keys())}")
+        for ticker, data in prices.items():
+            print(f"[DEBUG] {ticker}: {data.get('price', 'NO PRICE')}")
+        
         # Calculate position values
         position_data = []
         total_value = 0
