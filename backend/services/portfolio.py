@@ -84,7 +84,7 @@ class PortfolioService:
         prices = {}
         
         # Separate by asset type
-        stocks_etfs = positions[positions['type'].isin(['stock', 'etf'])]['ticker'].unique().tolist()
+        stocks_etfs = positions[positions['type'].isin(['stock', 'etf', 'fund'])]['ticker'].unique().tolist()
         cryptos = positions[positions['type'] == 'crypto']['ticker'].unique().tolist()
         
         # Fetch stock/ETF prices
@@ -92,9 +92,9 @@ class PortfolioService:
             stock_prices = await self.yahoo.get_prices(stocks_etfs)
             prices.update(stock_prices)
         
-        # Fetch crypto prices
+        # Fetch crypto prices (in EUR since portfolio is in EUR)
         if cryptos:
-            crypto_prices = await self.coingecko.get_prices(cryptos)
+            crypto_prices = await self.coingecko.get_prices(cryptos, vs_currency="eur")
             prices.update(crypto_prices)
         
         self._prices_cache = prices
