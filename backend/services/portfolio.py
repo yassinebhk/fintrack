@@ -145,7 +145,20 @@ class PortfolioService:
             broker = pos['broker']
             
             price_data = prices.get(ticker, {})
-            current_price = price_data.get('price', avg_price)
+            
+            # Get current price - if not available, try to use cached price or log warning
+            if 'price' in price_data:
+                current_price = price_data['price']
+            else:
+                # Check if we have a recent cached price
+                cached = self._prices_cache.get(ticker, {})
+                if 'price' in cached:
+                    current_price = cached['price']
+                    print(f"[WARN] Using cached price for {ticker}: {current_price}")
+                else:
+                    current_price = avg_price
+                    print(f"[WARN] No price found for {ticker}, using avg_price: {avg_price}")
+            
             prev_close = price_data.get('previous_close', current_price)
             
             # Calculate values

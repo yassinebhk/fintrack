@@ -47,9 +47,10 @@ class CoinGeckoService:
     def __init__(self):
         self._cache: Dict[str, dict] = {}
         self._cache_expiry: Dict[str, datetime] = {}
-        self._cache_duration = timedelta(minutes=5)
+        self._cache_duration = timedelta(minutes=10)  # Longer cache to reduce API calls
         self._last_request = datetime.min
-        self._rate_limit_delay = 1.5  # CoinGecko rate limit: ~50 calls/min
+        self._rate_limit_delay = 3.0  # Increased delay for rate limiting
+        self._max_retries = 3
     
     def _is_cache_valid(self, key: str) -> bool:
         """Check if cached data is still valid"""
@@ -150,39 +151,56 @@ class CoinGeckoService:
             "include_market_cap": "true"
         }
         
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url, params=params, timeout=15.0)
-                response.raise_for_status()
-                data = response.json()
-                
-                for ticker, coin_id in zip(to_fetch, coin_ids):
-                    if coin_id in data:
-                        coin_data = data[coin_id]
-                        price = coin_data.get(vs_currency, 0)
-                        change_24h = coin_data.get(f'{vs_currency}_24h_change', 0)
-                        
-                        result = {
-                            'ticker': ticker.upper(),
-                            'price': float(price),
-                            'previous_close': float(price / (1 + change_24h / 100)) if change_24h else price,
-                            'change': float(price * change_24h / 100) if change_24h else 0,
-                            'change_percent': float(change_24h) if change_24h else 0,
-                            'currency': vs_currency.upper(),
-                            'market_cap': coin_data.get(f'{vs_currency}_market_cap', 0),
-                            'name': ticker.upper(),
-                            'last_updated': datetime.now().isoformat()
-                        }
-                        
-                        cache_key = f"{ticker}_{vs_currency}"
-                        self._cache[cache_key] = result
-                        self._cache_expiry[cache_key] = datetime.now() + self._cache_duration
-                        results[ticker] = result
-                        
-        except Exception as e:
-            print(f"[ERROR] Error fetching crypto prices: {e}")
-            import traceback
-            traceback.print_exc()
+        # Retry logic for rate limiting
+        for attempt in range(self._max_retries):
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(url, params=params, timeout=30.0)
+                    
+                    # Handle rate limiting
+                    if response.status_code == 429:
+                        wait_time = (attempt + 1) * 10  # 10, 20, 30 seconds
+                        print(f"[WARN] CoinGecko rate limited, waiting {wait_time}s (attempt {attempt + 1})")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    print(f"[DEBUG] CoinGecko response: {list(data.keys())}")
+                    
+                    for ticker, coin_id in zip(to_fetch, coin_ids):
+                        if coin_id in data:
+                            coin_data = data[coin_id]
+                            price = coin_data.get(vs_currency, 0)
+                            change_24h = coin_data.get(f'{vs_currency}_24h_change', 0)
+                            
+                            result = {
+                                'ticker': ticker.upper(),
+                                'price': float(price),
+                                'previous_close': float(price / (1 + change_24h / 100)) if change_24h else price,
+                                'change': float(price * change_24h / 100) if change_24h else 0,
+                                'change_percent': float(change_24h) if change_24h else 0,
+                                'currency': vs_currency.upper(),
+                                'market_cap': coin_data.get(f'{vs_currency}_market_cap', 0),
+                                'name': ticker.upper(),
+                                'last_updated': datetime.now().isoformat()
+                            }
+                            
+                            cache_key = f"{ticker}_{vs_currency}"
+                            self._cache[cache_key] = result
+                            self._cache_expiry[cache_key] = datetime.now() + self._cache_duration
+                            results[ticker] = result
+                            print(f"[DEBUG] Got price for {ticker}: {price} {vs_currency.upper()}")
+                        else:
+                            print(f"[WARN] No data for {ticker} (coin_id: {coin_id}) in response")
+                    
+                    break  # Success, exit retry loop
+                            
+            except Exception as e:
+                print(f"[ERROR] Error fetching crypto prices (attempt {attempt + 1}): {e}")
+                if attempt < self._max_retries - 1:
+                    await asyncio.sleep(5)  # Wait before retry
         
         print(f"[DEBUG] CoinGecko returning {len(results)} prices: {list(results.keys())}")
         return results
