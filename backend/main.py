@@ -21,6 +21,7 @@ from services.portfolio import PortfolioService
 from services.yahoo_finance import YahooFinanceService
 from services.coingecko import CoinGeckoService
 from services.exchange_rates import ExchangeRateService
+from services.news import NewsService
 
 
 # Initialize FastAPI app
@@ -45,6 +46,7 @@ portfolio_service = PortfolioService(
     historical_file="data/historical_values.json",
     base_currency="EUR"
 )
+news_service = NewsService()
 
 
 # Pydantic models for requests
@@ -814,6 +816,54 @@ POSICIONES:
             "model": "error",
             "tokens_used": 0
         }
+
+
+# =============================================================================
+# NEWS ENDPOINTS
+# =============================================================================
+
+@app.get("/api/news")
+async def get_news(
+    category: str = Query(default="all", description="Filter by category: all, stocks, crypto, economy, politics"),
+    limit: int = Query(default=30, ge=1, le=100, description="Number of news items to return")
+):
+    """
+    Get real-time financial news from RSS feeds.
+    
+    Categories:
+    - all: All news
+    - stocks: Stock market news
+    - crypto: Cryptocurrency news
+    - economy: Economic news
+    - politics: Political/geopolitical news affecting markets
+    """
+    try:
+        news = await news_service.get_news(category=category, limit=limit)
+        return {
+            "news": news,
+            "count": len(news),
+            "category": category,
+            "last_updated": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/news/asset/{ticker}")
+async def get_news_for_asset(
+    ticker: str,
+    limit: int = Query(default=10, ge=1, le=50)
+):
+    """Get news related to a specific asset/ticker"""
+    try:
+        news = await news_service.get_news_for_asset(ticker=ticker, limit=limit)
+        return {
+            "ticker": ticker.upper(),
+            "news": news,
+            "count": len(news)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Run server
