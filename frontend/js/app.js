@@ -379,7 +379,7 @@ function createPortfolioChart(history) {
     const ctx = document.getElementById('portfolioChart');
     if (!ctx) return;
     
-    if (charts.portfolio) {
+    if (charts.portfolio && typeof charts.portfolio.destroy === 'function') {
         charts.portfolio.destroy();
     }
     
@@ -482,7 +482,7 @@ function createDoughnutChart(canvasId, data, legendId) {
     if (!ctx) return;
     
     const chartKey = canvasId.replace('Chart', '');
-    if (charts[chartKey]) {
+    if (charts[chartKey] && typeof charts[chartKey].destroy === 'function') {
         charts[chartKey].destroy();
     }
     

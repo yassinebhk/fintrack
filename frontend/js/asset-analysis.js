@@ -179,7 +179,7 @@ function renderAssetChart(data) {
     canvas.style.display = 'block';
     
     // Destroy existing chart
-    if (assetChart) {
+    if (assetChart && typeof assetChart.destroy === 'function') {
         assetChart.destroy();
     }
     

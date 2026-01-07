@@ -783,7 +783,7 @@ function initProjectionChart() {
             }
         }
         
-        if (window.projectionChart) {
+        if (window.projectionChart && typeof window.projectionChart.destroy === 'function') {
             window.projectionChart.destroy();
         }
         
