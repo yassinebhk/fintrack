@@ -786,7 +786,7 @@ POSICIONES:
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "llama-3.1-70b-versatile",
+                    "model": "llama-3.3-70b-versatile",
                     "messages": [
                         {"role": "system", "content": AI_SYSTEM_PROMPT},
                         {"role": "user", "content": f"{context}\n\nPREGUNTA DEL USUARIO: {question.question}"}
@@ -806,7 +806,7 @@ POSICIONES:
             
             return {
                 "response": ai_response,
-                "model": "llama-3.1-70b",
+                "model": "llama-3.3-70b-versatile",
                 "tokens_used": tokens
             }
             
