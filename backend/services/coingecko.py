@@ -186,6 +186,11 @@ class CoinGeckoService:
     
     async def get_history(self, ticker: str, days: int = 365, vs_currency: str = "usd") -> Optional[List[dict]]:
         """Get historical prices for a cryptocurrency"""
+        # Check cache first
+        cache_key = f"history_{ticker}_{days}_{vs_currency}"
+        if self._is_cache_valid(cache_key):
+            return self._cache.get(cache_key)
+        
         await self._rate_limit()
         
         coin_id = self._get_coingecko_id(ticker)
@@ -193,25 +198,43 @@ class CoinGeckoService:
         params = {
             "vs_currency": vs_currency,
             "days": str(days),
-            "interval": "daily"
+            "interval": "daily" if days > 1 else "hourly"
         }
         
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(url, params=params, timeout=15.0)
+                response = await client.get(url, params=params, timeout=30.0)
+                
+                # Handle rate limiting
+                if response.status_code == 429:
+                    print(f"Rate limited by CoinGecko, waiting...")
+                    await asyncio.sleep(60)  # Wait 1 minute
+                    response = await client.get(url, params=params, timeout=30.0)
+                
                 response.raise_for_status()
                 data = response.json()
                 
                 prices = data.get('prices', [])
                 
-                return [
+                result = [
                     {
                         'date': datetime.fromtimestamp(ts / 1000).strftime('%Y-%m-%d'),
-                        'close': float(price)
+                        'close': float(price),
+                        'price': float(price)  # Alias for compatibility
                     }
                     for ts, price in prices
                 ]
                 
+                # Cache for 30 minutes
+                if result:
+                    self._cache[cache_key] = result
+                    self._cache_expiry[cache_key] = datetime.now() + timedelta(minutes=30)
+                
+                return result
+                
+        except httpx.HTTPStatusError as e:
+            print(f"HTTP error fetching history for {ticker}: {e.response.status_code}")
+            return None
         except Exception as e:
             print(f"Error fetching history for {ticker}: {e}")
             return None

@@ -103,13 +103,25 @@ class YahooFinanceService:
     
     async def get_history(self, ticker: str, period: str = "1y") -> Optional[List[dict]]:
         """Get historical prices for a ticker"""
+        # Check cache first
+        cache_key = f"history_{ticker}_{period}"
+        if cache_key in self._cache_expiry and datetime.now() < self._cache_expiry[cache_key]:
+            return self._cache.get(cache_key)
+        
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
+        result = await loop.run_in_executor(
             self._executor, 
             self._fetch_history_sync, 
             ticker, 
             period
         )
+        
+        # Cache for 30 minutes
+        if result:
+            self._cache[cache_key] = result
+            self._cache_expiry[cache_key] = datetime.now() + timedelta(minutes=30)
+        
+        return result
     
     async def get_multiple_history(self, tickers: List[str], period: str = "1y") -> Dict[str, List[dict]]:
         """Get historical data for multiple tickers"""
