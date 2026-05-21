@@ -36,6 +36,14 @@ logs/
 # Uncomment if you want to keep positions private
 # backend/data/positions.csv
 
+# Runtime data
+backend/data/fintrack.db
+backend/data/fintrack.db-journal
+backend/data/fintrack.db-wal
+backend/data/fintrack.db-shm
+backend/logs/
+backend/data/transactions.json
+
 # Cache
 .cache/
 *.cache

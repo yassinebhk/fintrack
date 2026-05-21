@@ -1,20 +1,61 @@
-# Render Blueprint for FinTrack
-# https://render.com/docs/blueprint-spec
+# FinTrack v2.0 — Render Blueprint
+# Two services: backend (API + jobs) and frontend (static).
+# Set secret env vars via Render dashboard (sync: false → never stored here).
 
 services:
-  # Backend API
   - type: web
     name: fintrack-api
     env: python
-    buildCommand: cd backend && pip install -r requirements.txt && pip install httpx
-    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    buildCommand: |
+      cd backend &&
+      pip install -r requirements.txt
+    startCommand: |
+      cd backend &&
+      python -m app.scripts.migrate_legacy || true &&
+      uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: HOST
+        value: 0.0.0.0
+      - key: BASE_CURRENCY
+        value: EUR
+      - key: TIMEZONE
+        value: Europe/Madrid
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: GEMINI_MODEL_ORCHESTRATOR
+        value: gemini-2.5-flash
+      - key: GEMINI_MODEL_AGENT
+        value: gemini-2.5-flash
+      - key: GEMINI_MODEL_CHEAP
+        value: gemini-2.5-flash-lite
+      - key: GEMINI_MODEL_FALLBACK
+        value: gemini-2.5-flash-lite
+      # Secrets — set these from Render dashboard (sync: false hides their values)
+      - key: GEMINI_API_KEY
+        sync: false
       - key: GROQ_API_KEY
         sync: false
-      - key: PYTHON_VERSION
-        value: 3.11.0
+      - key: KRAKEN_API_KEY
+        sync: false
+      - key: KRAKEN_API_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: TR_PHONE
+        sync: false
+      - key: TR_PIN
+        sync: false
+      - key: FRED_API_KEY
+        sync: false
+      - key: ETHERSCAN_API_KEY
+        sync: false
 
-  # Frontend Static Site
   - type: web
     name: fintrack-frontend
     env: static
@@ -29,4 +70,3 @@ services:
           type: web
           name: fintrack-api
           property: url
-
