@@ -8,10 +8,39 @@ from loguru import logger
 
 from app import __version__
 from app.api import build_api_router
-from app.config import get_settings
-from app.db import init_db
+from app.config import BACKEND_DIR, get_settings
+from app.db import init_db, session_scope
 from app.logging_config import setup_logging
+from app.repositories import PositionRepository
 from app.scheduler import start_scheduler, stop_scheduler
+
+
+async def _seed_if_empty() -> None:
+    """On first boot (e.g. fresh Render container), seed the DB from the legacy CSV."""
+    async with session_scope() as session:
+        count = await PositionRepository(session).count()
+    if count > 0:
+        logger.info("db already populated ({} positions), skipping legacy seed", count)
+        return
+    csv_path = BACKEND_DIR / "data" / "positions.csv"
+    if not csv_path.exists():
+        logger.info("no legacy positions.csv to seed from")
+        return
+    logger.info("db empty + legacy CSV present → running migrate_legacy")
+    try:
+        from app.scripts.migrate_legacy import (
+            migrate_positions,
+            migrate_snapshots,
+            seed_ticker_mappings,
+        )
+        await seed_ticker_mappings()
+        await migrate_positions(csv_path)
+        snaps_path = BACKEND_DIR / "data" / "historical_values.json"
+        if snaps_path.exists():
+            await migrate_snapshots(snaps_path)
+        logger.info("seed complete")
+    except Exception as exc:
+        logger.error("seed failed: {}", exc)
 
 
 @asynccontextmanager
@@ -30,6 +59,8 @@ async def lifespan(app: FastAPI):
 
     await init_db()
     logger.info("database ready at {}", settings.database_url)
+
+    await _seed_if_empty()
 
     start_scheduler()
 
