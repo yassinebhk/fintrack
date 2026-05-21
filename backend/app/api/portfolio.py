@@ -57,8 +57,9 @@ async def get_distributions() -> dict:
     }
 
 
-@router.post("/refresh")
+@router.api_route("/refresh", methods=["GET", "POST"])
 async def refresh_data() -> dict:
+    """Force a portfolio recalculation. Accepts GET (legacy frontend) and POST."""
     from datetime import datetime, timezone
 
     p = await _service.calculate_portfolio()

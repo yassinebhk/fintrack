@@ -1,33 +1,38 @@
-"""AI chat endpoint — placeholder until Fase 2.2 wires the Gemini multi-agent stack."""
+"""AI chat endpoint — uses Gemini via the unified LLM client.
 
-import httpx
+Provider precedence: Gemini → Groq fallback → static config message.
+"""
+
 from fastapi import APIRouter
 from loguru import logger
 from pydantic import BaseModel
 
 from app.config import get_settings
+from app.llm import LLMMessage, get_llm_client
 from app.services.portfolio import PortfolioService
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 _portfolio = PortfolioService()
 
-AI_SYSTEM_PROMPT = """Eres un asesor financiero experto y educador. Tu nombre es FinBot.
+AI_SYSTEM_PROMPT = """Eres FinBot, un asesor financiero virtual experto y pedagógico.
 
-IMPORTANTE:
+Reglas:
 - Hablas SIEMPRE en español.
-- Eres amable, cercano y pedagógico.
+- Eres amable, cercano y didáctico.
 - Explicas conceptos complejos de forma simple.
-- Nunca das consejos específicos de compra/venta.
+- Nunca recomiendas comprar/vender tickers concretos (regulación).
 - Recomiendas diversificación y horizonte a largo plazo.
-- Si te preguntan sobre la cartera del usuario, analizas sus posiciones de forma educativa.
-- Termina con un disclaimer cuando hables de inversión.
+- Si te preguntan sobre la cartera del usuario, la analizas de forma educativa.
+- Si la pregunta toca inversión, añades un disclaimer breve al final.
 """
 
-CONFIG_MSG = """¡Hola! Soy FinBot, tu asesor financiero virtual.
-
-Estoy temporalmente en modo de transición: el equipo multi-agente con Gemini llega en la siguiente fase.
-Mientras tanto, puedes explorar la sección "Aprender" o ver el briefing diario en la página "Hoy" (próximamente).
-"""
+CONFIG_MSG = (
+    "¡Hola! Soy FinBot, tu asesor financiero virtual.\n\n"
+    "Aún no tengo configurada ninguna API key de LLM. Para activarme, "
+    "el administrador necesita definir GEMINI_API_KEY (o GROQ_API_KEY) en las "
+    "variables de entorno del servidor.\n\n"
+    "Mientras tanto puedes explorar la sección 'Aprender' o ver tus posiciones."
+)
 
 
 class AIQuestion(BaseModel):
@@ -35,60 +40,64 @@ class AIQuestion(BaseModel):
     include_portfolio: bool = True
 
 
+def _build_portfolio_context(portfolio: dict) -> str:
+    lines = [
+        "DATOS DE LA CARTERA DEL USUARIO:",
+        f"- Valor total: {portfolio.get('total_value', 0):.2f} {portfolio.get('base_currency', 'EUR')}",
+        f"- Ganancia/Pérdida total: {portfolio.get('total_gain_loss', 0):+.2f} ({portfolio.get('total_gain_loss_pct', 0):+.2f}%)",
+        f"- Cambio hoy: {portfolio.get('daily_change', 0):+.2f} ({portfolio.get('daily_change_pct', 0):+.2f}%)",
+        "",
+        "POSICIONES:",
+    ]
+    for pos in (portfolio.get("positions") or [])[:15]:
+        lines.append(
+            f"- {pos['ticker']} ({pos.get('type', '?')}): {pos.get('quantity'):.6g} unidades, "
+            f"P/L: {pos.get('gain_loss_pct', 0):+.1f}%, Peso: {pos.get('weight', 0):.1f}%"
+        )
+    by_type = portfolio.get("by_type") or {}
+    if by_type:
+        lines.append("")
+        lines.append("DISTRIBUCIÓN POR TIPO:")
+        for t, info in by_type.items():
+            lines.append(f"- {t}: {info.get('weight', 0):.1f}%")
+    return "\n".join(lines)
+
+
 @router.post("/chat")
 async def ai_chat(question: AIQuestion) -> dict:
     settings = get_settings()
-    if not settings.has_groq and not settings.has_gemini:
+    if not settings.has_gemini and not settings.has_groq:
         return {"response": CONFIG_MSG, "model": "none", "tokens_used": 0}
 
     context = ""
     if question.include_portfolio:
         try:
             p = await _portfolio.calculate_portfolio()
-            context = (
-                f"DATOS DE LA CARTERA DEL USUARIO:\n"
-                f"- Valor total: {p['total_value']:.2f} {p['base_currency']}\n"
-                f"- Ganancia/Pérdida total: {p['total_gain_loss']:.2f} ({p['total_gain_loss_pct']:.2f}%)\n"
-                f"- Cambio hoy: {p['daily_change']:.2f} ({p['daily_change_pct']:.2f}%)\n\nPOSICIONES:\n"
-            )
-            for pos in p["positions"][:15]:
-                context += (
-                    f"- {pos['ticker']} ({pos['type']}): {pos['quantity']} unidades, "
-                    f"P/L: {pos['gain_loss_pct']:.1f}%, Peso: {pos['weight']:.1f}%\n"
-                )
+            context = _build_portfolio_context(p)
         except Exception as exc:
             logger.warning("could not build portfolio context: {}", exc)
 
-    # Quick Groq path until the Gemini agent stack lands in Fase 2.2.
-    if settings.has_groq:
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {settings.groq_api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "llama-3.3-70b-versatile",
-                        "messages": [
-                            {"role": "system", "content": AI_SYSTEM_PROMPT},
-                            {"role": "user", "content": f"{context}\n\nPREGUNTA: {question.question}"},
-                        ],
-                        "max_tokens": 1500,
-                        "temperature": 0.7,
-                    },
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                return {
-                    "response": data["choices"][0]["message"]["content"],
-                    "model": "llama-3.3-70b-versatile",
-                    "tokens_used": data.get("usage", {}).get("total_tokens", 0),
-                }
-        except Exception as exc:
-            logger.error("groq chat error: {}", exc)
-            return {"response": f"Error temporal en FinBot: {exc}", "model": "error", "tokens_used": 0}
+    user_msg = f"{context}\n\nPREGUNTA DEL USUARIO: {question.question}" if context else question.question
 
-    # If only gemini is configured, fall back to a placeholder until Fase 2.2.
-    return {"response": CONFIG_MSG, "model": "gemini-pending-fase2", "tokens_used": 0}
+    try:
+        client = get_llm_client()
+        resp = await client.generate(
+            [
+                LLMMessage(role="system", content=AI_SYSTEM_PROMPT),
+                LLMMessage(role="user", content=user_msg),
+            ],
+            max_tokens=1500,
+            temperature=0.7,
+        )
+        return {
+            "response": resp.text,
+            "model": resp.model,
+            "tokens_used": resp.tokens_input + resp.tokens_output,
+        }
+    except Exception as exc:
+        logger.exception("ai chat failed")
+        return {
+            "response": f"Lo siento, hubo un error procesando tu pregunta: {exc}. Intenta de nuevo en unos segundos.",
+            "model": "error",
+            "tokens_used": 0,
+        }
