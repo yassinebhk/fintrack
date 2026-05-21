@@ -4,9 +4,11 @@
  */
 
 // Configuration - Auto-detects production vs development
+// In production the backend serves both the API and this HTML from the same origin.
+// In local dev we typically run the frontend on :3000 and the backend on :8000.
 const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-const API_BASE_URL = isProduction 
-    ? 'https://fintrack-vnvx.onrender.com/api'
+const API_BASE_URL = isProduction
+    ? `${window.location.origin}/api`
     : 'http://localhost:8000/api';
 
 const CONFIG = {

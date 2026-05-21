@@ -1,4 +1,4 @@
-"""Health / root endpoints."""
+"""Health / status endpoints."""
 
 from datetime import datetime, timezone
 
@@ -10,8 +10,10 @@ from app.config import get_settings
 router = APIRouter(tags=["health"])
 
 
-@router.get("/")
-async def root() -> dict:
+@router.get("/api")
+@router.get("/api/health")
+async def api_status() -> dict:
+    """Backend status. `/` is now reserved for the frontend SPA."""
     settings = get_settings()
     return {
         "status": "online",
@@ -19,6 +21,7 @@ async def root() -> dict:
         "version": __version__,
         "llm_provider": settings.llm_provider,
         "has_gemini": settings.has_gemini,
+        "has_groq": settings.has_groq,
         "has_kraken": settings.has_kraken,
         "has_telegram": settings.has_telegram,
         "timestamp": datetime.now(timezone.utc).isoformat(),

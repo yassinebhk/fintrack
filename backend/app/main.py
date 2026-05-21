@@ -1,9 +1,12 @@
 """FastAPI app factory with lifespan-managed DB init and scheduler stub."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from app import __version__
@@ -13,6 +16,9 @@ from app.db import init_db, session_scope
 from app.logging_config import setup_logging
 from app.repositories import PositionRepository
 from app.scheduler import start_scheduler, stop_scheduler
+
+
+FRONTEND_DIR = (BACKEND_DIR.parent / "frontend").resolve()
 
 
 async def _seed_if_empty() -> None:
@@ -86,6 +92,35 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(build_api_router())
+
+    # Serve the frontend SPA from the same origin as the API.
+    # / → frontend/index.html
+    # /css/*, /js/*, /pages/* → static files
+    # /api/* → backend (handled by routers above)
+    if FRONTEND_DIR.exists():
+        # Mount asset subdirectories
+        for sub in ("css", "js", "pages"):
+            d = FRONTEND_DIR / sub
+            if d.exists():
+                app.mount(f"/{sub}", StaticFiles(directory=str(d)), name=sub)
+
+        @app.get("/", include_in_schema=False)
+        async def index() -> FileResponse:
+            return FileResponse(str(FRONTEND_DIR / "index.html"))
+
+        # Optional favicon fallback (legacy frontend doesn't ship one)
+        @app.get("/favicon.ico", include_in_schema=False)
+        async def favicon() -> FileResponse:
+            for candidate in ("favicon.ico", "favicon.png", "logo.png"):
+                p = FRONTEND_DIR / candidate
+                if p.exists():
+                    return FileResponse(str(p))
+            return FileResponse(str(FRONTEND_DIR / "index.html"))
+
+        logger.info("frontend mounted from {}", FRONTEND_DIR)
+    else:
+        logger.warning("frontend dir not found at {} — UI will not be served", FRONTEND_DIR)
+
     return app
 
 
