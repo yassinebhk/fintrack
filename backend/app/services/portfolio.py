@@ -68,15 +68,34 @@ class PortfolioService:
             # fall back to using avg_price as the live price (which zeroes out P/L).
             missing = [c for c in cryptos if c not in crypto_prices]
             for ticker in missing:
-                yp = await self.yahoo.get_price(f"{ticker.upper()}-EUR")
-                if yp and yp.get("price"):
-                    yp = dict(yp)
-                    yp["ticker"] = ticker
+                yp = await self._crypto_price_yahoo(ticker)
+                if yp:
                     prices[ticker] = yp
                     logger.info("crypto {} price via Yahoo fallback: {}", ticker, yp["price"])
 
         self._prices_cache = prices
         return prices
+
+    async def _crypto_price_yahoo(self, ticker: str) -> dict | None:
+        """Yahoo fallback for a crypto price in EUR. Tries -EUR, then -USD converted to EUR."""
+        up = ticker.upper()
+        yp = await self.yahoo.get_price(f"{up}-EUR")
+        if yp and yp.get("price"):
+            out = dict(yp)
+            out["ticker"] = ticker
+            out["currency"] = "EUR"
+            return out
+        # -USD with conversion
+        yp = await self.yahoo.get_price(f"{up}-USD")
+        if yp and yp.get("price"):
+            rate = await self.fx.get_rate("USD", "EUR")
+            out = dict(yp)
+            out["ticker"] = ticker
+            out["price"] = yp["price"] * rate
+            out["previous_close"] = yp.get("previous_close", yp["price"]) * rate
+            out["currency"] = "EUR"
+            return out
+        return None
 
     # ------------------------------------------------------------------ aggregation
 
@@ -281,7 +300,17 @@ class PortfolioService:
 
     async def get_asset_history(self, ticker: str, asset_type: str, days: int = 365) -> list[dict] | None:
         if asset_type == "crypto":
-            return await self.coingecko.get_history(ticker, days=days, vs_currency=self.base_currency.lower())
+            hist = await self.coingecko.get_history(ticker, days=days, vs_currency=self.base_currency.lower())
+            if hist:
+                return hist
+            # Fallback: CoinGecko rate-limited → Yahoo BTC-EUR / BTC-USD
+            up = ticker.upper()
+            yperiod = "max" if days > 1825 else "5y" if days > 730 else "2y" if days > 365 else "1y" if days > 90 else "6mo" if days > 30 else "1mo"
+            for yt in (f"{up}-EUR", f"{up}-USD"):
+                hist = await self.yahoo.get_history(yt, period=yperiod)
+                if hist:
+                    return hist
+            return None
         period = "1y" if days >= 365 else f"{days}d"
         return await self.yahoo.get_history(ticker, period=period)
 
