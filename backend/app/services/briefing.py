@@ -8,6 +8,7 @@ from loguru import logger
 from app.agents import (
     AgentContext,
     CryptoAgent,
+    MacroAgent,
     MarketAgent,
     NewsAgent,
     OrchestratorAgent,
@@ -15,9 +16,10 @@ from app.agents import (
 )
 from app.db import session_scope
 from app.models.briefing import Briefing
+from app.services.market import ECBClient, FREDClient, upcoming_events
 from app.services.news import NewsService
-from app.services.portfolio import PortfolioService
 from app.services.notifications.telegram import TelegramNotifier
+from app.services.portfolio import PortfolioService
 
 
 def render_briefing_markdown(content: dict) -> str:
@@ -153,21 +155,38 @@ class BriefingService:
         portfolio = await self.portfolio_service.calculate_portfolio()
         news_items = await self.news_service.get_news("all", limit=30)
 
+        # Fetch macro data in parallel (best-effort)
+        fred = FREDClient()
+        ecb = ECBClient()
+        try:
+            us_macro, eu_macro = await asyncio.gather(fred.snapshot(), ecb.snapshot())
+        except Exception as exc:
+            logger.warning("macro fetch partial failure: {}", exc)
+            us_macro, eu_macro = [], []
+        upcoming = upcoming_events(horizon_days=14)
+        logger.info("macro context: us={} eu={} upcoming={}", len(us_macro), len(eu_macro), len(upcoming))
+
         context_base = AgentContext(portfolio=portfolio)
         market = MarketAgent()
         news = NewsAgent()
         risk = RiskAgent()
         crypto = CryptoAgent()
+        macro = MacroAgent()
 
         news_ctx = AgentContext(portfolio=portfolio, extras={"news": news_items})
         crypto_ctx = AgentContext(portfolio=portfolio, extras={"crypto_market": {}})
+        macro_ctx = AgentContext(
+            portfolio=portfolio,
+            extras={"macro": {"us": us_macro, "eu": eu_macro, "upcoming": upcoming}},
+        )
 
         try:
-            market_res, news_res, risk_res, crypto_res = await asyncio.gather(
+            market_res, news_res, risk_res, crypto_res, macro_res = await asyncio.gather(
                 market.run(context_base),
                 news.run(news_ctx),
                 risk.run(context_base),
                 crypto.run(crypto_ctx),
+                macro.run(macro_ctx),
                 return_exceptions=False,
             )
         except Exception as exc:
@@ -179,9 +198,14 @@ class BriefingService:
             "news": news_res.output,
             "risk": risk_res.output,
             "crypto": crypto_res.output,
+            "macro": macro_res.output,
         }
-        total_tokens_in = sum(r.tokens_input for r in (market_res, news_res, risk_res, crypto_res))
-        total_tokens_out = sum(r.tokens_output for r in (market_res, news_res, risk_res, crypto_res))
+        total_tokens_in = sum(
+            r.tokens_input for r in (market_res, news_res, risk_res, crypto_res, macro_res)
+        )
+        total_tokens_out = sum(
+            r.tokens_output for r in (market_res, news_res, risk_res, crypto_res, macro_res)
+        )
 
         orch = OrchestratorAgent()
         orch_ctx = AgentContext(portfolio=portfolio, extras={"sub_results": sub_results})
