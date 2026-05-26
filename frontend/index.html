@@ -52,6 +52,10 @@
                     <span class="nav-icon">🧮</span>
                     <span class="nav-label">Calculadoras</span>
                 </li>
+                <li class="nav-item" data-page="backtest">
+                    <span class="nav-icon">🔬</span>
+                    <span class="nav-label">Backtest Lab</span>
+                </li>
                 <li class="nav-item" data-page="ai-advisor">
                     <span class="nav-icon">🤖</span>
                     <span class="nav-label">Asesor IA</span>
@@ -1199,6 +1203,84 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                     </div>
                 </div>
 
+                <!-- Backtest Lab Page -->
+                <div class="page page-backtest" id="page-backtest">
+                    <section class="manager-header">
+                        <div>
+                            <h2>🔬 Backtest Lab</h2>
+                            <p>Prueba estrategias contra el histórico de tus activos antes de aplicarlas</p>
+                        </div>
+                    </section>
+
+                    <div class="card" style="margin-bottom: 16px;">
+                        <h3>Configuración</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Estrategia *</label>
+                                <select id="btStrategy"></select>
+                                <small id="btStrategyDesc" class="text-muted"></small>
+                            </div>
+                            <div class="form-group">
+                                <label>Periodo</label>
+                                <select id="btPeriod">
+                                    <option value="1y">Último año</option>
+                                    <option value="3y" selected>Últimos 3 años</option>
+                                    <option value="5y">Últimos 5 años</option>
+                                    <option value="custom">Personalizado</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row" id="btCustomDates" style="display:none;">
+                            <div class="form-group">
+                                <label>Fecha inicio</label>
+                                <input type="date" id="btStartDate">
+                            </div>
+                            <div class="form-group">
+                                <label>Fecha fin (opcional)</label>
+                                <input type="date" id="btEndDate">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Activos a incluir</label>
+                            <div id="btTickerList" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+                            <small class="text-muted">Activos detectados de tu cartera. Marca / desmarca los que quieras incluir.</small>
+                        </div>
+
+                        <div id="btParams" class="form-row"></div>
+
+                        <div class="modal-footer">
+                            <button class="btn-primary" onclick="runBacktest()" id="btRunBtn">🔬 Ejecutar backtest</button>
+                        </div>
+                    </div>
+
+                    <div id="btLoading" style="display:none; text-align:center; padding:20px;" class="text-muted">
+                        Ejecutando backtest contra histórico (~10-30s)...
+                    </div>
+
+                    <div id="btResults" style="display:none;">
+                        <div class="card card-kpi" id="btMetrics" style="margin-bottom:16px;"></div>
+                        <div class="card card-chart">
+                            <div class="card-header"><h3>Curva de capital</h3></div>
+                            <div class="chart-container" style="height:340px;">
+                                <canvas id="btChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="card" style="margin-top:16px;">
+                            <h3>Trades ejecutados (primeros 50)</h3>
+                            <div class="table-container">
+                                <table class="manager-table">
+                                    <thead>
+                                        <tr><th>Fecha</th><th>Acción</th><th>Ticker</th><th class="text-right">Importe €</th><th class="text-right">Precio</th><th class="text-right">Unidades</th></tr>
+                                    </thead>
+                                    <tbody id="btTradesBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- News Page -->
                 <div class="page page-news" id="page-news">
                     <section class="news-header">
@@ -1248,6 +1330,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/portfolio-manager.js"></script>
     <script src="js/ai-advisor.js"></script>
     <script src="js/asset-analysis.js"></script>
+    <script src="js/backtest.js"></script>
     <script src="js/pages.js"></script>
 </body>
 </html>
