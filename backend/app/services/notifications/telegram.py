@@ -52,6 +52,20 @@ class TelegramNotifier:
             logger.error("telegram POST failed: {}", exc)
             return False
 
+    async def send_chat_action(self, action: str = "typing") -> bool:
+        """Show the native '…está escribiendo' indicator in Telegram."""
+        if not self.enabled:
+            return False
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(
+                    self.BASE_URL.format(token=self.token, method="sendChatAction"),
+                    json={"chat_id": self.chat_id, "action": action},
+                )
+            return True
+        except Exception:
+            return False
+
     async def send_text(self, text: str) -> bool:
         """Send plain text (no formatting)."""
         return await self._post({

@@ -106,6 +106,7 @@ class TelegramBotHandler:
 
     async def _send_chart(self, text: str) -> None:
         """Send a portfolio or per-asset evolution chart as an image."""
+        await self.notifier.send_chat_action("upload_photo")
         low = text.lower()
         async with session_scope() as session:
             positions = await PositionRepository(session).list_all()
@@ -276,6 +277,9 @@ class TelegramBotHandler:
             await self.notifier.send_text("No tengo LLM configurado para responder ahora mismo.")
             return
 
+        # Show "escribiendo..." while we crunch the portfolio + call the LLM
+        await self.notifier.send_chat_action("typing")
+
         # Build rich context: portfolio + weekly change + per-position detail
         try:
             p = await self.portfolio_service.calculate_portfolio()
@@ -283,6 +287,8 @@ class TelegramBotHandler:
             logger.warning("telegram Q&A: portfolio failed: {}", exc)
             await self.notifier.send_text("No pude cargar tu cartera ahora mismo, intenta en un minuto.")
             return
+
+        await self.notifier.send_chat_action("typing")
 
         # Weekly change from snapshots
         weekly_line = ""
@@ -299,28 +305,37 @@ class TelegramBotHandler:
             pass
 
         context = [
-            f"Cartera: {p['total_value']:.2f} {p['base_currency']} | "
-            f"P/L total {p['total_gain_loss']:+.2f} ({p['total_gain_loss_pct']:+.2f}%) | "
-            f"hoy {p['daily_change']:+.2f} ({p['daily_change_pct']:+.2f}%){weekly_line}",
+            f"Cartera: valor actual {p['total_value']:.2f} {p['base_currency']} | "
+            f"dinero invertido (coste) {p['total_cost']:.2f}€ | "
+            f"ganancia/pérdida total {p['total_gain_loss']:+.2f}€ ({p['total_gain_loss_pct']:+.2f}%) | "
+            f"hoy {p['daily_change']:+.2f}€ ({p['daily_change_pct']:+.2f}%){weekly_line}",
             "",
-            "Posiciones:",
+            "Posiciones (invertido = lo que pusiste; valor = lo que vale hoy; ganancia = valor - invertido):",
         ]
         for pos in p["positions"]:
             name = friendly_name(pos["ticker"], pos.get("name"))
+            invested = pos.get("cost_basis", 0)
+            gain_eur = pos.get("gain_loss", 0)
             context.append(
-                f"- {name} (ticker {pos['ticker']}, {pos['type']}, {pos['broker']}): {pos['quantity']:.6g} ud, "
-                f"valor {pos['market_value_base']:.2f}€, P/L {pos['gain_loss_pct']:+.1f}%, "
-                f"hoy {pos['day_change_pct']:+.1f}%, peso {pos['weight']:.1f}%"
+                f"- {name} (ticker {pos['ticker']}, {pos['type']}, {pos['broker']}): "
+                f"{pos['quantity']:.6g} unidades · invertido {invested:.2f}€ · "
+                f"valor actual {pos['market_value_base']:.2f}€ · "
+                f"ganancia {gain_eur:+.2f}€ ({pos['gain_loss_pct']:+.1f}%) · "
+                f"hoy {pos['day_change_pct']:+.1f}% · peso {pos['weight']:.1f}%"
             )
         context_str = "\n".join(context)
 
         system = (
             "Eres FinBot, asistente financiero del usuario por Telegram. Respondes en español, "
             "breve y claro (esto se lee en el móvil). Usas SOLO los datos de la cartera que se te dan. "
+            "TIENES el dinero invertido (campo 'invertido' = cantidad × precio medio de compra), el valor "
+            "actual y la ganancia en € de cada activo y del total: úsalos para responder cuánto invirtió, "
+            "cuánto vale y cuánto ha ganado. NUNCA digas que no sabes el dinero invertido — está en los datos. "
             "Refiérete a los activos por su NOMBRE (ej. 'Oro físico', 'Nasdaq-100', 'Fidelity MSCI World'), "
             "no por su ISIN. Si te preguntan por 'el oro', 'el nasdaq', 'el msci', etc., asócialo al activo "
-            "correcto de la lista. Si te piden algo que no está en los datos, dilo. "
-            "No das consejos de compra/venta concretos."
+            "correcto. No das consejos de compra/venta concretos. "
+            "Aclara, solo si es relevante, que en cripto el 'invertido' es el precio medio de Kraken y en "
+            "fondos es una estimación basada en el precio medio."
         )
         try:
             client = get_llm_client()
