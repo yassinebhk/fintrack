@@ -12,40 +12,50 @@ Recibes:
 - Las conclusiones de los analistas (en JSON).
 
 Tu trabajo:
-1. Producir un briefing diario en español, claro y accionable.
+1. Producir un briefing diario en español, claro y accionable, OPTIMIZADO PARA MÓVIL.
 2. Decir qué pasó en la cartera del usuario, qué pasó en mercados y qué vigilar hoy.
 3. Sugerir UNA acción razonable (DCA / no hacer nada / revisar X / esperar). Nunca tickers concretos a comprar/vender.
 4. Mantener tono honesto: si hay poco que decir, dilo. No inventes.
 5. Incluir un disclaimer breve al final.
 
-Formato esperado: JSON con headline, sections (lista de {title, body}), suggested_action, disclaimer.
+REGLAS DE FORMATO (críticas — esto se lee en Telegram en el móvil):
+- Cada sección tiene un `body` de UNA frase corta (máx 25 palabras) como intro.
+- Y un `bullets` con 2-4 puntos cortos (cada bullet ≤ 18 palabras, sin punto al final).
+- Los bullets son frases completas autónomas, NO empiecen con conector ("y", "pero", "además").
+- Habla directamente al usuario en español (tú, no usted).
+- Cifras: usa formato compacto ("+2.21 €", "+0.61%"), nunca decimales largos.
 """
 
 SCHEMA = {
     "type": "object",
     "properties": {
-        "headline": {"type": "string", "description": "Titular de hoy (1 frase)"},
+        "headline": {"type": "string", "description": "Titular de hoy (1 frase, máx 15 palabras)"},
         "sections": {
             "type": "array",
             "items": {
                 "type": "object",
                 "properties": {
-                    "title": {"type": "string"},
-                    "body": {"type": "string"},
+                    "title": {"type": "string", "description": "Título corto (2-4 palabras)"},
+                    "body": {"type": "string", "description": "Intro de UNA frase corta (máx 25 palabras)"},
+                    "bullets": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "2-4 puntos clave, cada uno ≤ 18 palabras, sin punto final",
+                    },
                 },
-                "required": ["title", "body"],
+                "required": ["title", "body", "bullets"],
             },
-            "description": "Secciones: Cartera ayer / Lo que pasó en mercados / Qué vigilar hoy",
+            "description": "3 secciones: Cartera ayer / Mercados / Qué vigilar hoy",
         },
         "suggested_action": {
             "type": "object",
             "properties": {
                 "label": {"type": "string", "enum": ["dca", "rebalance", "hold", "watch", "review_risk", "none"]},
-                "rationale": {"type": "string"},
+                "rationale": {"type": "string", "description": "1 frase corta (máx 25 palabras)"},
             },
             "required": ["label", "rationale"],
         },
-        "disclaimer": {"type": "string"},
+        "disclaimer": {"type": "string", "description": "1 frase breve, no más de 20 palabras"},
     },
     "required": ["headline", "sections", "suggested_action", "disclaimer"],
 }

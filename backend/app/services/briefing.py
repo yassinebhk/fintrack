@@ -103,11 +103,17 @@ def render_briefing_telegram(content: dict, briefing_date=None) -> str:
     for section in content.get("sections", []):
         title = section.get("title", "")
         body = section.get("body", "")
-        if not title and not body:
+        bullets = section.get("bullets", []) or []
+        if not title and not body and not bullets:
             continue
         icon = _section_icon(title)
         parts.append(f"{icon} <b>{esc(title)}</b>")
-        parts.append(esc(body))
+        if body:
+            parts.append(esc(body))
+        for bullet in bullets:
+            if not bullet:
+                continue
+            parts.append(f"  • {esc(bullet.strip().rstrip('.'))}")
         parts.append("")
 
     # Suggested action
