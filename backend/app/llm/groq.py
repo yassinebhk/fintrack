@@ -29,9 +29,26 @@ class GroqClient:
         json_schema: dict | None = None,
     ) -> LLMResponse:
         model = model or self.default_model
+        msgs = [{"role": m.role, "content": m.content} for m in messages]
+
+        # Groq supports `response_format: json_object` (valid JSON) but NOT a response
+        # schema. To get the *shape* we want, inject the schema into the prompt and
+        # ensure the word "json" appears (Groq requires it for json_object mode).
+        if json_schema is not None:
+            schema_str = json.dumps(json_schema, ensure_ascii=False)
+            instruction = (
+                "\n\nDevuelve EXCLUSIVAMENTE un objeto JSON válido que cumpla este JSON Schema "
+                "(usa exactamente esos nombres de campo, sin texto adicional):\n"
+                f"{schema_str}"
+            )
+            if msgs and msgs[-1]["role"] == "user":
+                msgs[-1]["content"] += instruction
+            else:
+                msgs.append({"role": "user", "content": instruction})
+
         body = {
             "model": model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": msgs,
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
