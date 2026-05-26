@@ -15,6 +15,9 @@ _coingecko = CoinGeckoService()
 async def get_price(ticker: str, asset_type: str = Query(default="stock")) -> dict:
     if asset_type == "crypto":
         price = await _coingecko.get_price(ticker, vs_currency="eur")
+        if price is None:
+            # CoinGecko free tier rate-limits aggressively — fall back to Yahoo BTC-EUR style
+            price = await _yahoo.get_price(f"{ticker.upper()}-EUR")
     else:
         price = await _yahoo.get_price(ticker)
     if price is None:
@@ -40,8 +43,16 @@ async def get_asset_history(
 
     if asset_type == "crypto":
         period_days = {"1d": 1, "5d": 5, "1mo": 30, "3mo": 90, "6mo": 180, "1y": 365, "2y": 730, "5y": 1825, "max": 2000}
-        history = await _coingecko.get_history(ticker, days=period_days.get(period, 365), vs_currency="eur")
+        days = period_days.get(period, 365)
+        history = await _coingecko.get_history(ticker, days=days, vs_currency="eur")
         current = await _coingecko.get_price(ticker, vs_currency="eur")
+        # Fallback to Yahoo (BTC-EUR etc.) if CoinGecko is rate-limited or the range is too long for free tier
+        if not history:
+            yahoo_ticker = f"{ticker.upper()}-EUR"
+            yperiod = "max" if days > 1825 else "5y" if days > 730 else "2y" if days > 365 else "1y" if days > 90 else "3mo" if days > 30 else "1mo"
+            history = await _yahoo.get_history(yahoo_ticker, period=yperiod)
+            if current is None:
+                current = await _yahoo.get_price(yahoo_ticker)
     else:
         history = await _yahoo.get_history(ticker, period=period)
         current = await _yahoo.get_price(ticker)
