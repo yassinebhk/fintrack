@@ -76,6 +76,29 @@ class TelegramNotifier:
         plain = plain.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
         return await self.send_text(plain)
 
+    async def send_photo(self, photo_url: str, caption: str = "") -> bool:
+        """Send a photo by URL (e.g. a QuickChart image). caption supports HTML."""
+        if not self.enabled:
+            return False
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    self.BASE_URL.format(token=self.token, method="sendPhoto"),
+                    json={
+                        "chat_id": self.chat_id,
+                        "photo": photo_url,
+                        "caption": caption[:1000],
+                        "parse_mode": "HTML",
+                    },
+                )
+                if resp.status_code >= 400:
+                    logger.warning("telegram sendPhoto failed ({}): {}", resp.status_code, resp.text[:150])
+                    return False
+            return True
+        except Exception as exc:
+            logger.error("telegram send_photo failed: {}", exc)
+            return False
+
     # Kept for backward compat — new code should call send_html
     async def send_markdown_v2(self, text: str) -> bool:
         return await self.send_html(text)

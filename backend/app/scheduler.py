@@ -38,6 +38,16 @@ async def _kraken_sync_job() -> None:
 
 
 async def _briefing_job() -> None:
+    # 1) Daily portfolio snapshot summary (live values per position, like checking each app)
+    try:
+        from app.services.telegram_bot import TelegramBotHandler
+
+        await TelegramBotHandler()._send_quick_summary()
+        logger.info("daily portfolio summary sent")
+    except Exception as exc:
+        logger.error("daily portfolio summary failed: {}", exc)
+
+    # 2) AI briefing (analysis)
     try:
         result = await BriefingService().generate_today(force=True)
         logger.info(

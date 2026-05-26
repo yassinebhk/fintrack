@@ -16,8 +16,33 @@ from app.config import get_settings
 from app.db import session_scope
 from app.llm import LLMMessage, get_llm_client
 from app.repositories import PositionRepository, SnapshotRepository
+from app.services.charts import line_chart
 from app.services.notifications.telegram import TelegramNotifier, html_escape
 from app.services.portfolio import PortfolioService
+
+
+PAGE_URL = "https://fintrack-front.onrender.com"
+PAGE_LINK = f'\n\n🔗 <a href="{PAGE_URL}">Ver más en FinTrack</a>'
+
+# Friendly display names so we never show raw ISINs to the user
+FRIENDLY_NAMES = {
+    "BTC": "Bitcoin",
+    "ETH": "Ethereum",
+    "SOL": "Solana",
+    "DOGE": "Dogecoin",
+    "PEPE": "Pepe",
+    "IE00BYX5NX33": "Fidelity MSCI World",
+    "IE00B4ND3602": "Oro físico (iShares)",
+    "LYX0F.DE": "Nasdaq-100 (Amundi)",
+}
+
+
+def friendly_name(ticker: str, asset_name: str | None = None) -> str:
+    if ticker in FRIENDLY_NAMES:
+        return FRIENDLY_NAMES[ticker]
+    if asset_name:
+        return asset_name
+    return ticker
 
 
 HELP_TEXT = (
@@ -25,14 +50,17 @@ HELP_TEXT = (
     "Puedes:\n"
     "• Preguntarme cualquier cosa: <i>¿cuánto he ganado esta semana?</i>, "
     "<i>resumen de mi bitcoin</i>, <i>¿cómo está diversificada mi cartera?</i>\n"
-    "• Aportar dinero a un fondo: <code>/aportar oro 50</code> o "
-    "<i>he metido 50€ al nasdaq</i>\n"
+    "• Pedir gráficas: <i>gráfica de mi cartera</i>, <i>gráfico de bitcoin</i>\n"
+    "• Aportar dinero: <code>/aportar oro 50</code> o <i>he metido 50€ al nasdaq</i>\n"
     "• <code>/cartera</code> — resumen rápido\n"
     "• <code>/ayuda</code> — este mensaje"
+    + PAGE_LINK
 )
 
 CONTRIBUTE_KEYWORDS = ("aporta", "aporté", "aporte", "mete", "metí", "meti", "añad", "anad",
                        "invierto", "invertí", "inverti", "compr", "ingreso", "ingresé")
+
+CHART_KEYWORDS = ("gráfic", "grafic", "chart", "evolución", "evolucion", "muéstrame", "muestrame")
 
 
 class TelegramBotHandler:
@@ -61,6 +89,11 @@ class TelegramBotHandler:
             await self._send_quick_summary()
             return
 
+        # Chart intent?
+        if any(k in low for k in CHART_KEYWORDS):
+            await self._send_chart(text)
+            return
+
         # Contribution intent?
         if low.startswith("/aportar") or self._looks_like_contribution(low):
             handled = await self._try_contribution(text)
@@ -70,6 +103,47 @@ class TelegramBotHandler:
 
         # Otherwise treat as a question for FinBot
         await self._answer_question(text)
+
+    async def _send_chart(self, text: str) -> None:
+        """Send a portfolio or per-asset evolution chart as an image."""
+        low = text.lower()
+        async with session_scope() as session:
+            positions = await PositionRepository(session).list_all()
+
+        # Did they mention a specific asset?
+        target = self._match_position(text, positions)
+        try:
+            if target:
+                period_days = 180
+                history = await self.portfolio_service.get_asset_history(
+                    target.ticker, target.type, days=period_days
+                )
+                if not history:
+                    await self.notifier.send_text(
+                        f"No pude obtener el histórico de {friendly_name(target.ticker, target.asset_name)} ahora mismo."
+                    )
+                    return
+                labels = [h["date"] for h in history]
+                values = [h.get("close") or h.get("price") for h in history]
+                name = friendly_name(target.ticker, target.asset_name)
+                url = line_chart(f"{name} — últimos 6 meses", labels, values)
+                await self.notifier.send_photo(url, caption=f"📈 <b>{html_escape(name)}</b>{PAGE_LINK}")
+            else:
+                # Portfolio evolution
+                hist = await self.portfolio_service.get_portfolio_history(days=180)
+                if not hist or len(hist) < 2:
+                    await self.notifier.send_html(
+                        "Aún no tengo suficiente histórico de tu cartera para una gráfica "
+                        "(se va construyendo cada día)." + PAGE_LINK
+                    )
+                    return
+                labels = [h["date"] for h in hist]
+                values = [h["value"] for h in hist]
+                url = line_chart("Evolución de tu cartera", labels, values)
+                await self.notifier.send_photo(url, caption=f"📊 <b>Tu cartera</b>{PAGE_LINK}")
+        except Exception as exc:
+            logger.error("telegram chart failed: {}", exc)
+            await self.notifier.send_text("No pude generar la gráfica ahora mismo, intenta en un momento.")
 
     # ------------------------------------------------------------------ helpers
 
@@ -88,10 +162,12 @@ class TelegramBotHandler:
             "<b>Posiciones:</b>",
         ]
         for pos in p["positions"][:12]:
+            name = friendly_name(pos["ticker"], pos.get("name"))
             lines.append(
-                f"• {html_escape(pos['ticker'])}: {pos['market_value_base']:.2f} € "
+                f"• {html_escape(name)}: {pos['market_value_base']:.2f} € "
                 f"({pos['gain_loss_pct']:+.1f}%)"
             )
+        lines.append(PAGE_LINK)
         await self.notifier.send_html("\n".join(lines))
 
     async def _try_contribution(self, text: str) -> bool:
@@ -230,8 +306,9 @@ class TelegramBotHandler:
             "Posiciones:",
         ]
         for pos in p["positions"]:
+            name = friendly_name(pos["ticker"], pos.get("name"))
             context.append(
-                f"- {pos['ticker']} ({pos['type']}, {pos['broker']}): {pos['quantity']:.6g} ud, "
+                f"- {name} (ticker {pos['ticker']}, {pos['type']}, {pos['broker']}): {pos['quantity']:.6g} ud, "
                 f"valor {pos['market_value_base']:.2f}€, P/L {pos['gain_loss_pct']:+.1f}%, "
                 f"hoy {pos['day_change_pct']:+.1f}%, peso {pos['weight']:.1f}%"
             )
@@ -240,7 +317,10 @@ class TelegramBotHandler:
         system = (
             "Eres FinBot, asistente financiero del usuario por Telegram. Respondes en español, "
             "breve y claro (esto se lee en el móvil). Usas SOLO los datos de la cartera que se te dan. "
-            "Si te piden algo que no está en los datos, dilo. No das consejos de compra/venta concretos."
+            "Refiérete a los activos por su NOMBRE (ej. 'Oro físico', 'Nasdaq-100', 'Fidelity MSCI World'), "
+            "no por su ISIN. Si te preguntan por 'el oro', 'el nasdaq', 'el msci', etc., asócialo al activo "
+            "correcto de la lista. Si te piden algo que no está en los datos, dilo. "
+            "No das consejos de compra/venta concretos."
         )
         try:
             client = get_llm_client()
@@ -253,8 +333,7 @@ class TelegramBotHandler:
                 temperature=0.4,
             )
             answer = resp.text.strip() or "No tengo una respuesta ahora mismo."
-            # Telegram HTML: send plain (LLM may emit markdown); keep it simple
-            await self.notifier.send_text(answer[:3500])
+            await self.notifier.send_html(html_escape(answer[:3400]) + PAGE_LINK)
         except Exception as exc:
             logger.error("telegram Q&A LLM failed: {}", exc)
             await self.notifier.send_text(f"No pude responder: {str(exc)[:100]}")

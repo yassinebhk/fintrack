@@ -61,7 +61,19 @@ class PortfolioService:
         if stocks_etfs:
             prices.update(await self.yahoo.get_prices(stocks_etfs))
         if cryptos:
-            prices.update(await self.coingecko.get_prices(cryptos, vs_currency=self.base_currency.lower()))
+            crypto_prices = await self.coingecko.get_prices(cryptos, vs_currency=self.base_currency.lower())
+            prices.update(crypto_prices)
+            # Fallback: CoinGecko free tier rate-limits hard. For any crypto it didn't
+            # return, fetch the EUR pair from Yahoo (BTC-EUR, ETH-EUR, ...) so we never
+            # fall back to using avg_price as the live price (which zeroes out P/L).
+            missing = [c for c in cryptos if c not in crypto_prices]
+            for ticker in missing:
+                yp = await self.yahoo.get_price(f"{ticker.upper()}-EUR")
+                if yp and yp.get("price"):
+                    yp = dict(yp)
+                    yp["ticker"] = ticker
+                    prices[ticker] = yp
+                    logger.info("crypto {} price via Yahoo fallback: {}", ticker, yp["price"])
 
         self._prices_cache = prices
         return prices
