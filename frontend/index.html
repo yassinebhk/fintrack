@@ -65,6 +65,10 @@
                     <span class="nav-icon">📰</span>
                     <span class="nav-label">Noticias</span>
                 </li>
+                <li class="nav-item" data-page="polymarket">
+                    <span class="nav-icon">🎲</span>
+                    <span class="nav-label">Polymarket Lab</span>
+                </li>
                 <li class="nav-item" data-page="learn">
                     <span class="nav-icon">📚</span>
                     <span class="nav-label">Aprender</span>
@@ -1289,6 +1293,34 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                     </div>
                 </div>
 
+                <!-- Polymarket Lab Page -->
+                <div class="page page-polymarket" id="page-polymarket">
+                    <section class="manager-header">
+                        <div>
+                            <h2>🎲 Polymarket Lab <span style="font-size:12px; background:var(--warning); color:#000; padding:2px 8px; border-radius:10px; vertical-align:middle;">EXPERIMENTAL</span></h2>
+                            <p>Escáner de mercados de predicción cripto vs precio spot de Binance — solo lectura, paper trading</p>
+                        </div>
+                    </section>
+
+                    <div class="integrations-banner-inner" style="margin-bottom:16px;">
+                        <div class="integrations-banner-icon">⚠️</div>
+                        <div class="integrations-banner-body">
+                            <strong>Esto es un laboratorio educativo</strong>
+                            <p style="margin:6px 0 0;">No coloca órdenes reales ni mueve dinero. Compara la probabilidad implícita de mercados de Polymarket con el precio spot de Binance para estudiar posibles desajustes. El edge de arbitraje de latencia real requiere infraestructura &lt;50ms imposible en este entorno.</p>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-bottom:16px;">
+                        <div class="card-header">
+                            <h3>Escáner de mercados cripto</h3>
+                            <button class="btn-primary" onclick="runPolymarketScan()" id="pmScanBtn">🔄 Escanear ahora</button>
+                        </div>
+                        <div id="pmScanResult">
+                            <p class="text-muted">Pulsa "Escanear ahora" para cargar los mercados cripto activos de Polymarket.</p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- News Page -->
                 <div class="page page-news" id="page-news">
                     <section class="news-header">
@@ -1339,6 +1371,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/ai-advisor.js"></script>
     <script src="js/asset-analysis.js"></script>
     <script src="js/backtest.js"></script>
+    <script src="js/polymarket.js"></script>
     <script src="js/pages.js"></script>
 </body>
 </html>

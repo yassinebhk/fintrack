@@ -13,6 +13,7 @@ from app.api import (
     health,
     imports,
     news,
+    polymarket,
     portfolio,
     positions,
     transactions,
@@ -34,4 +35,5 @@ def build_api_router() -> APIRouter:
     router.include_router(briefings.router)
     router.include_router(alerts.router)
     router.include_router(backtest.router)
+    router.include_router(polymarket.router)
     return router

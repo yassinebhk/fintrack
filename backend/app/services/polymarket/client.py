@@ -1,0 +1,98 @@
+"""Polymarket Gamma API client (public, read-only).
+
+Docs: https://docs.polymarket.com/  (Gamma markets API)
+We only read market metadata + current prices; no trading.
+"""
+
+import httpx
+from loguru import logger
+
+
+GAMMA_URL = "https://gamma-api.polymarket.com"
+
+
+class PolymarketClient:
+    async def get_markets(
+        self,
+        *,
+        closed: bool = False,
+        limit: int = 50,
+        tag: str | None = None,
+    ) -> list[dict]:
+        """Fetch active markets. Optionally filter by a tag like 'crypto'."""
+        params: dict = {"closed": str(closed).lower(), "limit": limit, "order": "volume24hr", "ascending": "false"}
+        if tag:
+            params["tag_id"] = tag
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.get(f"{GAMMA_URL}/markets", params=params)
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as exc:
+            logger.warning("polymarket markets fetch failed: {}", exc)
+            return []
+        if isinstance(data, dict):
+            data = data.get("data", [])
+        return data or []
+
+    async def search_crypto_markets(self, limit: int = 30) -> list[dict]:
+        """Pull active markets and keep the ones genuinely about crypto prices.
+
+        Uses word-boundary matching so e.g. 'Ethan' doesn't match 'eth', and
+        requires a price-related token ($, k, price, hit, reach, above, below)
+        to avoid sports/politics noise.
+        """
+        import re
+
+        markets = await self.get_markets(closed=False, limit=200)
+        crypto_re = re.compile(
+            r"\b(bitcoin|btc|ethereum|eth|solana|sol|dogecoin|doge|crypto)\b",
+            re.IGNORECASE,
+        )
+        price_signal_re = re.compile(
+            r"(\$|\bprice\b|\bhit\b|\breach\b|\babove\b|\bbelow\b|\bk\b|all[- ]time high|\bath\b)",
+            re.IGNORECASE,
+        )
+        result = []
+        for m in markets:
+            question = m.get("question") or m.get("title") or ""
+            if crypto_re.search(question) and price_signal_re.search(question):
+                result.append(self._normalize_market(m))
+            if len(result) >= limit:
+                break
+        return result
+
+    def _normalize_market(self, m: dict) -> dict:
+        # Parse outcome prices (Gamma returns them as a JSON string sometimes)
+        import json
+        outcomes = m.get("outcomes")
+        prices = m.get("outcomePrices")
+        if isinstance(outcomes, str):
+            try:
+                outcomes = json.loads(outcomes)
+            except json.JSONDecodeError:
+                outcomes = []
+        if isinstance(prices, str):
+            try:
+                prices = json.loads(prices)
+            except json.JSONDecodeError:
+                prices = []
+        outcome_data = []
+        for i, o in enumerate(outcomes or []):
+            price = None
+            try:
+                price = float(prices[i]) if prices and i < len(prices) else None
+            except (ValueError, TypeError):
+                price = None
+            outcome_data.append({"outcome": o, "price": price})
+
+        return {
+            "id": m.get("id"),
+            "question": m.get("question") or m.get("title"),
+            "slug": m.get("slug"),
+            "end_date": m.get("endDate"),
+            "volume_24h": m.get("volume24hr") or m.get("volume24hrClob"),
+            "liquidity": m.get("liquidity"),
+            "outcomes": outcome_data,
+            "url": f"https://polymarket.com/event/{m.get('slug')}" if m.get("slug") else None,
+        }
