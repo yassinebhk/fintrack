@@ -1,9 +1,28 @@
-"""Telegram bot notifier (no python-telegram-bot dependency — direct API)."""
+"""Telegram bot notifier (no python-telegram-bot dependency — direct API).
+
+Telegram supports two formatting modes: MarkdownV2 (very strict, easy to break)
+and HTML (lenient, predictable). We always send HTML — it lets us use
+<b>, <i>, <code>, <pre>, <a> and only requires escaping &, <, >.
+"""
 
 import httpx
 from loguru import logger
 
 from app.config import get_settings
+
+
+TG_MAX_LEN = 4000  # leave headroom under Telegram's 4096 limit
+
+
+def html_escape(text: str) -> str:
+    """Escape Telegram-HTML-reserved chars (only &, <, >)."""
+    if not text:
+        return ""
+    return (
+        text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+    )
 
 
 class TelegramNotifier:
@@ -15,7 +34,7 @@ class TelegramNotifier:
         self.chat_id = settings.telegram_chat_id
         self.enabled = bool(self.token and self.chat_id)
 
-    async def send_text(self, text: str) -> bool:
+    async def _post(self, body: dict) -> bool:
         if not self.enabled:
             logger.debug("telegram disabled (no token/chat_id)")
             return False
@@ -23,34 +42,40 @@ class TelegramNotifier:
             async with httpx.AsyncClient(timeout=20.0) as client:
                 resp = await client.post(
                     self.BASE_URL.format(token=self.token, method="sendMessage"),
-                    json={"chat_id": self.chat_id, "text": text, "disable_web_page_preview": True},
-                )
-                resp.raise_for_status()
-            return True
-        except Exception as exc:
-            logger.error("telegram send_text failed: {}", exc)
-            return False
-
-    async def send_markdown_v2(self, text: str) -> bool:
-        if not self.enabled:
-            return False
-        try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.post(
-                    self.BASE_URL.format(token=self.token, method="sendMessage"),
-                    json={
-                        "chat_id": self.chat_id,
-                        "text": text[:4000],
-                        "parse_mode": "MarkdownV2",
-                        "disable_web_page_preview": True,
-                    },
+                    json=body,
                 )
                 if resp.status_code >= 400:
-                    logger.warning("telegram markdown failed ({}), falling back to plain", resp.status_code)
-                    # Fallback: strip backslashes the escape inserted, send plain
-                    plain = text.replace("\\", "")
-                    return await self.send_text(plain)
+                    logger.warning("telegram send failed ({}): {}", resp.status_code, resp.text[:200])
+                    return False
             return True
         except Exception as exc:
-            logger.error("telegram send_markdown_v2 failed: {}", exc)
+            logger.error("telegram POST failed: {}", exc)
             return False
+
+    async def send_text(self, text: str) -> bool:
+        """Send plain text (no formatting)."""
+        return await self._post({
+            "chat_id": self.chat_id,
+            "text": text[:TG_MAX_LEN],
+            "disable_web_page_preview": True,
+        })
+
+    async def send_html(self, html: str) -> bool:
+        """Send HTML-formatted message. Safe; falls back to plain if HTML is rejected."""
+        ok = await self._post({
+            "chat_id": self.chat_id,
+            "text": html[:TG_MAX_LEN],
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+        })
+        if ok:
+            return True
+        # Strip tags and retry as plain
+        import re
+        plain = re.sub(r"<[^>]+>", "", html)
+        plain = plain.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+        return await self.send_text(plain)
+
+    # Kept for backward compat — new code should call send_html
+    async def send_markdown_v2(self, text: str) -> bool:
+        return await self.send_html(text)

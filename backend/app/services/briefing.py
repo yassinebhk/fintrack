@@ -37,32 +37,96 @@ def render_briefing_markdown(content: dict) -> str:
     return "\n".join(lines).strip()
 
 
-def render_briefing_telegram(content: dict) -> str:
-    """Compact, telegram-friendly version."""
-    lines = []
-    headline = content.get("headline", "Briefing diario")
-    lines.append(f"📊 *{_md_escape(headline)}*")
+SECTION_ICONS = {
+    "cartera": "💼",
+    "portfolio": "💼",
+    "mercados": "🌍",
+    "mercado": "🌍",
+    "market": "🌍",
+    "vigilar": "👀",
+    "watch": "👀",
+    "noticias": "📰",
+    "news": "📰",
+    "riesgo": "⚠️",
+    "risk": "⚠️",
+    "cripto": "₿",
+    "crypto": "₿",
+}
+
+ACTION_LABELS = {
+    "dca": "Continuar DCA",
+    "rebalance": "Rebalancear cartera",
+    "hold": "Mantener posiciones",
+    "watch": "Vigilar mercado",
+    "review_risk": "Revisar exposición al riesgo",
+    "none": "Sin acción",
+}
+
+
+def _section_icon(title: str) -> str:
+    if not title:
+        return "•"
+    key = title.lower()
+    for needle, icon in SECTION_ICONS.items():
+        if needle in key:
+            return icon
+    return "•"
+
+
+def render_briefing_telegram(content: dict, briefing_date=None) -> str:
+    """Telegram HTML rendering — visually rich, predictable parser.
+
+    Telegram HTML supports: <b>, <i>, <u>, <s>, <code>, <pre>, <a>, <tg-spoiler>.
+    Only &, <, > need escaping in content.
+    """
+    from datetime import date as _date
+    from app.services.notifications.telegram import html_escape as esc
+
+    briefing_date = briefing_date or _date.today()
+    date_str = briefing_date.strftime("%d %b %Y").capitalize()
+
+    parts: list[str] = []
+
+    # Header
+    parts.append(f"📊 <b>FinTrack — Briefing diario</b>")
+    parts.append(f"<i>{esc(date_str)}</i>")
+    parts.append("")
+    parts.append("━━━━━━━━━━━━━━━━━━")
+
+    # Headline
+    headline = content.get("headline")
+    if headline:
+        parts.append(f"<b>{esc(headline)}</b>")
+        parts.append("")
+
+    # Sections
     for section in content.get("sections", []):
-        lines.append("")
-        lines.append(f"*{_md_escape(section.get('title', '?'))}*")
-        lines.append(_md_escape(section.get("body", "")))
+        title = section.get("title", "")
+        body = section.get("body", "")
+        if not title and not body:
+            continue
+        icon = _section_icon(title)
+        parts.append(f"{icon} <b>{esc(title)}</b>")
+        parts.append(esc(body))
+        parts.append("")
+
+    # Suggested action
     action = content.get("suggested_action") or {}
     if action:
-        lines.append("")
-        lines.append(f"🎯 *Acción sugerida*: `{_md_escape(action.get('label', '-'))}` — {_md_escape(action.get('rationale', ''))}")
+        label = action.get("label", "none")
+        label_pretty = ACTION_LABELS.get(label, label)
+        rationale = action.get("rationale", "")
+        parts.append("━━━━━━━━━━━━━━━━━━")
+        parts.append(f"🎯 <b>Acción sugerida:</b> <i>{esc(label_pretty)}</i>")
+        if rationale:
+            parts.append(esc(rationale))
+        parts.append("")
+
+    # Disclaimer
     if content.get("disclaimer"):
-        lines.append("")
-        lines.append(f"_{_md_escape(content['disclaimer'])}_")
-    return "\n".join(lines).strip()
+        parts.append(f"<i>{esc(content['disclaimer'])}</i>")
 
-
-def _md_escape(text: str) -> str:
-    """Escape MarkdownV2 reserved characters for Telegram."""
-    if not text:
-        return ""
-    for ch in r"_*[]()~`>#+-=|{}.!\\":
-        text = text.replace(ch, "\\" + ch)
-    return text
+    return "\n".join(parts).strip()
 
 
 class BriefingService:
@@ -132,7 +196,7 @@ class BriefingService:
             tokens_out=total_tokens_out,
         )
 
-        delivered = await self.telegram.send_markdown_v2(render_briefing_telegram(content))
+        delivered = await self.telegram.send_html(render_briefing_telegram(content, briefing_date=today))
         if delivered:
             await self._mark_delivered(today)
 

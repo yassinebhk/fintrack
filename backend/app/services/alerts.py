@@ -141,10 +141,15 @@ class AlertsEngine:
             await session.flush()
             alert_id = alert.id
 
-        # Notify
-        delivered = await self.telegram.send_text(
-            f"🔔 [{severity.upper()}] {title}\n{body}"
+        # Notify with rich HTML
+        from app.services.notifications.telegram import html_escape as esc
+        severity_emoji = {"info": "ℹ️", "warning": "⚠️", "critical": "🚨"}.get(severity, "🔔")
+        html = (
+            f"{severity_emoji} <b>{esc(title)}</b>\n"
+            f"<i>{esc(severity.upper())}</i>\n\n"
+            f"{esc(body)}"
         )
+        delivered = await self.telegram.send_html(html)
         if delivered:
             async with session_scope() as session:
                 row = await session.get(Alert, alert_id)
