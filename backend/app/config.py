@@ -61,6 +61,23 @@ class Settings(BaseSettings):
     )
 
     @property
+    def async_database_url(self) -> str:
+        """Normalize the DB URL to an async driver.
+
+        Render's Postgres URL comes as `postgres://...` or `postgresql://...`;
+        SQLAlchemy async needs `postgresql+asyncpg://...`.
+        """
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = "postgresql+asyncpg://" + url[len("postgres://"):]
+        elif url.startswith("postgresql://"):
+            url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+        # Strip sslmode query param that asyncpg doesn't accept as-is
+        if "?sslmode=" in url:
+            url = url.split("?sslmode=")[0]
+        return url
+
+    @property
     def has_gemini(self) -> bool:
         return bool(self.gemini_api_key)
 

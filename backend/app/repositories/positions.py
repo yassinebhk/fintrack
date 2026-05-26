@@ -3,9 +3,9 @@
 from collections.abc import Iterable
 
 from sqlalchemy import delete, select
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db import upsert_insert
 from app.models.position import Position
 
 
@@ -51,7 +51,7 @@ class PositionRepository:
         rows = list(rows)
         if not rows:
             return 0
-        stmt = sqlite_insert(Position).values(rows)
+        stmt = upsert_insert()(Position).values(rows)
         update_cols = {
             c.name: c
             for c in stmt.excluded

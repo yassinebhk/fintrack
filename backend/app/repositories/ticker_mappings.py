@@ -1,9 +1,9 @@
 """CRUD for ISIN / problematic ticker mappings."""
 
 from sqlalchemy import select
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db import upsert_insert
 from app.models.ticker_mapping import TickerMapping
 
 
@@ -32,7 +32,7 @@ class TickerMappingRepository:
         asset_name: str | None = None,
         notes: str | None = None,
     ) -> None:
-        stmt = sqlite_insert(TickerMapping).values(
+        stmt = upsert_insert()(TickerMapping).values(
             source_ticker=source_ticker,
             target_ticker=target_ticker,
             provider=provider,

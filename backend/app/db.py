@@ -20,7 +20,7 @@ class Base(DeclarativeBase):
 _settings = get_settings()
 
 engine = create_async_engine(
-    _settings.database_url,
+    _settings.async_database_url,
     echo=False,
     pool_pre_ping=True,
 )
@@ -30,6 +30,20 @@ SessionLocal = async_sessionmaker(
     expire_on_commit=False,
     class_=AsyncSession,
 )
+
+
+def upsert_insert():
+    """Return the dialect-appropriate INSERT that supports ON CONFLICT.
+
+    SQLite and PostgreSQL both expose on_conflict_do_update with the same
+    API, but the constructor lives in different dialect modules.
+    """
+    url = _settings.database_url
+    if url.startswith("postgresql") or "+asyncpg" in url or "+psycopg" in url:
+        from sqlalchemy.dialects.postgresql import insert
+    else:
+        from sqlalchemy.dialects.sqlite import insert
+    return insert
 
 
 @asynccontextmanager

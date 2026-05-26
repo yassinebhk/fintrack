@@ -3,9 +3,9 @@
 from datetime import date, timedelta
 
 from sqlalchemy import select
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db import upsert_insert
 from app.models.snapshot import Snapshot
 
 
@@ -21,7 +21,7 @@ class SnapshotRepository:
         total_gain_loss: float = 0.0,
         daily_change: float = 0.0,
     ) -> None:
-        stmt = sqlite_insert(Snapshot).values(
+        stmt = upsert_insert()(Snapshot).values(
             snapshot_date=snapshot_date,
             total_value=total_value,
             total_cost=total_cost,
