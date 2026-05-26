@@ -55,6 +55,69 @@ function showQuickAddModal() {
     showModal('quickAddModal');
 }
 
+function showImportPdfModal() {
+    document.getElementById('pdfFileInput').value = '';
+    document.getElementById('pdfImportResult').innerHTML = '';
+    document.getElementById('pdfImportBtn').disabled = false;
+    showModal('importPdfModal');
+}
+
+async function handlePdfImport() {
+    const fileInput = document.getElementById('pdfFileInput');
+    const broker = document.getElementById('pdfBroker').value;
+    const replace = document.getElementById('pdfReplace').value;
+    const resultEl = document.getElementById('pdfImportResult');
+    const btn = document.getElementById('pdfImportBtn');
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        resultEl.innerHTML = '<div class="alert alert-error">Selecciona un archivo PDF</div>';
+        return;
+    }
+    const file = fileInput.files[0];
+    if (file.size > 10 * 1024 * 1024) {
+        resultEl.innerHTML = '<div class="alert alert-error">PDF demasiado grande (máx 10 MB)</div>';
+        return;
+    }
+
+    btn.disabled = true;
+    resultEl.innerHTML = '<div class="alert alert-info">📄 Subiendo PDF y extrayendo posiciones con IA... (~10-30s)</div>';
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('broker', broker);
+    fd.append('replace_existing', replace);
+
+    try {
+        const resp = await fetch(`${API_BASE}/brokers/pdf/import`, { method: 'POST', body: fd });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.detail || `HTTP ${resp.status}`);
+        }
+        const items = (data.positions || []).map(p =>
+            `<li><code>${p.ticker}</code> ${p.asset_name || ''} — qty ${p.quantity} @ ${p.avg_price || '—'} ${p.currency}</li>`
+        ).join('');
+        resultEl.innerHTML = `
+            <div class="alert alert-success">
+                ✅ ${data.positions_imported} posiciones importadas
+                ${data.broker_detected ? `<br><small>Broker detectado por IA: <b>${data.broker_detected}</b></small>` : ''}
+                ${data.statement_date ? `<br><small>Fecha del extracto: ${data.statement_date}</small>` : ''}
+            </div>
+            <details style="margin-top: 10px;">
+                <summary>Detalle (${data.positions_imported} líneas)</summary>
+                <ul style="max-height: 240px; overflow-y: auto; font-size: 12px;">${items}</ul>
+            </details>
+        `;
+
+        // Refresh the positions table behind the modal
+        if (typeof loadPositions === 'function') loadPositions();
+        if (window.showToast) window.showToast(`PDF importado: ${data.positions_imported} posiciones`, 'success');
+    } catch (err) {
+        resultEl.innerHTML = `<div class="alert alert-error">❌ ${err.message}</div>`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
 // ============================================
 // Load and Display Positions
 // ============================================

@@ -627,16 +627,61 @@
                             <h4>Añadir Posición</h4>
                             <p>Añade una nueva posición manualmente</p>
                         </button>
+                        <button type="button" class="action-card" onclick="showImportPdfModal()">
+                            <span class="action-icon">📄</span>
+                            <h4>Importar PDF</h4>
+                            <p>Sube extracto MyInvestor o Trade Republic (IA lo lee)</p>
+                        </button>
                         <button type="button" class="action-card" onclick="showImportModal()">
                             <span class="action-icon">📤</span>
                             <h4>Importar CSV</h4>
-                            <p>Importa desde Trade Republic, MyInvestor, Kraken...</p>
+                            <p>Importa desde un CSV exportado del broker</p>
                         </button>
                         <button type="button" class="action-card" onclick="showQuickAddModal()">
                             <span class="action-icon">⚡</span>
                             <h4>Añadir Rápido</h4>
                             <p>Añade múltiples posiciones a la vez</p>
                         </button>
+                    </div>
+
+                    <!-- PDF Import Modal -->
+                    <div class="modal" id="importPdfModal">
+                        <div class="modal-content modal-lg">
+                            <div class="modal-header">
+                                <h3>📄 Importar extracto PDF</h3>
+                                <button class="modal-close" onclick="closeModal('importPdfModal')">×</button>
+                            </div>
+                            <p class="text-muted" style="margin: 0 0 12px;">
+                                Sube un extracto mensual de MyInvestor o Trade Republic. La IA extrae las posiciones automáticamente y reemplaza las anteriores del mismo broker.
+                            </p>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Broker *</label>
+                                    <select id="pdfBroker">
+                                        <option value="MyInvestor">MyInvestor</option>
+                                        <option value="TradeRepublic">Trade Republic</option>
+                                        <option value="Generic">Otro broker</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Reemplazar posiciones previas del broker</label>
+                                    <select id="pdfReplace">
+                                        <option value="true">Sí (recomendado)</option>
+                                        <option value="false">No, fusionar</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="pdfFileInput">Archivo PDF</label>
+                                <input type="file" id="pdfFileInput" accept="application/pdf,.pdf">
+                                <small class="text-muted">Máx. 10 MB. El PDF se procesa con Gemini y nunca se almacena.</small>
+                            </div>
+                            <div id="pdfImportResult" style="margin-top: 12px;"></div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn-secondary" onclick="closeModal('importPdfModal')">Cancelar</button>
+                                <button type="button" class="btn-primary" id="pdfImportBtn" onclick="handlePdfImport()">Importar</button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Current Positions -->

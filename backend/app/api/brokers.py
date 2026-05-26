@@ -1,6 +1,6 @@
 """Broker sync endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,10 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db import get_session
 from app.models.broker_sync import BrokerSync
-from app.services.brokers import KrakenService
+from app.services.brokers import KrakenService, PDFExtractionError, import_pdf
 from app.services.brokers.kraken import KrakenAPIError, KrakenAuthError
 
 router = APIRouter(prefix="/api/brokers", tags=["brokers"])
+
+ALLOWED_PDF_BROKERS = {"MyInvestor", "TradeRepublic", "Generic"}
+MAX_PDF_SIZE_MB = 10
 
 
 @router.post("/kraken/sync")
@@ -50,6 +53,47 @@ async def kraken_balance() -> dict:
     except KrakenAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return {"balances": balances}
+
+
+@router.post("/pdf/import")
+async def pdf_import(
+    file: UploadFile = File(..., description="PDF de extracto (MyInvestor, TradeRepublic, etc.)"),
+    broker: str = Form(default="Generic", description="MyInvestor | TradeRepublic | Generic"),
+    replace_existing: bool = Form(default=True, description="Si true, borra las posiciones previas del broker antes de importar"),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Import positions from a broker PDF statement via Gemini Flash-Lite."""
+    settings = get_settings()
+    if not settings.has_gemini and not settings.has_groq:
+        raise HTTPException(status_code=400, detail="LLM not configured (need GEMINI_API_KEY or GROQ_API_KEY)")
+
+    if broker not in ALLOWED_PDF_BROKERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"broker must be one of {sorted(ALLOWED_PDF_BROKERS)}",
+        )
+
+    content = await file.read()
+    size_mb = len(content) / (1024 * 1024)
+    if size_mb > MAX_PDF_SIZE_MB:
+        raise HTTPException(status_code=413, detail=f"PDF demasiado grande ({size_mb:.1f} MB > {MAX_PDF_SIZE_MB} MB)")
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="El archivo no parece un PDF válido")
+
+    try:
+        result = await import_pdf(
+            pdf_bytes=content,
+            broker=broker,
+            session=session,
+            replace_broker_positions=replace_existing,
+        )
+    except PDFExtractionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("pdf import failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return {"message": "PDF imported", **result}
 
 
 @router.get("/syncs")
