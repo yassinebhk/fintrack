@@ -26,6 +26,7 @@ const ASSET_DISPLAY_NAMES = {
 function initAssetAnalysis() {
     loadAssetSelector();
     setupPeriodButtons();
+    setupChartTypeToggle();
     loadAssetQuickCards();
 }
 
@@ -171,18 +172,125 @@ async function updateAssetInfo(ticker, data) {
 /**
  * Render the asset chart
  */
-function renderAssetChart(data) {
+// Current chart type for TradingView ('candles' | 'area')
+let currentChartType = 'candles';
+let tvChart = null;
+let tvSeries = null;
+
+function setupChartTypeToggle() {
+    const container = document.getElementById('chartTypeToggle');
+    if (!container) return;
+    container.addEventListener('click', (e) => {
+        if (e.target.dataset.charttype) {
+            container.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            currentChartType = e.target.dataset.charttype;
+            if (currentAssetData) renderAssetChart(currentAssetData);
+        }
+    });
+}
+
+function renderTradingViewChart(data) {
+    const tvContainer = document.getElementById('tvChartContainer');
     const canvas = document.getElementById('assetHistoryChart');
     const placeholder = document.querySelector('.chart-placeholder');
-    
+    if (placeholder) placeholder.style.display = 'none';
+    if (canvas) canvas.style.display = 'none';
+    tvContainer.style.display = 'block';
+
+    // Clean previous chart
+    if (tvChart) {
+        try { tvChart.remove(); } catch (e) { /* noop */ }
+        tvChart = null;
+        tvSeries = null;
+    }
+    tvContainer.innerHTML = '';
+
+    const chart = LightweightCharts.createChart(tvContainer, {
+        width: tvContainer.clientWidth,
+        height: 400,
+        layout: {
+            background: { color: 'transparent' },
+            textColor: '#94a3b8',
+        },
+        grid: {
+            vertLines: { color: 'rgba(30, 41, 59, 0.5)' },
+            horzLines: { color: 'rgba(30, 41, 59, 0.5)' },
+        },
+        rightPriceScale: { borderColor: '#334155' },
+        timeScale: { borderColor: '#334155', timeVisible: false },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    });
+    tvChart = chart;
+
+    const history = data.history || [];
+    const hasOHLC = history.length > 0 && history[0].open !== undefined && history[0].high !== undefined;
+
+    if (currentChartType === 'candles' && hasOHLC) {
+        const series = chart.addCandlestickSeries({
+            upColor: '#00d4aa', downColor: '#ef4444',
+            borderUpColor: '#00d4aa', borderDownColor: '#ef4444',
+            wickUpColor: '#00d4aa', wickDownColor: '#ef4444',
+        });
+        series.setData(history.map(h => ({
+            time: h.date,
+            open: h.open, high: h.high, low: h.low, close: h.close,
+        })));
+        tvSeries = series;
+    } else {
+        // Area chart (also used when only close prices are available, e.g. crypto from CoinGecko)
+        const firstPrice = history[0]?.close ?? history[0]?.price ?? 0;
+        const lastPrice = history[history.length - 1]?.close ?? history[history.length - 1]?.price ?? 0;
+        const up = lastPrice >= firstPrice;
+        const color = up ? '#00d4aa' : '#ef4444';
+        const series = chart.addAreaSeries({
+            lineColor: color,
+            topColor: up ? 'rgba(0,212,170,0.4)' : 'rgba(239,68,68,0.4)',
+            bottomColor: 'rgba(0,0,0,0)',
+            lineWidth: 2,
+        });
+        series.setData(history.map(h => ({
+            time: h.date,
+            value: h.close ?? h.price,
+        })));
+        tvSeries = series;
+    }
+
+    chart.timeScale().fitContent();
+
+    // Responsive resize
+    if (!tvContainer._resizeHandler) {
+        tvContainer._resizeHandler = () => {
+            if (tvChart) tvChart.applyOptions({ width: tvContainer.clientWidth });
+        };
+        window.addEventListener('resize', tvContainer._resizeHandler);
+    }
+}
+
+function renderAssetChart(data) {
+    // Prefer TradingView lightweight-charts; fall back to Chart.js if the lib didn't load
+    if (typeof LightweightCharts !== 'undefined') {
+        try {
+            renderTradingViewChart(data);
+            return;
+        } catch (err) {
+            console.warn('TradingView chart failed, falling back to Chart.js:', err);
+        }
+    }
+
+    const canvas = document.getElementById('assetHistoryChart');
+    const tvContainer = document.getElementById('tvChartContainer');
+    const placeholder = document.querySelector('.chart-placeholder');
+
+    if (tvContainer) tvContainer.style.display = 'none';
     if (placeholder) placeholder.style.display = 'none';
     canvas.style.display = 'block';
-    
+
     // Destroy existing chart
     if (assetChart && typeof assetChart.destroy === 'function') {
         assetChart.destroy();
     }
-    
+
     const ctx = canvas.getContext('2d');
     const assetInfo = ASSET_DISPLAY_NAMES[data.ticker] || { color: '#00d4aa' };
     

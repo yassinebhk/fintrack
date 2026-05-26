@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -305,6 +306,10 @@
                                     <button class="period-btn" data-period="1y">1A</button>
                                     <button class="period-btn" data-period="max">Max</button>
                                 </div>
+                                <div class="chart-type-toggle" id="chartTypeToggle">
+                                    <button class="period-btn active" data-charttype="candles">🕯️ Velas</button>
+                                    <button class="period-btn" data-charttype="area">📈 Área</button>
+                                </div>
                             </div>
                             
                             <!-- Asset Info -->
@@ -346,6 +351,9 @@
                                     <span class="placeholder-icon">📊</span>
                                     <p>Selecciona un activo para ver su evolución</p>
                                 </div>
+                                <!-- TradingView lightweight-charts mounts here -->
+                                <div id="tvChartContainer" style="display: none; width: 100%; height: 400px;"></div>
+                                <!-- Chart.js fallback canvas -->
                                 <canvas id="assetHistoryChart" style="display: none;"></canvas>
                             </div>
 
