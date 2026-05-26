@@ -37,5 +37,12 @@ async def generate(force: bool = False) -> dict:
     try:
         return await _service.generate_today(force=force)
     except Exception as exc:
+        msg = str(exc)
         logger.exception("briefing generation failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="Cuota de Gemini (free tier) agotada por hoy. El briefing automático de las 08:00 se "
+                       "regenerará con cuota fresca. Límite: ~20 generaciones/día.",
+            ) from exc
+        raise HTTPException(status_code=500, detail=msg) from exc

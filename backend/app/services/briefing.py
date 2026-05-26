@@ -180,32 +180,39 @@ class BriefingService:
             extras={"macro": {"us": us_macro, "eu": eu_macro, "upcoming": upcoming}},
         )
 
-        try:
-            market_res, news_res, risk_res, crypto_res, macro_res = await asyncio.gather(
-                market.run(context_base),
-                news.run(news_ctx),
-                risk.run(context_base),
-                crypto.run(crypto_ctx),
-                macro.run(macro_ctx),
-                return_exceptions=False,
-            )
-        except Exception as exc:
-            logger.exception("specialist agents failed")
-            raise
+        # Resilient fan-out: if a specialist fails (e.g. Gemini 429 quota), keep the
+        # others. The orchestrator works with whatever succeeded.
+        agent_names = ["market", "news", "risk", "crypto", "macro"]
+        agent_results = await asyncio.gather(
+            market.run(context_base),
+            news.run(news_ctx),
+            risk.run(context_base),
+            crypto.run(crypto_ctx),
+            macro.run(macro_ctx),
+            return_exceptions=True,
+        )
 
-        sub_results = {
-            "market": market_res.output,
-            "news": news_res.output,
-            "risk": risk_res.output,
-            "crypto": crypto_res.output,
-            "macro": macro_res.output,
-        }
-        total_tokens_in = sum(
-            r.tokens_input for r in (market_res, news_res, risk_res, crypto_res, macro_res)
-        )
-        total_tokens_out = sum(
-            r.tokens_output for r in (market_res, news_res, risk_res, crypto_res, macro_res)
-        )
+        sub_results = {}
+        total_tokens_in = 0
+        total_tokens_out = 0
+        failures = []
+        for name, res in zip(agent_names, agent_results):
+            if isinstance(res, Exception):
+                failures.append(name)
+                logger.warning("agent {} failed: {}", name, str(res)[:120])
+                continue
+            sub_results[name] = res.output
+            total_tokens_in += res.tokens_input
+            total_tokens_out += res.tokens_output
+
+        if not sub_results:
+            # Every specialist failed (quota fully exhausted) — surface a clear error.
+            raise RuntimeError(
+                "No se pudo generar el briefing: todos los agentes fallaron "
+                f"(probablemente cuota de Gemini agotada). Agentes caídos: {failures}"
+            )
+        if failures:
+            logger.warning("briefing proceeding with partial data, missing: {}", failures)
 
         orch = OrchestratorAgent()
         orch_ctx = AgentContext(portfolio=portfolio, extras={"sub_results": sub_results})
