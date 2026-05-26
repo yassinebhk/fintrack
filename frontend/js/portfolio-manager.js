@@ -172,6 +172,7 @@ function renderManagerPositions(positions) {
             <td class="text-right">${pos.currency}</td>
             <td>
                 <div class="action-buttons">
+                    <button class="btn-icon" onclick="contributeToPosition('${pos.ticker}', '${pos.broker}')" title="Aportar dinero">💶</button>
                     <button class="btn-icon" onclick="editPosition('${pos.ticker}')" title="Editar">✏️</button>
                     <button class="btn-icon btn-danger" onclick="deletePosition('${pos.ticker}')" title="Eliminar">🗑️</button>
                 </div>
@@ -400,6 +401,30 @@ async function handleEditPosition(event) {
 // ============================================
 // Delete Position
 // ============================================
+
+async function contributeToPosition(ticker, broker) {
+    const raw = prompt(`💶 ¿Cuántos EUROS has aportado a ${ticker} (${broker})?\n\nEl sistema calculará las participaciones automáticamente con el precio de hoy.`);
+    if (raw === null) return;
+    const eur = parseFloat(String(raw).replace(',', '.'));
+    if (isNaN(eur) || eur <= 0) {
+        showToast('Introduce una cantidad válida en euros', 'error');
+        return;
+    }
+    try {
+        const response = await fetch(`${API_BASE}/positions/${ticker}/contribute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ broker, eur_amount: eur }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Error al aportar');
+        showToast(`+${eur.toFixed(2)}€ en ${ticker}: ${data.shares_added} part. @ ${data.price_used}`, 'success');
+        loadManagerPositions();
+        if (typeof loadDashboard === 'function') loadDashboard();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
 
 async function deletePosition(ticker) {
     if (!confirm(`¿Estás seguro de eliminar la posición ${ticker}?`)) {
