@@ -581,11 +581,48 @@ function exportToCSV() {
     }
 }
 
+// Check which backend integrations are configured and surface a banner if any are missing.
+async function loadIntegrationsStatus() {
+    const banner = document.getElementById('integrationsBanner');
+    if (!banner) return;
+    try {
+        const status = await fetchAPI('').catch(() => null) || await (await fetch(`${CONFIG.API_BASE_URL}`)).json();
+        const checks = [
+            { key: 'has_gemini', label: 'Gemini (briefing diario + FinBot)', env: 'GEMINI_API_KEY' },
+            { key: 'has_kraken', label: 'Kraken (sync cripto cada 15 min)', env: 'KRAKEN_API_KEY + KRAKEN_API_SECRET' },
+            { key: 'has_telegram', label: 'Telegram (alertas push)', env: 'TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID' },
+        ];
+        const missing = checks.filter(c => !status[c.key]);
+        if (missing.length === 0) {
+            banner.style.display = 'none';
+            return;
+        }
+        const items = missing.map(m =>
+            `<li><strong>${m.label}</strong> — define <code>${m.env}</code> en Render → Environment</li>`
+        ).join('');
+        banner.innerHTML = `
+            <div class="integrations-banner-inner">
+                <div class="integrations-banner-icon">⚙️</div>
+                <div class="integrations-banner-body">
+                    <strong>Quedan ${missing.length} integraci${missing.length === 1 ? 'ón' : 'ones'} por activar</strong>
+                    <ul>${items}</ul>
+                    <small>Lo que ya funciona: portfolio, posiciones, news, charts y FinBot con Groq.</small>
+                </div>
+            </div>
+        `;
+        banner.style.display = 'block';
+    } catch (err) {
+        console.warn('Could not load integrations status:', err);
+    }
+}
+
 // Main Functions
 async function loadDashboard() {
     try {
         updateStatus(false);
-        
+
+        loadIntegrationsStatus();
+
         // Fetch portfolio data
         portfolioData = await fetchPortfolio();
         

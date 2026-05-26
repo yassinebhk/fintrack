@@ -3380,3 +3380,61 @@ button.action-card {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
 }
+
+/* ============================================
+   Integrations status banner
+   ============================================ */
+.integrations-banner {
+    margin-bottom: 16px;
+}
+
+.integrations-banner-inner {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(99, 102, 241, 0.05));
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 10px;
+    color: var(--text-primary);
+}
+
+.integrations-banner-icon {
+    font-size: 22px;
+    line-height: 1;
+    padding-top: 2px;
+}
+
+.integrations-banner-body {
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.integrations-banner-body strong {
+    color: var(--accent-tertiary);
+}
+
+.integrations-banner-body ul {
+    margin: 8px 0 6px;
+    padding-left: 18px;
+    list-style: disc;
+}
+
+.integrations-banner-body li {
+    margin: 2px 0;
+}
+
+.integrations-banner-body code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+}
+
+.integrations-banner-body small {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-secondary);
+}
