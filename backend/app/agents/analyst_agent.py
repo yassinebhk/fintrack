@@ -31,6 +31,8 @@ Reglas:
 5. Distingue DATO (lo que sabes por los números) de OPINIÓN/análisis (tu criterio).
 6. NO prometas rentabilidades ni des órdenes de compra. Es análisis educativo.
 7. Responde en español, claro y para leer en el móvil.
+8. SÉ CONCISO: cada campo (what_it_is, why_now, risks, fit) en 1-2 frases. Propón 3 oportunidades
+   (no más) para no extenderte. La brevedad es importante.
 """
 
 SCHEMA = {
@@ -65,7 +67,9 @@ class AnalystAgent(Agent):
     model_tier = "agent"
     system_prompt = SYSTEM
     response_schema = SCHEMA
-    max_tokens = 4096
+    # Gemini 2.5 Flash spends a big chunk of the budget on internal "thinking";
+    # give it plenty of headroom so the JSON output isn't truncated mid-array.
+    max_tokens = 8192
 
     def build_user_prompt(self, context: AgentContext) -> str:
         themes_str = context.extras.get("themes_str", "(sin datos de sectores)")
