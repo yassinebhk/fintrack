@@ -10,7 +10,7 @@ async function loadLearnPage(targetPage) {
     if (targetPage.dataset.loaded === 'true') return;
     
     try {
-        const response = await fetch('pages/learn.html?v=20260528', { cache: 'no-store' });
+        const response = await fetch('pages/learn.html?v=20260528b', { cache: 'no-store' });
         if (response.ok) {
             targetPage.innerHTML = await response.text();
             targetPage.dataset.loaded = 'true';
@@ -1235,7 +1235,11 @@ function initNavigation() {
                 'docs': 'Documentación'
             };
             pageTitle.textContent = titles[pageName] || 'Dashboard';
-            
+
+            // Reflect the page in the URL so it's shareable / survives a refresh
+            // (replaceState doesn't fire hashchange, so no navigation loop).
+            try { history.replaceState(null, '', '#' + pageName); } catch (e) {}
+
             // Load dynamic content for pages
             if (pageName === 'learn') {
                 loadLearnPage(targetPage);
@@ -1266,6 +1270,44 @@ function initNavigation() {
         menuToggle.addEventListener('click', () => {
             document.querySelector('.sidebar').classList.toggle('open');
         });
+    }
+
+    // --- Hash routing: make URLs like #opportunities or #algoritmos work ---
+    window.addEventListener('hashchange', navigateFromHash);
+    navigateFromHash();  // honor the hash on initial load
+}
+
+// Anchors that live inside the (dynamically injected) docs / learn pages.
+const DOCS_ANCHORS = new Set(['que-es', 'guia-uso', 'el-cerebro', 'novedades', 'algoritmos',
+    'arquitectura', 'inicio-rapido', 'configuracion', 'añadir-posiciones', 'funcionalidades', 'api', 'faq']);
+const LEARN_ANCHORS = new Set(['conceptos-basicos', 'tipos-activos', 'metricas', 'estrategias', 'riesgos', 'fiscalidad']);
+
+function navigateFromHash() {
+    const raw = decodeURIComponent((location.hash || '').replace(/^#/, '')).trim();
+    if (!raw) return;
+
+    // 1) Direct page name (e.g. #opportunities, #docs, #backtest)
+    const navByPage = document.querySelector(`.nav-item[data-page="${raw}"]`);
+    if (navByPage) {
+        const pageEl = document.getElementById('page-' + raw);
+        if (!pageEl || !pageEl.classList.contains('active')) navByPage.click();
+        return;
+    }
+
+    // 2) Anchor inside docs/learn → open that page, then scroll to the section
+    const page = DOCS_ANCHORS.has(raw) ? 'docs' : (LEARN_ANCHORS.has(raw) ? 'learn' : null);
+    if (!page) return;
+    const pageEl = document.getElementById('page-' + page);
+    const alreadyActive = pageEl && pageEl.classList.contains('active');
+    const scrollToAnchor = () => {
+        const el = document.getElementById(raw);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    if (alreadyActive) {
+        scrollToAnchor();
+    } else {
+        const nav = document.querySelector(`.nav-item[data-page="${page}"]`);
+        if (nav) { nav.click(); setTimeout(scrollToAnchor, 450); }  // wait for content injection
     }
 }
 
