@@ -53,6 +53,10 @@
                     <span class="nav-icon">🧮</span>
                     <span class="nav-label">Calculadoras</span>
                 </li>
+                <li class="nav-item" data-page="opportunities">
+                    <span class="nav-icon">💡</span>
+                    <span class="nav-label">Oportunidades</span>
+                </li>
                 <li class="nav-item" data-page="backtest">
                     <span class="nav-icon">🔬</span>
                     <span class="nav-label">Backtest Lab</span>
@@ -1215,6 +1219,23 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                     </div>
                 </div>
 
+                <!-- Opportunities Page -->
+                <div class="page page-opportunities" id="page-opportunities">
+                    <section class="manager-header">
+                        <div>
+                            <h2>💡 Oportunidades de inversión</h2>
+                            <p>Tu analista IA rastrea el mercado cada día y te trae ideas con su tesis</p>
+                        </div>
+                        <button class="btn-primary" onclick="loadOpportunities(true)" id="oppRefreshBtn">🔄 Buscar oportunidades</button>
+                    </section>
+                    <div id="oppLoading" style="display:none; text-align:center; padding:20px;" class="text-muted">
+                        🔎 Analizando mercado, sectores y tu cartera… (~20-40s)
+                    </div>
+                    <div id="oppContent">
+                        <p class="text-muted">Pulsa "Buscar oportunidades" para que el analista revise el mercado.</p>
+                    </div>
+                </div>
+
                 <!-- Backtest Lab Page -->
                 <div class="page page-backtest" id="page-backtest">
                     <section class="manager-header">
@@ -1371,6 +1392,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/ai-advisor.js"></script>
     <script src="js/asset-analysis.js"></script>
     <script src="js/backtest.js"></script>
+    <script src="js/opportunities.js"></script>
     <script src="js/polymarket.js"></script>
     <script src="js/pages.js"></script>
 </body>

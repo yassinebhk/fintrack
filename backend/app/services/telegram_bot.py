@@ -51,6 +51,7 @@ HELP_TEXT = (
     "• Preguntarme cualquier cosa: <i>¿cuánto he ganado esta semana?</i>, "
     "<i>resumen de mi bitcoin</i>, <i>¿cómo está diversificada mi cartera?</i>\n"
     "• Pedir gráficas: <i>gráfica de mi cartera</i>, <i>gráfico de bitcoin</i>\n"
+    "• <b>Oportunidades de inversión</b>: <code>/oportunidades</code> — el analista rastrea el mercado y te trae ideas\n"
     "• Aportar dinero: <code>/aportar oro 50</code> o <i>he metido 50€ al nasdaq</i>\n"
     "• <code>/cartera</code> — resumen rápido\n"
     "• <code>/ayuda</code> — este mensaje"
@@ -89,6 +90,10 @@ class TelegramBotHandler:
             await self._send_quick_summary()
             return
 
+        if low in ("/oportunidades", "oportunidades", "ideas", "recomendaciones", "que compro", "qué compro"):
+            await self._send_opportunities()
+            return
+
         # Chart intent?
         if any(k in low for k in CHART_KEYWORDS):
             await self._send_chart(text)
@@ -103,6 +108,23 @@ class TelegramBotHandler:
 
         # Otherwise treat as a question for FinBot
         await self._answer_question(text)
+
+    async def _send_opportunities(self) -> None:
+        """Run the market analyst and send today's opportunities."""
+        await self.notifier.send_chat_action("typing")
+        await self.notifier.send_text("🔎 Analizando el mercado y buscando oportunidades… (~20-40s)")
+        await self.notifier.send_chat_action("typing")
+        try:
+            from app.services.opportunities import OpportunityService, render_opportunities_telegram
+
+            payload = await OpportunityService().generate()
+            if not payload.get("opportunities"):
+                await self.notifier.send_text("No pude generar oportunidades ahora mismo (posible límite de cuota). Reintenta en un rato.")
+                return
+            await self.notifier.send_html(render_opportunities_telegram(payload))
+        except Exception as exc:
+            logger.error("telegram opportunities failed: {}", exc)
+            await self.notifier.send_text("No pude generar las oportunidades ahora mismo, intenta más tarde.")
 
     async def _send_chart(self, text: str) -> None:
         """Send a portfolio or per-asset evolution chart as an image."""

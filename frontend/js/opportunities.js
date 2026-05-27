@@ -1,0 +1,75 @@
+/**
+ * Opportunities page - AI market analyst suggestions.
+ */
+const OPP_API = (window.API_BASE_URL || 'http://localhost:8000/api');
+let oppLoaded = false;
+
+async function loadOpportunities(force = false) {
+    const btn = document.getElementById('oppRefreshBtn');
+    const loading = document.getElementById('oppLoading');
+    const content = document.getElementById('oppContent');
+    btn.disabled = true;
+    loading.style.display = 'block';
+    if (force) content.innerHTML = '';
+
+    try {
+        const resp = await fetch(`${OPP_API}/opportunities${force ? '?force=true' : ''}`);
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+        renderOpportunities(data);
+        oppLoaded = true;
+    } catch (err) {
+        content.innerHTML = `<div class="alert alert-error">No se pudieron cargar las oportunidades: ${err.message}</div>`;
+    } finally {
+        btn.disabled = false;
+        loading.style.display = 'none';
+    }
+}
+
+function renderOpportunities(data) {
+    const content = document.getElementById('oppContent');
+    const convColor = { alta: '#10b981', media: '#f59e0b', baja: '#64748b' };
+    const kindIcon = { tema: '🌐', etf: '📊', fondo: '💼', sector: '🏭' };
+
+    const opps = (data.opportunities || []).map(op => {
+        const color = convColor[op.conviction] || '#f59e0b';
+        const icon = kindIcon[op.kind] || '💡';
+        return `
+        <div class="card" style="margin-bottom:14px; border-left:3px solid ${color};">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                <h3 style="margin:0;">${icon} ${op.name}${op.ticker_or_isin ? ` <span class="text-muted" style="font-size:13px;">${op.ticker_or_isin}</span>` : ''}</h3>
+                <span style="background:${color}22; color:${color}; padding:2px 10px; border-radius:12px; font-size:12px; white-space:nowrap;">convicción ${op.conviction}</span>
+            </div>
+            <p style="margin:8px 0 4px;"><strong>Qué es:</strong> ${op.what_it_is}</p>
+            <p style="margin:4px 0;"><strong>📈 Por qué ahora:</strong> ${op.why_now}</p>
+            <p style="margin:4px 0;"><strong>⚠️ Riesgos:</strong> ${op.risks}</p>
+            <p style="margin:4px 0;"><strong>🎯 Encaje en tu cartera:</strong> ${op.fit}</p>
+        </div>`;
+    }).join('');
+
+    const themes = (data.themes || []).slice(0, 8).map(t => {
+        const r3 = t.ret_3m, cls = (r3 || 0) >= 0 ? 'value-positive' : 'value-negative';
+        return `<tr><td>${t.theme}</td><td class="text-right mono ${cls}">${r3 != null ? (r3>=0?'+':'')+r3+'%' : '—'}</td><td class="text-right mono">${t.ret_1y != null ? (t.ret_1y>=0?'+':'')+t.ret_1y+'%' : '—'}</td><td class="text-right mono">${t.range_pos_52w != null ? t.range_pos_52w.toFixed(0)+'%' : '—'}</td></tr>`;
+    }).join('');
+
+    content.innerHTML = `
+        ${data.market_summary ? `<div class="integrations-banner-inner" style="margin-bottom:16px;"><div class="integrations-banner-icon">🧠</div><div class="integrations-banner-body"><strong>Resumen de mercado</strong><p style="margin:6px 0 0;">${data.market_summary}</p></div></div>` : ''}
+        ${opps}
+        <div class="card" style="margin-top:16px;">
+            <h3>📊 Momentum de sectores (datos reales, 3 meses)</h3>
+            <div class="table-container">
+                <table class="manager-table">
+                    <thead><tr><th>Tema</th><th class="text-right">3 meses</th><th class="text-right">1 año</th><th class="text-right">Rango 52s</th></tr></thead>
+                    <tbody>${themes}</tbody>
+                </table>
+            </div>
+        </div>
+        ${data.disclaimer ? `<p class="text-muted" style="font-size:11px; margin-top:12px;">${data.disclaimer}</p>` : ''}
+        <p class="text-muted" style="font-size:11px;">Generado ${data.generated_at ? new Date(data.generated_at).toLocaleString('es-ES') : ''} · modelo ${data.model || ''}</p>
+    `;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const nav = document.querySelector('[data-page="opportunities"]');
+    if (nav) nav.addEventListener('click', () => { if (!oppLoaded) loadOpportunities(false); });
+});

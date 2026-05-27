@@ -1,0 +1,92 @@
+"""Analyst agent — the 'market analyst' that finds opportunities the user doesn't know about.
+
+Grounded on real sector/theme momentum + macro + the user's portfolio. Proposes
+concrete opportunities (themes, ETFs, funds like Robeco Smart Energy / Horos Value
+when they fit) each with a full overview: what it is, why now, risks, and fit.
+"""
+
+from app.agents.base import Agent, AgentContext, render_portfolio_for_prompt
+
+
+SYSTEM = """Eres un analista de inversiones profesional que trabaja para el usuario. Cada día revisas
+el mercado y le traes 2-4 OPORTUNIDADES concretas que probablemente desconoce, como haría un gestor.
+
+Tienes:
+- Datos REALES de momentum de sectores/temas (retornos a 1m/3m/1y, posición en rango anual).
+- Contexto macro (tipos, inflación).
+- La cartera actual del usuario (para detectar qué le falta y evitar redundancias).
+
+Reglas:
+1. Propón oportunidades CONCRETAS y variadas: pueden ser temas/sectores, ETFs (UCITS si es para Europa),
+   o fondos gestionados conocidos (p.ej. Robeco Smart Energy, Horos Value Internacional, Fundsmith,
+   Baelo, Seilern...) cuando encajen con lo que se está moviendo.
+2. Para CADA oportunidad da un overview completo: qué es, en qué invierte, por qué es interesante AHORA
+   (liga tu razón a los datos de momentum/macro que tienes), riesgos, y cómo encaja en la cartera del usuario.
+3. Prioriza la DIVERSIFICACIÓN: si el usuario está muy concentrado (ej. mucho cripto), valora ideas que
+   compensen ese riesgo.
+4. Marca tu nivel de convicción (alta/media/baja) y sé honesto: si algo está caro o en máximos, dilo.
+5. Distingue DATO (lo que sabes por los números) de OPINIÓN/análisis (tu criterio).
+6. NO prometas rentabilidades ni des órdenes de compra. Es análisis educativo.
+7. Responde en español, claro y para leer en el móvil.
+"""
+
+SCHEMA = {
+    "type": "object",
+    "properties": {
+        "market_summary": {"type": "string", "description": "2-3 frases sobre el régimen de mercado hoy según los datos"},
+        "opportunities": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Nombre de la oportunidad (fondo/ETF/tema)"},
+                    "kind": {"type": "string", "enum": ["tema", "etf", "fondo", "sector"]},
+                    "ticker_or_isin": {"type": "string", "description": "Ticker/ISIN si lo conoces, vacío si no"},
+                    "what_it_is": {"type": "string", "description": "Qué es y en qué invierte (overview)"},
+                    "why_now": {"type": "string", "description": "Por qué es interesante ahora, ligado a datos"},
+                    "risks": {"type": "string", "description": "Riesgos principales"},
+                    "fit": {"type": "string", "description": "Cómo encaja en la cartera del usuario"},
+                    "conviction": {"type": "string", "enum": ["alta", "media", "baja"]},
+                },
+                "required": ["name", "kind", "what_it_is", "why_now", "risks", "fit", "conviction"],
+            },
+        },
+        "disclaimer": {"type": "string"},
+    },
+    "required": ["market_summary", "opportunities", "disclaimer"],
+}
+
+
+class AnalystAgent(Agent):
+    name = "analyst"
+    model_tier = "agent"
+    system_prompt = SYSTEM
+    response_schema = SCHEMA
+    max_tokens = 4096
+
+    def build_user_prompt(self, context: AgentContext) -> str:
+        themes_str = context.extras.get("themes_str", "(sin datos de sectores)")
+        macro = context.extras.get("macro", {}) or {}
+        portfolio = context.portfolio or {}
+
+        macro_lines = []
+        for s in (macro.get("us", []) or [])[:4]:
+            macro_lines.append(f"  - {s.get('label')}: {s.get('value')} {s.get('unit','')}")
+        for s in (macro.get("eu", []) or [])[:3]:
+            macro_lines.append(f"  - {s.get('label')}: {s.get('value')} {s.get('unit','')}")
+        macro_str = "\n".join(macro_lines) if macro_lines else "  (sin datos macro)"
+
+        rendered_portfolio = render_portfolio_for_prompt(portfolio)
+
+        return (
+            "## Datos de mercado (momentum real de sectores/temas)\n"
+            f"{themes_str}\n\n"
+            "## Macro\n"
+            f"{macro_str}\n\n"
+            "## Cartera actual del usuario\n"
+            f"{rendered_portfolio}\n\n"
+            "## Tu tarea\n"
+            "Propón 2-4 oportunidades concretas que el usuario probablemente desconoce, cada una con "
+            "overview completo (what_it_is, why_now ligado a los datos, risks, fit con su cartera, conviction). "
+            "Prioriza diversificar su riesgo actual. Distingue dato de opinión."
+        )
