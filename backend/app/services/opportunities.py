@@ -13,6 +13,9 @@ from app.services.news import NewsService
 from app.services.portfolio import PortfolioService
 
 
+_DB_KEY = "opportunities"
+
+
 class OpportunityService:
     def __init__(self) -> None:
         self.scanner = MarketScanner()
@@ -24,6 +27,7 @@ class OpportunityService:
         # never falls back to a cold scan); the next morning's job refreshes it.
         self._ttl = timedelta(hours=20)
         self._lock = asyncio.Lock()
+        self._generating: asyncio.Task | None = None  # background scan in flight
 
     def _fresh(self) -> bool:
         return (
@@ -32,9 +36,56 @@ class OpportunityService:
             and datetime.now(timezone.utc) - self._cache_at < self._ttl
         )
 
+    async def _load_from_db(self) -> dict | None:
+        """Load the last payload persisted to the DB (survives redeploys, unlike the
+        in-memory cache). Populates the memory cache if the stored row is still fresh."""
+        try:
+            from sqlalchemy import select
+
+            from app.db import session_scope
+            from app.models import JsonCache
+
+            async with session_scope() as s:
+                row = (await s.execute(select(JsonCache).where(JsonCache.key == _DB_KEY))).scalar_one_or_none()
+            if not row or not row.payload:
+                return None
+            updated = row.updated_at
+            if updated and updated.tzinfo is None:
+                updated = updated.replace(tzinfo=timezone.utc)
+            if updated and datetime.now(timezone.utc) - updated < self._ttl:
+                self._cache = row.payload
+                self._cache_at = updated
+                return row.payload
+        except Exception as exc:
+            logger.warning("could not load opportunities from DB: {}", exc)
+        return None
+
+    async def _persist(self, payload: dict) -> None:
+        try:
+            from app.db import session_scope, upsert_insert
+            from app.models import JsonCache
+
+            stmt = upsert_insert()(JsonCache).values(
+                key=_DB_KEY, payload=payload, updated_at=datetime.now(timezone.utc)
+            )
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["key"],
+                set_={"payload": payload, "updated_at": datetime.now(timezone.utc)},
+            )
+            async with session_scope() as s:
+                await s.execute(stmt)
+        except Exception as exc:
+            logger.warning("could not persist opportunities to DB: {}", exc)
+
     async def generate(self, *, force: bool = False) -> dict:
-        if self._fresh() and not force:
-            return self._cache
+        """Return opportunities, generating if needed. Callers here (scheduler, bot)
+        can afford to wait for the full scan."""
+        if not force:
+            if self._fresh():
+                return self._cache
+            cached = await self._load_from_db()
+            if cached:
+                return cached
 
         # Only one scan at a time: concurrent callers (manual click, daily job, bot)
         # wait for the in-flight result instead of each kicking off a heavy 100+
@@ -43,6 +94,29 @@ class OpportunityService:
             if self._fresh() and not force:
                 return self._cache
             return await self._generate_locked()
+
+    async def peek_or_start(self, *, force: bool = False) -> dict:
+        """Non-blocking entry point for the HTTP endpoint: returns the cached payload
+        instantly if available, otherwise kicks off generation in the BACKGROUND and
+        returns {status: 'generating'} so the request never hangs (and Render never
+        cuts a 2-min connection). The frontend polls until it's ready."""
+        if self._fresh() and not force:
+            return {**self._cache, "status": "ready"}
+        if not force:
+            cached = await self._load_from_db()
+            if cached:
+                return {**cached, "status": "ready"}
+        # Need a fresh scan — run it in the background, return immediately.
+        if self._generating is None or self._generating.done():
+            self._generating = asyncio.create_task(self._background_generate())
+        return {"status": "generating", "message": "Analizando el mercado y buscando oportunidades…"}
+
+    async def _background_generate(self) -> None:
+        try:
+            await self.generate(force=True)
+            logger.info("background opportunities generation finished")
+        except Exception as exc:
+            logger.error("background opportunities generation failed: {}", exc)
 
     async def _generate_locked(self) -> dict:
         portfolio = await self.portfolio_service.calculate_portfolio()
@@ -132,6 +206,7 @@ class OpportunityService:
         }
         self._cache = payload
         self._cache_at = datetime.now(timezone.utc)
+        await self._persist(payload)  # survive redeploys
         return payload
 
     def _render_trends_for_prompt(self, trends: dict) -> str:

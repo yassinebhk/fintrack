@@ -10,9 +10,11 @@ router = APIRouter(prefix="/api/opportunities", tags=["opportunities"])
 
 @router.get("")
 async def get_opportunities(force: bool = False) -> dict:
-    """Today's opportunities (cached 12h; force=true to regenerate)."""
+    """Today's opportunities. Non-blocking: returns the cached payload instantly, or
+    {status:'generating'} while a background scan runs (the frontend polls). This way
+    the request never hangs on the ~2-min cold scan."""
     try:
-        return await get_opportunity_service().generate(force=force)
+        return await get_opportunity_service().peek_or_start(force=force)
     except Exception as exc:
         msg = str(exc)
         logger.exception("opportunities generation failed")

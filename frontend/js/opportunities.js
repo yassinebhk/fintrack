@@ -27,6 +27,53 @@ function stopOppThinking() {
     if (oppThinkingTimer) { clearInterval(oppThinkingTimer); oppThinkingTimer = null; }
 }
 
+let oppPollTimer = null;
+let oppPollStart = 0;
+const OPP_POLL_MS = 6000;
+const OPP_POLL_MAX_MS = 5 * 60 * 1000; // give up after ~5 min
+
+async function fetchOpp(force) {
+    const resp = await fetch(`${OPP_API}/opportunities${force ? '?force=true' : ''}`);
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+    return data;
+}
+
+function endOppLoading() {
+    stopOppThinking();
+    if (oppPollTimer) { clearTimeout(oppPollTimer); oppPollTimer = null; }
+    const btn = document.getElementById('oppRefreshBtn');
+    const loading = document.getElementById('oppLoading');
+    if (btn) btn.disabled = false;
+    if (loading) loading.style.display = 'none';
+}
+
+function finishOpp(data) {
+    renderOpportunities(data);
+    oppLoaded = true;
+    endOppLoading();
+}
+
+function scheduleOppPoll() {
+    // Still generating in the background — keep the spinner and check again soon.
+    oppPollTimer = setTimeout(async () => {
+        if (Date.now() - oppPollStart > OPP_POLL_MAX_MS) {
+            document.getElementById('oppContent').innerHTML =
+                '<div class="alert alert-error">El análisis está tardando más de lo normal. Vuelve a intentarlo en un momento.</div>';
+            endOppLoading();
+            return;
+        }
+        try {
+            const data = await fetchOpp(false);
+            if (data.status === 'generating') { scheduleOppPoll(); return; }
+            finishOpp(data);
+        } catch (err) {
+            // transient (e.g., instance busy) — keep trying until the max window
+            scheduleOppPoll();
+        }
+    }, OPP_POLL_MS);
+}
+
 async function loadOpportunities(force = false) {
     const btn = document.getElementById('oppRefreshBtn');
     const loading = document.getElementById('oppLoading');
@@ -34,20 +81,19 @@ async function loadOpportunities(force = false) {
     btn.disabled = true;
     loading.style.display = 'block';
     startOppThinking();
+    oppPollStart = Date.now();
     if (force) content.innerHTML = '';
 
     try {
-        const resp = await fetch(`${OPP_API}/opportunities${force ? '?force=true' : ''}`);
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
-        renderOpportunities(data);
-        oppLoaded = true;
+        const data = await fetchOpp(force);
+        if (data.status === 'generating') {
+            scheduleOppPoll();   // keep spinner, poll until ready — never hangs
+            return;
+        }
+        finishOpp(data);
     } catch (err) {
         content.innerHTML = `<div class="alert alert-error">No se pudieron cargar las oportunidades: ${err.message}</div>`;
-    } finally {
-        stopOppThinking();
-        btn.disabled = false;
-        loading.style.display = 'none';
+        endOppLoading();
     }
 }
 
