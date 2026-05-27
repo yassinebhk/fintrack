@@ -1321,6 +1321,36 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                         </div>
                     </section>
 
+                    <div class="card" style="margin-bottom:16px;">
+                        <h3>📖 ¿Qué es esto y cómo se usa?</h3>
+                        <p>Un <strong>backtest</strong> simula cómo se habría comportado una estrategia <strong>en el pasado</strong>, usando precios históricos reales de tus activos. Sirve para <strong>comparar estrategias</strong> y entender su riesgo antes de aplicarlas con dinero real.</p>
+                        <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;"><strong>Aviso clave:</strong> que algo funcionara en el pasado <em>no garantiza</em> que funcione en el futuro. Cuidado con elegir la estrategia que mejor salió "por casualidad" (eso es <em>sobreajuste</em>). Úsalo para entender, no para predecir.</p>
+
+                        <h4 style="margin:14px 0 4px;">Cómo se usa (3 pasos)</h4>
+                        <ol style="margin:0 0 8px; padding-left:20px;">
+                            <li><strong>Elige una estrategia</strong> (abajo se explican).</li>
+                            <li><strong>Elige el periodo</strong> (cuántos años hacia atrás simular) y la <strong>inversión</strong> (<code>initial_eur</code> = dinero inicial; en las de aportación, lo que metes cada mes).</li>
+                            <li><strong>Marca los activos</strong> de tu cartera a incluir y pulsa <strong>Ejecutar backtest</strong>.</li>
+                        </ol>
+
+                        <h4 style="margin:14px 0 4px;">Las estrategias</h4>
+                        <ul style="margin:0;">
+                            <li><strong>Buy &amp; Hold</strong>: inviertes todo de golpe al principio, repartido entre los activos, y no tocas nada. Es el <em>punto de referencia</em> contra el que comparar el resto.</li>
+                            <li><strong>DCA mensual</strong> (Dollar-Cost Averaging): aportas una cantidad fija cada mes. La estrategia más simple y disciplinada; reduce el riesgo de "entrar en el peor momento".</li>
+                            <li><strong>DCA on-dip</strong>: como el DCA mensual, pero <strong>compra extra cuando un activo cae</strong> un % desde su máximo reciente. Ajustable: parte fija, % de caída que activa el extra y cuánto multiplicar.</li>
+                            <li><strong>Rebalance trimestral</strong>: inversión inicial repartida y, cada trimestre, <strong>vuelve a equilibrar</strong> a los pesos objetivo (vende lo que subió de más, compra lo que bajó). Disciplina "comprar barato, vender caro".</li>
+                        </ul>
+
+                        <h4 style="margin:14px 0 4px;">Cómo leer los resultados</h4>
+                        <ul style="margin:0;">
+                            <li><strong>Valor final</strong> vs <strong>invertido</strong>: cuánto tendrías hoy frente a lo que pusiste.</li>
+                            <li><strong>Retorno total</strong> y <strong>CAGR</strong>: ganancia total y su equivalente <em>anualizado</em> (mejor para comparar periodos distintos).</li>
+                            <li><strong>Volatilidad</strong> y <strong>máximo drawdown</strong>: el riesgo — cuánto oscila y la peor caída desde un máximo (el "susto" mayor).</li>
+                            <li><strong>Ratio de Sharpe</strong>: rentabilidad ajustada al riesgo (más alto = mejor premio por unidad de riesgo).</li>
+                        </ul>
+                        <p style="margin-top:10px; font-size:13px; color:#94a3b8;">¿Qué significan CAGR, Sharpe o drawdown? Están explicados en <strong>Aprender</strong> y, en detalle, en <strong>Documentación → Cómo funcionan nuestros algoritmos</strong>.</p>
+                    </div>
+
                     <div class="card" style="margin-bottom: 16px;">
                         <h3>Configuración</h3>
                         <div class="form-row">
