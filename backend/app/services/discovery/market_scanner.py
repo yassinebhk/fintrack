@@ -62,9 +62,11 @@ class MarketScanner:
         lo = min(closes)
         range_pos = (last - lo) / (hi - lo) * 100 if hi > lo else 50.0
 
-        # Technical signals via the `ta` library (objective, not LLM opinion)
+        # Technical signals via the `ta` library + quant factors via empyrical (objective)
         from app.services.discovery.technical import compute_signals
+        from app.services.discovery.quant_score import compute_factors
         signals = compute_signals(closes)
+        factors = compute_factors(closes)
 
         return {
             "theme": name,
@@ -77,6 +79,7 @@ class MarketScanner:
             "range_pos_52w": round(range_pos, 1),  # 0 = mínimo anual, 100 = máximo anual
             "day_change_pct": round(price.get("change_percent", 0), 2),
             "signals": signals,
+            "factors": factors,
         }
 
     async def scan_themes(self) -> list[dict]:
@@ -85,45 +88,51 @@ class MarketScanner:
             *(self._theme_momentum(name, meta) for name, meta in THEMES.items())
         )
         themes = [r for r in results if r]
-        themes.sort(key=lambda x: (x.get("ret_3m") or -999), reverse=True)
-        logger.info("market scanner: {} themes with data", len(themes))
+        # Objective quant scoring (momentum_score / value_score) via z-scoring + empyrical
+        from app.services.discovery.quant_score import score_universe
+        score_universe(themes)
+        logger.info("market scanner: {} themes with data (quant-scored)", len(themes))
         return themes
 
     def render_for_prompt(self, themes: list[dict]) -> str:
         """Render themes split into HOT (momentum/highs) vs COLD (beaten-down/possible entry)."""
         from app.services.discovery.technical import signals_label
 
-        def line(t: dict) -> str:
-            if not all(t.get(k) is not None for k in ("ret_1m", "ret_3m", "ret_1y")):
-                return f"- {t['theme']} ({t['ticker']}): datos parciales · {t['desc']}"
+        def line(t: dict, score_key: str) -> str:
             tech = signals_label(t.get("signals"))
+            f = t.get("factors") or {}
+            score = t.get(score_key)
+            score_str = f"{score:+.2f}" if score is not None else "—"
+            base = f"- [{score_str}] {t['theme']} ({t['ticker']})"
+            if not all(t.get(k) is not None for k in ("ret_1m", "ret_3m", "ret_1y")):
+                return f"{base}: datos parciales · {t['desc']}"
+            sharpe = f.get("sharpe")
+            sharpe_str = f" · Sharpe {sharpe:+.2f}" if sharpe is not None else ""
             return (
-                f"- {t['theme']} ({t['ticker']}): "
-                f"1m {t['ret_1m']:+.1f}% · 3m {t['ret_3m']:+.1f}% · 1y {t['ret_1y']:+.1f}% · "
-                f"rango52s {t['range_pos_52w']:.0f}% · [técnico: {tech}] · {t['desc']}"
+                f"{base}: 1m {t['ret_1m']:+.1f}% · 3m {t['ret_3m']:+.1f}% · 1y {t['ret_1y']:+.1f}% · "
+                f"rango52s {t['range_pos_52w']:.0f}%{sharpe_str} · [técnico: {tech}] · {t['desc']}"
             )
 
-        # Classify: hot = near 52w highs / strong; cold = near lows / corrected (contrarian candidates)
-        hot, cold, mid = [], [], []
-        for t in themes:
-            rp = t.get("range_pos_52w")
-            if rp is None:
-                mid.append(t)
-            elif rp >= 70:
-                hot.append(t)
-            elif rp <= 40:
-                cold.append(t)
-            else:
-                mid.append(t)
+        scored = [t for t in themes if t.get("factors")]
+        # Objective ranking from the quant engine (empyrical + ta + z-scoring), NOT LLM opinion.
+        by_momentum = sorted(scored, key=lambda x: x.get("momentum_score", 0), reverse=True)
+        by_value = sorted(scored, key=lambda x: x.get("value_score", 0), reverse=True)
 
-        out = ["Datos reales de momentum por tema (ETFs de referencia).", ""]
-        out.append("🔥 CALIENTES (cerca de máximos 52s — tesis MOMENTUM, ojo a que estén caros):")
-        out += [line(t) for t in hot] or ["  (ninguno)"]
+        out = [
+            "RANKING CUANTITATIVO OBJETIVO (motor de scoring: empyrical + ta + z-score "
+            "transversal; el número entre [ ] es la puntuación, NO una opinión).",
+            "",
+            "🔥 TOP MOMENTUM (mejor tendencia + retorno ajustado a riesgo — ordenado por momentum_score):",
+        ]
+        out += [line(t, "momentum_score") for t in by_momentum[:6]] or ["  (sin datos)"]
         out.append("")
-        out.append("🧊 EN CORRECCIÓN / ZONA BAJA (cerca de mínimos 52s — posibles tesis VALOR/CONTRARIAN si hay catalizador):")
-        out += [line(t) for t in cold] or ["  (ninguno)"]
-        if mid:
-            out.append("")
-            out.append("➖ INTERMEDIOS:")
-            out += [line(t) for t in mid]
+        out.append(
+            "🧊 TOP VALOR/CONTRARIAN (castigados/sobrevendidos pero con calidad — ordenado por value_score):"
+        )
+        out += [line(t, "value_score") for t in by_value[:6]] or ["  (sin datos)"]
+        out.append("")
+        out.append(
+            "Instrucción: elige tus oportunidades SOLO de entre los temas mejor rankeados arriba. "
+            "Tu trabajo es EXPLICAR los que encabezan el ranking, no reordenarlos a tu criterio."
+        )
         return "\n".join(out)

@@ -52,19 +52,25 @@ function renderOpportunities(data) {
         </div>`;
     }).join('');
 
-    const themes = (data.themes || []).slice(0, 8).map(t => {
+    const fmtScore = (s) => {
+        if (s == null) return '<span class="text-muted">—</span>';
+        const cls = s >= 0 ? 'value-positive' : 'value-negative';
+        return `<span class="mono ${cls}">${s >= 0 ? '+' : ''}${s.toFixed(2)}</span>`;
+    };
+    const themes = (data.themes || []).slice(0, 10).map(t => {
         const r3 = t.ret_3m, cls = (r3 || 0) >= 0 ? 'value-positive' : 'value-negative';
-        return `<tr><td>${t.theme}</td><td class="text-right mono ${cls}">${r3 != null ? (r3>=0?'+':'')+r3+'%' : '—'}</td><td class="text-right mono">${t.ret_1y != null ? (t.ret_1y>=0?'+':'')+t.ret_1y+'%' : '—'}</td><td class="text-right mono">${t.range_pos_52w != null ? t.range_pos_52w.toFixed(0)+'%' : '—'}</td></tr>`;
+        return `<tr><td>${t.theme}</td><td class="text-right">${fmtScore(t.momentum_score)}</td><td class="text-right">${fmtScore(t.value_score)}</td><td class="text-right mono ${cls}">${r3 != null ? (r3>=0?'+':'')+r3+'%' : '—'}</td><td class="text-right mono">${t.range_pos_52w != null ? t.range_pos_52w.toFixed(0)+'%' : '—'}</td></tr>`;
     }).join('');
 
     content.innerHTML = `
         ${data.market_summary ? `<div class="integrations-banner-inner" style="margin-bottom:16px;"><div class="integrations-banner-icon">🧠</div><div class="integrations-banner-body"><strong>Resumen de mercado</strong><p style="margin:6px 0 0;">${data.market_summary}</p></div></div>` : ''}
         ${opps}
         <div class="card" style="margin-top:16px;">
-            <h3>📊 Momentum de sectores (datos reales, 3 meses)</h3>
+            <h3>📊 Ranking cuantitativo de sectores (motor empyrical + ta, datos reales)</h3>
+            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">Puntuación objetiva por estadística sobre precios, no opinión de la IA. Score Mom. = tendencia + retorno ajustado a riesgo · Score Valor = castigado pero de calidad.</p>
             <div class="table-container">
                 <table class="manager-table">
-                    <thead><tr><th>Tema</th><th class="text-right">3 meses</th><th class="text-right">1 año</th><th class="text-right">Rango 52s</th></tr></thead>
+                    <thead><tr><th>Tema</th><th class="text-right">Score Mom.</th><th class="text-right">Score Valor</th><th class="text-right">3 meses</th><th class="text-right">Rango 52s</th></tr></thead>
                     <tbody>${themes}</tbody>
                 </table>
             </div>
