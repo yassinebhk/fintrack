@@ -131,11 +131,13 @@ class MarketScanner:
 
         These rotate daily, so they surface names no static list contains. If the
         installed yfinance lacks screener support we just skip them silently."""
+        # Quality-oriented screens only: surface solid undervalued/growth names, NOT
+        # day-trade pump candidates. (day_gainers / aggressive_small_caps removed on
+        # purpose — they fed speculative micro-caps into the ranking.)
         screens = {
             "undervalued_large_caps": "infravalorada (large cap)",
+            "undervalued_growth_stocks": "crecimiento a buen precio (GARP)",
             "growth_technology_stocks": "tecnológica en crecimiento",
-            "aggressive_small_caps": "small cap agresiva",
-            "day_gainers": "subiendo con fuerza hoy",
         }
 
         def _run() -> dict[str, dict]:
