@@ -1399,6 +1399,29 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                         </div>
                     </section>
 
+                    <div style="background:linear-gradient(135deg,#6366f122,#00d4aa22); border:1px solid #6366f144; border-radius:10px; padding:14px 18px; margin-bottom:16px;">
+                        <strong>🧭 Paso 3 de 3 del recorrido — la visión.</strong>
+                        <p style="margin:8px 0 0; font-size:14px;">Esta pestaña es un <strong>laboratorio</strong>: explora la idea que inspira a FinTrack — un asistente que observa el mercado y razona por su cuenta. Aquí lo aplicamos a los <em>mercados de predicción</em>.</p>
+                        <p style="margin:8px 0 0; font-size:13px; color:#94a3b8;">Recorrido: 📚 Aprender → 📖 Documentación → <strong style="color:#00d4aa;">🎲 Lab (estás aquí)</strong></p>
+                    </div>
+
+                    <div class="card" style="margin-bottom:16px;">
+                        <h3>🔮 ¿Qué es un mercado de predicción?</h3>
+                        <p>Un mercado de predicción (como <strong>Polymarket</strong>) es un mercado donde la gente apuesta dinero real sobre si algo ocurrirá ("¿estará Bitcoin por encima de 100k€ el 31 de diciembre?"). El precio de cada apuesta se mueve entre 0 y 1 € y se interpreta como una <strong>probabilidad</strong>: si "Sí" cuesta 0,70 €, el mercado cree que hay un 70% de probabilidad.</p>
+                        <p style="margin-top:8px;">Lo interesante: esa "sabiduría de la multitud", con dinero de por medio, suele ser <strong>sorprendentemente buena estimando probabilidades</strong>. Y a veces se <strong>desajusta</strong> respecto al precio real del activo en un exchange como Binance — ahí es donde un agente podría detectar oportunidades.</p>
+
+                        <h3 style="margin-top:16px;">💡 Por qué inspira a FinTrack</h3>
+                        <p>El proyecto nace de una idea: <strong>un agente autónomo que observa datos en tiempo real, los analiza con criterio y actúa</strong> — exactamente la filosofía que aplica el motor cuantitativo de la pestaña <em>Oportunidades</em>. Este laboratorio lleva esa idea a su forma más pura: comparar la probabilidad que implica el mercado de predicción con la realidad del spot, en busca de desajustes.</p>
+
+                        <h3 style="margin-top:16px;">🛠️ Cómo funciona este escáner</h3>
+                        <ol style="margin:6px 0 0; padding-left:20px;">
+                            <li>Carga los mercados de predicción <strong>cripto activos</strong> de Polymarket.</li>
+                            <li>Lee el <strong>precio spot real</strong> del activo en Binance.</li>
+                            <li>Compara la <strong>probabilidad implícita</strong> del mercado con lo que dice el precio real, y señala posibles desajustes.</li>
+                        </ol>
+                        <p style="margin-top:8px; font-size:13px; color:#94a3b8;">Es <strong>solo lectura y paper trading</strong>: no mueve dinero. El arbitraje real de latencia exige infraestructura &lt;50 ms imposible aquí; esto es para <em>aprender y experimentar</em>, no para operar.</p>
+                    </div>
+
                     <div class="integrations-banner-inner" style="margin-bottom:16px;">
                         <div class="integrations-banner-icon">⚠️</div>
                         <div class="integrations-banner-body">
@@ -1415,6 +1438,12 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                         <div id="pmScanResult">
                             <p class="text-muted">Pulsa "Escanear ahora" para cargar los mercados cripto activos de Polymarket.</p>
                         </div>
+                    </div>
+
+                    <div style="background:#6366f114; border:1px solid #6366f144; border-radius:10px; padding:14px 18px; text-align:center;">
+                        <strong>🎉 Has completado el recorrido.</strong>
+                        <p style="margin:6px 0 10px; font-size:14px;">Ya sabes invertir (Aprender), cómo funciona FinTrack (Documentación) y hacia dónde va (este Lab).</p>
+                        <a href="#" onclick="document.querySelector('[data-page=learn]').click(); return false;" style="display:inline-block; background:#6366f1; color:#fff; font-weight:600; padding:8px 18px; border-radius:8px; text-decoration:none;">↩ Volver al inicio (Aprender)</a>
                     </div>
                 </div>
 

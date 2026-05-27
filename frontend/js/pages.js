@@ -28,7 +28,13 @@ const pageContent = {
     learn: `
 <div class="learn-content">
     <h1>📚 Guía de Inversión</h1>
-    
+
+    <div style="background:linear-gradient(135deg,#6366f122,#00d4aa22); border:1px solid #6366f144; border-radius:10px; padding:14px 18px; margin:12px 0 18px;">
+        <strong>🧭 Estás en el paso 1 de 3 del recorrido de FinTrack.</strong>
+        <p style="margin:8px 0 0; font-size:14px;">Esta guía te enseña <strong>a invertir desde cero</strong>: conceptos, tipos de activos y las métricas que luego verás por toda la app. Cuando la domines, en <em>Documentación</em> verás <strong>cómo FinTrack automatiza todo esto por ti</strong>, y en <em>Polymarket Lab</em>, hacia dónde va el proyecto.</p>
+        <p style="margin:8px 0 0; font-size:13px; color:#94a3b8;">Recorrido: <strong style="color:#00d4aa;">📚 Aprender (estás aquí)</strong> → 📖 Documentación → 🎲 Lab</p>
+    </div>
+
     <div class="table-of-contents">
         <h4>Índice de Contenidos</h4>
         <ul>
@@ -318,27 +324,131 @@ const pageContent = {
         <h3>Ventaja de los Fondos de Inversión</h3>
         <p>Los traspasos entre fondos de inversión (no ETFs) no tributan hasta que retiras el dinero. Esto permite el <strong>diferimiento fiscal</strong>.</p>
     </section>
+
+    <div style="background:#00d4aa14; border:1px solid #00d4aa44; border-radius:10px; padding:16px 18px; margin-top:24px; text-align:center;">
+        <strong style="font-size:15px;">✅ Ya entiendes los fundamentos. Siguiente paso →</strong>
+        <p style="margin:8px 0 12px; font-size:14px;">Ahora descubre <strong>cómo FinTrack aplica todo esto automáticamente</strong> cada día: cómo lee tu cartera, escanea el mercado y te trae oportunidades explicadas.</p>
+        <a href="#" onclick="document.querySelector('[data-page=docs]').click(); return false;" style="display:inline-block; background:#00d4aa; color:#04121a; font-weight:600; padding:8px 18px; border-radius:8px; text-decoration:none;">📖 Ir a Documentación →</a>
+    </div>
 </div>
     `,
-    
+
     docs: `
 <div class="docs-content">
     <h1>📖 Documentación de FinTrack</h1>
-    
+
+    <div style="background:linear-gradient(135deg,#6366f122,#00d4aa22); border:1px solid #6366f144; border-radius:10px; padding:14px 18px; margin:12px 0 18px;">
+        <strong>🧭 Paso 2 de 3 del recorrido.</strong>
+        <p style="margin:8px 0 0; font-size:14px;">Aquí ves <strong>qué es FinTrack, cómo se usa cada pestaña y cómo "piensa"</strong> para descubrir oportunidades. Si te falta base sobre métricas como Sharpe o momentum, repásalas primero en <em>Aprender</em>.</p>
+        <p style="margin:8px 0 0; font-size:13px; color:#94a3b8;">Recorrido: 📚 Aprender → <strong style="color:#00d4aa;">📖 Documentación (estás aquí)</strong> → 🎲 Lab</p>
+    </div>
+
     <div class="table-of-contents">
         <h4>Índice</h4>
+        <p style="font-size:13px; color:#94a3b8; margin:0 0 8px;">Léelo de arriba abajo: va de <em>qué es</em> → <em>cómo se usa</em> → <em>cómo funciona por dentro</em> → <em>detalle técnico</em>.</p>
         <ul>
-            <li><a href="#novedades">🆕 Novedades (asistente autónomo con IA)</a></li>
-            <li><a href="#algoritmos">🧠 Cómo funcionan nuestros algoritmos (teoría + ejemplos)</a></li>
-            <li><a href="#arquitectura">🏗️ Arquitectura del Sistema</a></li>
-            <li><a href="#inicio-rapido">1. Inicio Rápido</a></li>
-            <li><a href="#configuracion">2. Configuración</a></li>
-            <li><a href="#añadir-posiciones">3. Añadir Posiciones</a></li>
-            <li><a href="#funcionalidades">4. Funcionalidades</a></li>
-            <li><a href="#api">5. API Reference</a></li>
-            <li><a href="#faq">6. Preguntas Frecuentes</a></li>
+            <li><strong>Empezar aquí</strong></li>
+            <li style="margin-left:14px;"><a href="#que-es">🎯 Qué es FinTrack y la visión</a></li>
+            <li style="margin-left:14px;"><a href="#guia-uso">🧭 Guía de uso: pestaña por pestaña</a></li>
+            <li style="margin-left:14px;"><a href="#el-cerebro">🧠 El cerebro: cómo descubre y recomienda (paso a paso)</a></li>
+            <li style="margin-top:6px;"><strong>En profundidad</strong></li>
+            <li style="margin-left:14px;"><a href="#novedades">🆕 Novedades (asistente autónomo con IA)</a></li>
+            <li style="margin-left:14px;"><a href="#algoritmos">🔬 Cómo funcionan nuestros algoritmos (teoría + ejemplos)</a></li>
+            <li style="margin-left:14px;"><a href="#arquitectura">🏗️ Arquitectura del Sistema</a></li>
+            <li style="margin-top:6px;"><strong>Referencia</strong></li>
+            <li style="margin-left:14px;"><a href="#inicio-rapido">Inicio Rápido</a></li>
+            <li style="margin-left:14px;"><a href="#configuracion">Configuración</a></li>
+            <li style="margin-left:14px;"><a href="#añadir-posiciones">Añadir Posiciones</a></li>
+            <li style="margin-left:14px;"><a href="#funcionalidades">Funcionalidades</a></li>
+            <li style="margin-left:14px;"><a href="#api">API Reference</a></li>
+            <li style="margin-left:14px;"><a href="#faq">Preguntas Frecuentes</a></li>
         </ul>
     </div>
+
+    <!-- ==================== QUÉ ES FINTRACK ==================== -->
+    <section id="que-es">
+        <h2>🎯 Qué es FinTrack y la visión</h2>
+        <p>FinTrack es tu <strong>asistente de inversión personal</strong>. No es solo un panel para mirar cuánto vale tu cartera: cada día <strong>rastrea el mercado, lo analiza con un motor cuantitativo y te trae oportunidades concretas y explicadas</strong>, tanto en la web como por Telegram.</p>
+        <p>La idea de fondo: que las decisiones se apoyen en <strong>datos y estadística</strong> (no en la intuición de una IA), y que la IA se limite a <strong>explicarte</strong> en lenguaje claro lo que los números ya han decidido.</p>
+        <div class="formula-box">
+            <p><strong>En una frase:</strong></p>
+            <p style="font-size:15px;">Tú llevas tus inversiones reales (Kraken, Trade Republic, MyInvestor) → FinTrack las une, las valora con precios reales, y cada mañana te propone <em>qué mirar hoy</em> con su porqué.</p>
+        </div>
+        <h3>¿Qué hace por ti?</h3>
+        <ul>
+            <li><strong>Une toda tu cartera</strong> en un sitio, con precios actualizados (como abrir cada app por separado, pero de golpe).</li>
+            <li><strong>Descubre oportunidades nuevas</strong> que quizá no conoces, filtrando lo que ya tienes.</li>
+            <li><strong>Te explica el porqué</strong> de cada idea: tendencia, riesgo, noticias que la respaldan y una gráfica.</li>
+            <li><strong>Te avisa</strong> (alertas y resumen diario) y responde tus preguntas por Telegram.</li>
+        </ul>
+        <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;"><strong>Importante y honesto:</strong> FinTrack <em>no predice el futuro</em> ni da órdenes de compra. Es análisis educativo para ayudarte a decidir mejor. Tú mandas.</p>
+    </section>
+
+    <!-- ==================== GUÍA DE USO ==================== -->
+    <section id="guia-uso">
+        <h2>🧭 Guía de uso: pestaña por pestaña</h2>
+        <p>Un recorrido por la app en el orden en que la usarías:</p>
+
+        <h3>1. 📊 Dashboard</h3>
+        <p>Tu foto global: valor total, ganancia/pérdida, evolución histórica y reparto por tipo de activo. Es lo primero que ves al entrar.</p>
+
+        <h3>2. 💼 Gestionar Cartera</h3>
+        <p>Aquí registras lo que tienes y los <strong>movimientos reales</strong> que haces en tus apps de trading. Cuando aportas dinero a un activo puedes indicar <strong>desde qué broker y en qué fecha</strong>, y FinTrack calcula las participaciones al precio de ese instante para mantener un registro fiel.</p>
+
+        <h3>3. 💡 Oportunidades</h3>
+        <p>El corazón del asistente. Cada día muestra:</p>
+        <ul>
+            <li><strong>Régimen de mercado</strong> (alcista/bajista/neutral) según la amplitud del mercado.</li>
+            <li><strong>Tendencias del momento</strong>: qué ETFs/fondos y cripto más han crecido y qué patrones comparten.</li>
+            <li><strong>2-4 oportunidades</strong> con gráfica a 6 meses, noticias que las respaldan y el desglose de por qué el motor las puntúa así.</li>
+            <li><strong>Ranking cuantitativo</strong> de sectores (puntuación objetiva, no opinión).</li>
+        </ul>
+
+        <h3>4. 🔔 Alertas</h3>
+        <p>Reglas que vigilan tu cartera y el mercado (caídas, noticias relevantes agrupadas por activo) y te avisan por Telegram.</p>
+
+        <h3>5. 🧮 Calculadoras y 📈 Backtest</h3>
+        <p>Herramientas para simular interés compuesto, aportaciones periódicas y para <em>probar</em> cómo se habría comportado una estrategia en el pasado.</p>
+
+        <h3>6. 🤖 Asesor IA y 📰 Noticias</h3>
+        <p>Chat con contexto de tu cartera para resolver dudas, y un agregador de noticias financieras con su sentimiento (positivo/negativo) clasificado por IA.</p>
+
+        <h3>7. 📱 Telegram</h3>
+        <p>Todo lo anterior, en tu bolsillo: <code>/cartera</code>, <code>/oportunidades</code>, <code>/aportar</code>, resumen diario, gráficas como imagen y preguntas en lenguaje natural. El bot muestra que "está pensando" hasta que responde.</p>
+    </section>
+
+    <!-- ==================== EL CEREBRO ==================== -->
+    <section id="el-cerebro">
+        <h2>🧠 El cerebro: cómo descubre y recomienda (paso a paso)</h2>
+        <p>Cuando pides oportunidades (o a las 07:30 automáticamente), esto es lo que ocurre <strong>de principio a fin</strong>:</p>
+        <pre class="diagram-box">
+1. 📥 LEE TU CARTERA      → para no recomendarte lo que ya tienes y diversificar tu riesgo.
+
+2. 🌐 ESCANEA EL MERCADO   → ~100 ETFs/fondos curados + screeners de Yahoo (infravaloradas,
+                             growth de calidad) + una cesta de cripto. Datos reales de precio.
+
+3. 🔬 PUNTÚA CON EL MOTOR  → cada activo pasa por un ENSEMBLE de criterios (jueces):
+   (estadística, no IA)      momentum · régimen/tendencia · Sharpe · técnico (RSI/MACD)
+                             · volatilidad EWMA · reversión a la media.
+                             Cada juez "vota" con un z-score; convergen en 2 puntuaciones:
+                             MOMENTUM (lo fuerte) y VALOR (lo castigado pero de calidad).
+
+4. 📡 DETECTA EL RÉGIMEN    → % de activos sobre su tendencia de 200 sesiones.
+                             Alcista → pesa más momentum. Bajista → pesa más valor/defensivo.
+
+5. 🚀 ANALIZA TENDENCIAS    → qué ha crecido más y qué patrones comparten los líderes.
+
+6. 📰 AÑADE NOTICIAS+MACRO   → titulares recientes (con sentimiento) y contexto macro.
+
+7. 🤖 LA IA EXPLICA          → Gemini coge SOLO lo mejor rankeado y lo redacta: qué es,
+   (no decide, narra)        por qué ahora, riesgos, encaje en tu cartera. Usa el ticker real.
+
+8. 📈 AÑADE EVIDENCIA        → gráfica de 6 meses + noticias que respaldan cada idea.
+
+9. 📤 TE LO ENTREGA          → web (tarjetas + desglose) y Telegram (gráfica + criterios).
+        </pre>
+        <p>La clave: <strong>los pasos 2-6 son pura estadística</strong> sobre datos reales; la IA (paso 7) solo <strong>explica</strong> lo que el motor ya ordenó. Por eso puedes ver el "porqué" de cada idea con el desglose de criterios. El detalle matemático de cada juez está en <a href="#algoritmos">🔬 Cómo funcionan nuestros algoritmos</a>.</p>
+    </section>
 
     <!-- ==================== NOVEDADES ==================== -->
     <section id="novedades">
@@ -389,7 +499,7 @@ const pageContent = {
 
     <!-- ==================== ALGORITMOS ==================== -->
     <section id="algoritmos">
-        <h2>🧠 Cómo funcionan nuestros algoritmos (teoría + ejemplos)</h2>
+        <h2>🔬 Cómo funcionan nuestros algoritmos (teoría + ejemplos)</h2>
         <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;">
             <strong>Honestidad ante todo:</strong> estos métodos <em>no predicen el precio futuro</em>. Miden tendencia, riesgo y posición relativa sobre datos ya ocurridos, y rankean. Cualquiera que prometa "predecir" el precio con un indicador, miente. Nuestro objetivo es ranquear con criterio estadístico, no adivinar.
         </p>
@@ -1021,6 +1131,17 @@ curl -X DELETE "http://localhost:8000/api/positions/GOOGL"</code></pre>
         <h3>¿Cómo añado un nuevo broker?</h3>
         <p>Simplemente escribe el nombre del nuevo broker en el campo "broker" del CSV o al crear una transacción. El sistema lo reconocerá automáticamente.</p>
     </section>
+
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:24px;">
+        <a href="#" onclick="document.querySelector('[data-page=learn]').click(); return false;" style="flex:1; min-width:200px; background:#6366f114; border:1px solid #6366f144; border-radius:10px; padding:14px 18px; text-decoration:none; color:inherit;">
+            <strong>← Volver a Aprender</strong>
+            <p style="margin:6px 0 0; font-size:13px; color:#94a3b8;">Repasa los fundamentos y las métricas.</p>
+        </a>
+        <a href="#" onclick="document.querySelector('[data-page=polymarket]').click(); return false;" style="flex:1; min-width:200px; background:#00d4aa14; border:1px solid #00d4aa44; border-radius:10px; padding:14px 18px; text-decoration:none; color:inherit;">
+            <strong>Siguiente: Polymarket Lab →</strong>
+            <p style="margin:6px 0 0; font-size:13px; color:#94a3b8;">La visión: hacia un asistente autónomo.</p>
+        </a>
+    </div>
 </div>
     `
 };
@@ -1059,6 +1180,9 @@ function initNavigation() {
                 'calculators': 'Calculadoras',
                 'ai-advisor': 'Asesor IA',
                 'news': 'Noticias',
+                'opportunities': 'Oportunidades',
+                'backtest': 'Backtest',
+                'polymarket': 'Polymarket Lab',
                 'learn': 'Aprender',
                 'docs': 'Documentación'
             };
