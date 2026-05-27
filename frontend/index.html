@@ -1300,8 +1300,12 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                         </div>
                         <button class="btn-primary" onclick="loadOpportunities(true)" id="oppRefreshBtn">🔄 Buscar oportunidades</button>
                     </section>
-                    <div id="oppLoading" style="display:none; text-align:center; padding:20px;" class="text-muted">
-                        🔎 Analizando mercado, sectores y tu cartera… (~20-40s)
+                    <div id="oppLoading" style="display:none; padding:24px;">
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                            <span id="oppLoadingMsg">🧠 La herramienta está pensando…</span>
+                            <span class="text-muted" style="font-size:12px;">Puede tardar 1-2 min la primera vez del día</span>
+                        </div>
                     </div>
                     <div id="oppContent">
                         <p class="text-muted">Pulsa "Buscar oportunidades" para que el analista revise el mercado.</p>

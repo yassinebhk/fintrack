@@ -4,12 +4,36 @@
 const OPP_API = (window.API_BASE_URL || 'http://localhost:8000/api');
 let oppLoaded = false;
 
+const OPP_THINKING_STEPS = [
+    '🧠 La herramienta está pensando…',
+    '🔎 Escaneando ~130 ETFs/fondos y screeners del mercado…',
+    '📊 Calculando momentum, Sharpe y RSI (motor cuantitativo)…',
+    '📰 Cruzando con las noticias recientes…',
+    '🧩 Redactando las oportunidades y sus gráficas…',
+];
+let oppThinkingTimer = null;
+
+function startOppThinking() {
+    const msg = document.getElementById('oppLoadingMsg');
+    let i = 0;
+    if (msg) msg.textContent = OPP_THINKING_STEPS[0];
+    oppThinkingTimer = setInterval(() => {
+        i = (i + 1) % OPP_THINKING_STEPS.length;
+        if (msg) msg.textContent = OPP_THINKING_STEPS[i];
+    }, 3500);
+}
+
+function stopOppThinking() {
+    if (oppThinkingTimer) { clearInterval(oppThinkingTimer); oppThinkingTimer = null; }
+}
+
 async function loadOpportunities(force = false) {
     const btn = document.getElementById('oppRefreshBtn');
     const loading = document.getElementById('oppLoading');
     const content = document.getElementById('oppContent');
     btn.disabled = true;
     loading.style.display = 'block';
+    startOppThinking();
     if (force) content.innerHTML = '';
 
     try {
@@ -21,6 +45,7 @@ async function loadOpportunities(force = false) {
     } catch (err) {
         content.innerHTML = `<div class="alert alert-error">No se pudieron cargar las oportunidades: ${err.message}</div>`;
     } finally {
+        stopOppThinking();
         btn.disabled = false;
         loading.style.display = 'none';
     }

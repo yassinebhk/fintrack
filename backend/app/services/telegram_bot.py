@@ -7,6 +7,7 @@ Two capabilities:
 Security: only the configured TELEGRAM_CHAT_ID is allowed to interact.
 """
 
+import asyncio
 import re
 from datetime import date, timedelta
 
@@ -109,11 +110,23 @@ class TelegramBotHandler:
         # Otherwise treat as a question for FinBot
         await self._answer_question(text)
 
+    async def _keep_thinking(self) -> None:
+        """Keep the 'typing…' indicator alive while a long task runs (it expires ~5s)."""
+        try:
+            while True:
+                await self.notifier.send_chat_action("typing")
+                await asyncio.sleep(4)
+        except asyncio.CancelledError:
+            return
+
     async def _send_opportunities(self) -> None:
         """Run the market analyst and send today's opportunities."""
-        await self.notifier.send_chat_action("typing")
-        await self.notifier.send_text("🔎 Analizando el mercado y buscando oportunidades… (~20-40s)")
-        await self.notifier.send_chat_action("typing")
+        await self.notifier.send_text(
+            "🧠 Estoy analizando el mercado y buscando oportunidades…\n"
+            "Escaneo ~130 activos + noticias y preparo las gráficas. "
+            "Puede tardar 1-2 min la primera vez del día."
+        )
+        thinking = asyncio.create_task(self._keep_thinking())  # keep "typing…" visible
         try:
             from app.services.opportunities import (
                 OpportunityService,
@@ -122,6 +135,7 @@ class TelegramBotHandler:
             )
 
             payload = await OpportunityService().generate()
+            thinking.cancel()  # done thinking → stop the typing indicator
             opps = payload.get("opportunities") or []
             if not opps:
                 await self.notifier.send_text("No pude generar oportunidades ahora mismo (posible límite de cuota). Reintenta en un rato.")
@@ -149,6 +163,8 @@ class TelegramBotHandler:
         except Exception as exc:
             logger.error("telegram opportunities failed: {}", exc)
             await self.notifier.send_text("No pude generar las oportunidades ahora mismo, intenta más tarde.")
+        finally:
+            thinking.cancel()  # safety: always stop the indicator
 
     async def _send_chart(self, text: str) -> None:
         """Send a portfolio or per-asset evolution chart as an image."""
