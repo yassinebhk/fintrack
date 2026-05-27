@@ -121,6 +121,16 @@ UNIVERSE: list[tuple[str, str, str, str]] = [
     ("TIP", "Bonos ligados a inflación", "renta fija", "EEUU"),
     ("EMB", "Deuda emergente", "renta fija", "Emergentes"),
     ("BNDX", "Bonos internacionales", "renta fija", "Global"),
+    # --- Fondos gestionados (símbolo Yahoo 0P… con histórico de NAV diario) ---
+    # Se puntúan con el MISMO motor cuantitativo que el resto, no por opinión.
+    ("0P0001KWJN.F", "Robeco Smart Energy", "fondo gestionado", "Global"),
+    ("0P0001DFE8.F", "Horos Value Internacional", "fondo gestionado", "Global"),
+    ("0P0001DFE7.F", "Horos Value Iberia", "fondo gestionado", "España"),
+    ("0P00019W2R.F", "Cobas Internacional", "fondo gestionado", "Global"),
+    ("0P0001572W.F", "Magallanes European Equity", "fondo gestionado", "Europa"),
+    ("0P0001824G.L", "Fundsmith Equity", "fondo gestionado", "Global"),
+    ("0P0001OCUI.F", "Seilern World Growth", "fondo gestionado", "Global"),
+    ("0P0001CTGR.F", "Baelo Patrimonio", "fondo gestionado", "Global"),
 ]
 
 
