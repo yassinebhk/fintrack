@@ -35,18 +35,23 @@ class MarketScanner:
         self.yahoo = YahooFinanceService()
 
     async def _analyze_ticker(
-        self, ticker: str, name: str, desc: str, sem: asyncio.Semaphore | None = None
+        self, ticker: str, name: str, desc: str, sem: asyncio.Semaphore | None = None,
+        fetch_price: bool = True,
     ) -> dict | None:
         """Generic per-instrument analysis: returns, 52w range, technical signals
-        and quant factors. Used both for the fixed themes and the wide universe."""
+        and quant factors. Used both for the fixed themes and the wide universe.
+
+        For the wide universe we set fetch_price=False: the daily history already
+        gives us everything we need, and skipping the live-price call avoids a second
+        Yahoo round-trip per ticker (which, when rate-limited, falls back to slow
+        yfinance scraping and makes a 100+ ticker scan crawl on small instances)."""
         async def _work() -> dict | None:
             try:
                 hist = await self.yahoo.get_history(ticker, period="1y")
-                price = await self.yahoo.get_price(ticker)
             except Exception as exc:
                 logger.debug("{} fetch failed: {}", ticker, exc)
                 return None
-            if not hist or len(hist) < 30 or not price:
+            if not hist or len(hist) < 30:
                 return None
 
             closes = [h["close"] for h in hist if h.get("close")]
@@ -64,6 +69,18 @@ class MarketScanner:
             hi, lo = max(closes), min(closes)
             range_pos = (last - lo) / (hi - lo) * 100 if hi > lo else 50.0
 
+            # Day change: from a live price if requested, else from the last two closes.
+            day_change_pct = 0.0
+            if fetch_price:
+                try:
+                    price = await self.yahoo.get_price(ticker)
+                    if price:
+                        day_change_pct = price.get("change_percent", 0)
+                except Exception:
+                    pass
+            elif len(closes) >= 2 and closes[-2]:
+                day_change_pct = (closes[-1] - closes[-2]) / closes[-2] * 100
+
             # Technical signals via `ta` + quant factors via empyrical (objective)
             from app.services.discovery.technical import compute_signals
             from app.services.discovery.quant_score import compute_factors
@@ -79,7 +96,7 @@ class MarketScanner:
                 "ret_6m": round(ret(126), 2) if ret(126) is not None else None,
                 "ret_1y": round(ret(250), 2) if ret(250) is not None else None,
                 "range_pos_52w": round(range_pos, 1),  # 0 = mínimo anual, 100 = máximo anual
-                "day_change_pct": round(price.get("change_percent", 0), 2),
+                "day_change_pct": round(day_change_pct, 2),
                 "signals": signals,
                 "factors": factors,
             }
@@ -106,7 +123,7 @@ class MarketScanner:
 
         sem = asyncio.Semaphore(8)  # throttle so Yahoo doesn't rate-limit us
         tasks = [
-            self._analyze_ticker(tk, info["name"], info.get("cat", "descubierto"), sem)
+            self._analyze_ticker(tk, info["name"], info.get("cat", "descubierto"), sem, fetch_price=False)
             for tk, info in candidates.items()
             if tk.upper() not in exclude
         ]

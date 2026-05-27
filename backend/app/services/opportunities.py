@@ -1,5 +1,6 @@
 """Opportunity discovery service — runs the market scanner + analyst agent."""
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 from loguru import logger
@@ -20,6 +21,7 @@ class OpportunityService:
         self._cache: dict | None = None
         self._cache_at: datetime | None = None
         self._ttl = timedelta(hours=12)
+        self._lock = asyncio.Lock()
 
     def _fresh(self) -> bool:
         return (
@@ -32,6 +34,15 @@ class OpportunityService:
         if self._fresh() and not force:
             return self._cache
 
+        # Only one scan at a time: concurrent callers (manual click, daily job, bot)
+        # wait for the in-flight result instead of each kicking off a heavy 100+
+        # ticker scan and thrashing the instance.
+        async with self._lock:
+            if self._fresh() and not force:
+                return self._cache
+            return await self._generate_locked()
+
+    async def _generate_locked(self) -> dict:
         portfolio = await self.portfolio_service.calculate_portfolio()
 
         # Exclude what the user already holds so discoveries are genuinely new.
@@ -106,8 +117,6 @@ class OpportunityService:
         self, opportunities: list[dict], news_items: list[dict]
     ) -> None:
         """Attach a 6-month trend chart_url and supporting news (with links) to each idea."""
-        import asyncio
-
         from app.services.charts import line_chart
 
         def attach_news(opp: dict) -> None:
