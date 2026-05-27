@@ -10,7 +10,7 @@ async function loadLearnPage(targetPage) {
     if (targetPage.dataset.loaded === 'true') return;
     
     try {
-        const response = await fetch('pages/learn.html');
+        const response = await fetch('pages/learn.html?v=20260528', { cache: 'no-store' });
         if (response.ok) {
             targetPage.innerHTML = await response.text();
             targetPage.dataset.loaded = 'true';

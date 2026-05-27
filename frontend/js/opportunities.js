@@ -169,7 +169,7 @@ function renderOpportunities(data) {
         return `
         <div class="card" style="margin-bottom:14px; border-left:3px solid ${color};">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                <h3 style="margin:0;">${icon} ${op.name}${op.ticker_or_isin ? ` <span class="text-muted" style="font-size:13px;">${op.ticker_or_isin}</span>` : ''}</h3>
+                <h3 style="margin:0;">${icon} ${op.ticker_or_isin ? `<a href="https://finance.yahoo.com/quote/${encodeURIComponent(op.ticker_or_isin)}" target="_blank" rel="noopener" title="Ver ficha (precio e info)" style="color:inherit; text-decoration:underline dotted;">${op.name}</a>` : op.name}${op.ticker_or_isin ? ` <span class="text-muted" style="font-size:13px;">${op.ticker_or_isin}</span>` : ''}</h3>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
                     ${apprLabel ? `<span style="${apprStyle} padding:2px 10px; border-radius:12px; font-size:12px; white-space:nowrap;">${apprLabel}</span>` : ''}
                     <span style="background:${color}22; color:${color}; padding:2px 10px; border-radius:12px; font-size:12px; white-space:nowrap;">convicción ${op.conviction}</span>
