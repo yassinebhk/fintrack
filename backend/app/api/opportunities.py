@@ -3,17 +3,16 @@
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 
-from app.services.opportunities import OpportunityService
+from app.services.opportunities import get_opportunity_service
 
 router = APIRouter(prefix="/api/opportunities", tags=["opportunities"])
-_service = OpportunityService()
 
 
 @router.get("")
 async def get_opportunities(force: bool = False) -> dict:
     """Today's opportunities (cached 12h; force=true to regenerate)."""
     try:
-        return await _service.generate(force=force)
+        return await get_opportunity_service().generate(force=force)
     except Exception as exc:
         msg = str(exc)
         logger.exception("opportunities generation failed")

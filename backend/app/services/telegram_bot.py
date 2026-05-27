@@ -129,12 +129,12 @@ class TelegramBotHandler:
         thinking = asyncio.create_task(self._keep_thinking())  # keep "typing…" visible
         try:
             from app.services.opportunities import (
-                OpportunityService,
+                get_opportunity_service,
                 render_opportunities_telegram,
                 render_opportunity_caption,
             )
 
-            payload = await OpportunityService().generate()
+            payload = await get_opportunity_service().generate()
             thinking.cancel()  # done thinking → stop the typing indicator
             opps = payload.get("opportunities") or []
             if not opps:

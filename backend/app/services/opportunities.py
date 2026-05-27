@@ -20,7 +20,9 @@ class OpportunityService:
         self.news_service = NewsService()
         self._cache: dict | None = None
         self._cache_at: datetime | None = None
-        self._ttl = timedelta(hours=12)
+        # 20h so the 07:30 pre-warm keeps the cache fresh all day (an evening view
+        # never falls back to a cold scan); the next morning's job refreshes it.
+        self._ttl = timedelta(hours=20)
         self._lock = asyncio.Lock()
 
     def _fresh(self) -> bool:
@@ -206,3 +208,15 @@ def render_opportunity_caption(op: dict) -> str:
             src = esc(n.get("source", ""))
             lines.append(f"• <a href=\"{url}\">{title}</a> <i>({src})</i>" if url else f"• {title} <i>({src})</i>")
     return "\n".join(lines)[:1024]
+
+
+# Single shared instance so the in-memory cache is the same one the API endpoint,
+# the Telegram bot and the daily pre-warm job all read from / write to.
+_shared_service: OpportunityService | None = None
+
+
+def get_opportunity_service() -> OpportunityService:
+    global _shared_service
+    if _shared_service is None:
+        _shared_service = OpportunityService()
+    return _shared_service
