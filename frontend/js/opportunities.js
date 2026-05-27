@@ -35,7 +35,8 @@ const OPP_POLL_MS = 6000;
 const OPP_POLL_MAX_MS = 6 * 60 * 1000; // give up after ~6 min
 
 async function fetchOpp(force) {
-    const resp = await fetch(`${OPP_API}/opportunities${force ? '?force=true' : ''}`);
+    // no-store so the browser never serves a stale cached API response
+    const resp = await fetch(`${OPP_API}/opportunities${force ? '?force=true' : ''}`, { cache: 'no-store' });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
     return data;

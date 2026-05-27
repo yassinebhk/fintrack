@@ -10,7 +10,7 @@ async function loadTransactions() {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted" style="padding:24px;">Cargando transacciones…</td></tr>';
     try {
-        const resp = await fetch(`${TX_API}/transactions?limit=300`);
+        const resp = await fetch(`${TX_API}/transactions?limit=300`, { cache: 'no-store' });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
         _txAll = Array.isArray(data) ? data : [];
