@@ -349,6 +349,9 @@ def render_opportunity_caption(op: dict) -> str:
         top = list(bd.items())[:3]  # already sorted by |contribution|
         chips = " · ".join(f"{labels.get(k,k)} {'+' if v>=0 else ''}{v:.2f}" for k, v in top)
         lines.append(f"<b>🧮 Criterios:</b> <i>{esc(chips)}</i>")
+    if tk:
+        from urllib.parse import quote
+        lines.append(f'🔗 <a href="https://finance.yahoo.com/quote/{quote(str(tk))}">Ver ficha (precio e info)</a>')
     news = op.get("news") or []
     if news:
         lines.append("<b>📰 Noticias que lo respaldan:</b>")

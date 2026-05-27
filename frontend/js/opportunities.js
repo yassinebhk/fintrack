@@ -109,6 +109,19 @@ const CRITERION_LABEL = {
     calidad: 'Calidad (Sharpe)',
 };
 
+function assetLinks(op) {
+    const tk = (op.ticker_or_isin || '').trim();
+    if (!tk) return '';
+    const q = encodeURIComponent(tk);
+    const yahoo = `https://finance.yahoo.com/quote/${q}`;
+    const justetf = `https://www.justetf.com/en/search.html?query=${q}`;
+    const isFund = op.kind === 'etf' || op.kind === 'fondo';
+    return `<div style="margin:8px 0 2px; font-size:13px;">🔗 <strong>Ver ficha del activo:</strong>
+        <a href="${yahoo}" target="_blank" rel="noopener" style="color:#60a5fa;">precio actual e info (Yahoo Finance)</a>${isFund ? `
+        · <a href="${justetf}" target="_blank" rel="noopener" style="color:#60a5fa;">ISIN y dónde comprar (justETF)</a>` : ''}
+    </div>`;
+}
+
 function renderBreakdown(op) {
     const bd = op.score_breakdown;
     if (!bd || !Object.keys(bd).length) return '';
@@ -156,6 +169,7 @@ function renderOpportunities(data) {
             <p style="margin:4px 0;"><strong>📈 Por qué ahora:</strong> ${op.why_now}</p>
             <p style="margin:4px 0;"><strong>⚠️ Riesgos:</strong> ${op.risks}</p>
             <p style="margin:4px 0;"><strong>🎯 Encaje en tu cartera:</strong> ${op.fit}</p>
+            ${assetLinks(op)}
             ${renderBreakdown(op)}
             ${(op.news && op.news.length) ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);"><strong style="font-size:13px;">📰 Noticias que lo respaldan:</strong><ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${op.news.map(n => `<li><a href="${n.url}" target="_blank" rel="noopener" style="color:#60a5fa;">${n.title}</a> <span class="text-muted">(${n.source})</span></li>`).join('')}</ul></div>` : ''}
         </div>`;

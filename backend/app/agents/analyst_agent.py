@@ -9,7 +9,7 @@ from app.agents.base import Agent, AgentContext, render_portfolio_for_prompt
 
 
 SYSTEM = """Eres un analista de inversiones profesional que trabaja para el usuario. Cada día revisas
-el mercado y le traes 2-4 OPORTUNIDADES concretas que probablemente desconoce, como haría un gestor.
+el mercado y le traes 6-8 OPORTUNIDADES concretas que probablemente desconoce, como haría un gestor.
 
 Tienes:
 - Un RANKING CUANTITATIVO OBJETIVO calculado por un motor de scoring (librerías validadas empyrical +
@@ -46,8 +46,10 @@ Reglas:
 5. Distingue DATO (lo que sabes por los números) de OPINIÓN/análisis (tu criterio).
 6. NO prometas rentabilidades ni des órdenes de compra. Es análisis educativo.
 7. Responde en español, claro y para leer en el móvil.
-8. SÉ CONCISO: cada campo (what_it_is, why_now, risks, fit) en 1-2 frases. Propón 3 oportunidades
-   (no más) para no extenderte. La brevedad es importante.
+8. SÉ CONCISO en cada campo (what_it_is, why_now, risks, fit): 1-2 frases. Pero abarca AMPLIO:
+   propón 6-8 oportunidades VARIADAS (distintos sectores, regiones, factores y enfoques), repartidas
+   entre momentum y valor/contrarian. Aprovecha que el motor ha rankeado ~130 instrumentos: no te
+   quedes en 3. Eso sí, TODAS deben venir del ranking y TODAS deben ir explicadas por completo.
 """
 
 SCHEMA = {
@@ -92,7 +94,7 @@ class AnalystAgent(Agent):
     response_schema = SCHEMA
     # Gemini 2.5 Flash spends a big chunk of the budget on internal "thinking";
     # give it plenty of headroom so the JSON output isn't truncated mid-array.
-    max_tokens = 8192
+    max_tokens = 16384  # room for 6-8 fully-explained opportunities without truncation
 
     def build_user_prompt(self, context: AgentContext) -> str:
         themes_str = context.extras.get("themes_str", "(sin datos de sectores)")
@@ -123,7 +125,7 @@ class AnalystAgent(Agent):
             "## Cartera actual del usuario\n"
             f"{rendered_portfolio}\n\n"
             "## Tu tarea\n"
-            "Propón 2-4 oportunidades concretas que el usuario probablemente desconoce, cada una con "
+            "Propón 6-8 oportunidades concretas y VARIADAS que el usuario probablemente desconoce, cada una con "
             "overview completo (what_it_is, why_now ligado a los datos Y noticias, risks, fit con su cartera, "
             "conviction). Cuando un titular de la lista respalde una idea, cita su índice [N] en "
             "supporting_news_idx (0-2 por idea) y aludídelo en why_now. "

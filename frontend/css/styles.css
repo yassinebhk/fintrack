@@ -4,12 +4,12 @@
    ============================================ */
 
 :root {
-    /* Colors - Dark financial theme */
-    --bg-primary: #0a0e17;
-    --bg-secondary: #111827;
-    --bg-tertiary: #1a2332;
-    --bg-card: #151d2c;
-    --bg-card-hover: #1a253a;
+    /* Colors - Dark financial theme (lightened for a bit more brightness) */
+    --bg-primary: #131b29;
+    --bg-secondary: #1b2535;
+    --bg-tertiary: #243044;
+    --bg-card: #1e2a3d;
+    --bg-card-hover: #273650;
     
     /* Accent colors */
     --accent-primary: #00d4aa;
@@ -31,8 +31,8 @@
     --text-muted: #475569;
     
     /* Border colors */
-    --border-primary: #1e293b;
-    --border-secondary: #334155;
+    --border-primary: #2b3a52;
+    --border-secondary: #3d4f6b;
     --border-accent: rgba(0, 212, 170, 0.3);
     
     /* Chart colors */
