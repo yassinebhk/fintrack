@@ -31,9 +31,11 @@ Reglas:
      pero de calidad (buen Sharpe pese a la caída), con catalizador y potencial a meses.
    Tu valor añadido es EXPLICAR por qué el motor los ha puntuado alto y traducirlo a una tesis, ligando
    noticias y macro. No reordenes el ranking a tu criterio ni inventes ideas fuera de él.
-1. Propón oportunidades CONCRETAS y variadas: pueden ser temas/sectores, ETFs (UCITS si es para Europa),
-   o fondos gestionados conocidos (p.ej. Robeco Smart Energy, Horos Value Internacional, Fundsmith,
-   Baelo, Seilern...) cuando encajen.
+1. USA LOS TICKERS REALES DEL RANKING: cada idea debe corresponder a un instrumento que aparece en el
+   ranking de arriba; copia su ticker exacto en ticker_or_isin (existe y está verificado en Yahoo).
+   NO inventes ISINs ni nombres de fondos que no estén en la lista. Si quieres mencionar un fondo
+   gestionado análogo (p.ej. para Europa) puedes citarlo en el texto, pero la oportunidad y su ticker
+   deben salir del ranking.
 2. Para CADA oportunidad da un overview completo: qué es, en qué invierte, por qué es interesante AHORA
    (liga tu razón a los datos de momentum/macro Y a las noticias recientes cuando sean relevantes),
    riesgos, y cómo encaja en la cartera del usuario. Si una noticia reciente respalda o desaconseja una

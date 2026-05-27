@@ -66,8 +66,8 @@ function renderOpportunities(data) {
         ${data.market_summary ? `<div class="integrations-banner-inner" style="margin-bottom:16px;"><div class="integrations-banner-icon">🧠</div><div class="integrations-banner-body"><strong>Resumen de mercado</strong><p style="margin:6px 0 0;">${data.market_summary}</p></div></div>` : ''}
         ${opps}
         <div class="card" style="margin-top:16px;">
-            <h3>📊 Ranking cuantitativo de sectores (motor empyrical + ta, datos reales)</h3>
-            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">Puntuación objetiva por estadística sobre precios, no opinión de la IA. Score Mom. = tendencia + retorno ajustado a riesgo · Score Valor = castigado pero de calidad.</p>
+            <h3>📊 Ranking cuantitativo (motor empyrical + ta, datos reales)</h3>
+            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">${data.universe_size ? `Escaneados <strong>${data.universe_size}</strong> instrumentos (ETFs/fondos + screeners de Yahoo), excluyendo lo que ya tienes. ` : ''}Puntuación objetiva por estadística sobre precios, no opinión de la IA. Score Mom. = tendencia + retorno ajustado a riesgo · Score Valor = castigado pero de calidad.</p>
             <div class="table-container">
                 <table class="manager-table">
                     <thead><tr><th>Tema</th><th class="text-right">Score Mom.</th><th class="text-right">Score Valor</th><th class="text-right">3 meses</th><th class="text-right">Rango 52s</th></tr></thead>

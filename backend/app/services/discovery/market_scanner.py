@@ -34,53 +34,139 @@ class MarketScanner:
     def __init__(self) -> None:
         self.yahoo = YahooFinanceService()
 
+    async def _analyze_ticker(
+        self, ticker: str, name: str, desc: str, sem: asyncio.Semaphore | None = None
+    ) -> dict | None:
+        """Generic per-instrument analysis: returns, 52w range, technical signals
+        and quant factors. Used both for the fixed themes and the wide universe."""
+        async def _work() -> dict | None:
+            try:
+                hist = await self.yahoo.get_history(ticker, period="1y")
+                price = await self.yahoo.get_price(ticker)
+            except Exception as exc:
+                logger.debug("{} fetch failed: {}", ticker, exc)
+                return None
+            if not hist or len(hist) < 30 or not price:
+                return None
+
+            closes = [h["close"] for h in hist if h.get("close")]
+            if len(closes) < 30:
+                return None
+
+            last = closes[-1]
+
+            def ret(days_back: int) -> float | None:
+                if len(closes) > days_back:
+                    base = closes[-days_back - 1]
+                    return (last - base) / base * 100 if base else None
+                return None
+
+            hi, lo = max(closes), min(closes)
+            range_pos = (last - lo) / (hi - lo) * 100 if hi > lo else 50.0
+
+            # Technical signals via `ta` + quant factors via empyrical (objective)
+            from app.services.discovery.technical import compute_signals
+            from app.services.discovery.quant_score import compute_factors
+            signals = compute_signals(closes)
+            factors = compute_factors(closes)
+
+            return {
+                "theme": name,
+                "ticker": ticker,
+                "desc": desc,
+                "ret_1m": round(ret(21), 2) if ret(21) is not None else None,
+                "ret_3m": round(ret(63), 2) if ret(63) is not None else None,
+                "ret_6m": round(ret(126), 2) if ret(126) is not None else None,
+                "ret_1y": round(ret(250), 2) if ret(250) is not None else None,
+                "range_pos_52w": round(range_pos, 1),  # 0 = mínimo anual, 100 = máximo anual
+                "day_change_pct": round(price.get("change_percent", 0), 2),
+                "signals": signals,
+                "factors": factors,
+            }
+
+        if sem is not None:
+            async with sem:
+                return await _work()
+        return await _work()
+
     async def _theme_momentum(self, name: str, meta: dict) -> dict | None:
-        ticker = meta["ticker"]
-        try:
-            hist = await self.yahoo.get_history(ticker, period="1y")
-            price = await self.yahoo.get_price(ticker)
-        except Exception as exc:
-            logger.debug("theme {} fetch failed: {}", name, exc)
-            return None
-        if not hist or len(hist) < 30 or not price:
-            return None
+        return await self._analyze_ticker(meta["ticker"], name, meta["desc"])
 
-        closes = [h["close"] for h in hist if h.get("close")]
-        if len(closes) < 30:
-            return None
+    async def scan_universe(self, exclude_tickers: set[str] | None = None) -> list[dict]:
+        """Scan the wide curated universe + Yahoo screeners, score everything with the
+        quant engine, and return the ranking. This is what surfaces instruments the
+        user doesn't know — chosen by statistics, not by the LLM."""
+        from app.services.discovery.universe import universe_meta
 
-        last = closes[-1]
+        exclude = {t.upper() for t in (exclude_tickers or set())}
+        candidates = universe_meta()
+        # Merge in dynamic Yahoo screener candidates (genuinely fresh names)
+        for tk, info in (await self._screener_candidates()).items():
+            candidates.setdefault(tk, info)
 
-        def ret(days_back: int) -> float | None:
-            if len(closes) > days_back:
-                base = closes[-days_back - 1]
-                return (last - base) / base * 100 if base else None
-            return None
+        sem = asyncio.Semaphore(8)  # throttle so Yahoo doesn't rate-limit us
+        tasks = [
+            self._analyze_ticker(tk, info["name"], info.get("cat", "descubierto"), sem)
+            for tk, info in candidates.items()
+            if tk.upper() not in exclude
+        ]
+        results = await asyncio.gather(*tasks)
+        items = [r for r in results if r]
 
-        # 52-week range position
-        hi = max(closes)
-        lo = min(closes)
-        range_pos = (last - lo) / (hi - lo) * 100 if hi > lo else 50.0
+        # attach category/region metadata back onto each scored item
+        for it in items:
+            meta = candidates.get(it["ticker"], {})
+            it["category"] = meta.get("cat", "")
+            it["region"] = meta.get("region", "")
 
-        # Technical signals via the `ta` library + quant factors via empyrical (objective)
-        from app.services.discovery.technical import compute_signals
-        from app.services.discovery.quant_score import compute_factors
-        signals = compute_signals(closes)
-        factors = compute_factors(closes)
+        from app.services.discovery.quant_score import score_universe
+        score_universe(items)
+        logger.info(
+            "universe scan: {} of {} instruments scored (quant)", len(items), len(candidates)
+        )
+        return items
 
-        return {
-            "theme": name,
-            "ticker": ticker,
-            "desc": meta["desc"],
-            "ret_1m": round(ret(21), 2) if ret(21) is not None else None,
-            "ret_3m": round(ret(63), 2) if ret(63) is not None else None,
-            "ret_6m": round(ret(126), 2) if ret(126) is not None else None,
-            "ret_1y": round(ret(250), 2) if ret(250) is not None else None,
-            "range_pos_52w": round(range_pos, 1),  # 0 = mínimo anual, 100 = máximo anual
-            "day_change_pct": round(price.get("change_percent", 0), 2),
-            "signals": signals,
-            "factors": factors,
+    async def _screener_candidates(self) -> dict[str, dict]:
+        """Pull dynamic candidates from Yahoo's predefined screeners (best-effort).
+
+        These rotate daily, so they surface names no static list contains. If the
+        installed yfinance lacks screener support we just skip them silently."""
+        screens = {
+            "undervalued_large_caps": "infravalorada (large cap)",
+            "growth_technology_stocks": "tecnológica en crecimiento",
+            "aggressive_small_caps": "small cap agresiva",
+            "day_gainers": "subiendo con fuerza hoy",
         }
+
+        def _run() -> dict[str, dict]:
+            import yfinance as yf
+            found: dict[str, dict] = {}
+            screen_fn = getattr(yf, "screen", None)
+            if screen_fn is None:
+                return found
+            for key, label in screens.items():
+                try:
+                    res = screen_fn(key, count=10)
+                    quotes = (res or {}).get("quotes", []) if isinstance(res, dict) else []
+                    for q in quotes:
+                        sym = q.get("symbol")
+                        if not sym:
+                            continue
+                        found[sym] = {
+                            "name": q.get("shortName") or q.get("longName") or sym,
+                            "cat": f"screener · {label}",
+                            "region": "EEUU",
+                        }
+                except Exception as exc:
+                    logger.debug("screener {} failed: {}", key, exc)
+            return found
+
+        try:
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, _run)
+        except Exception as exc:
+            logger.debug("screeners unavailable: {}", exc)
+            return {}
 
     async def scan_themes(self) -> list[dict]:
         """Momentum snapshot of all reference themes, sorted by 3-month return."""
@@ -103,14 +189,17 @@ class MarketScanner:
             f = t.get("factors") or {}
             score = t.get(score_key)
             score_str = f"{score:+.2f}" if score is not None else "—"
+            cat = t.get("category") or t.get("desc") or ""
+            region = t.get("region")
+            tag = f" · {cat}" + (f"/{region}" if region else "")
             base = f"- [{score_str}] {t['theme']} ({t['ticker']})"
             if not all(t.get(k) is not None for k in ("ret_1m", "ret_3m", "ret_1y")):
-                return f"{base}: datos parciales · {t['desc']}"
+                return f"{base}: datos parciales{tag}"
             sharpe = f.get("sharpe")
             sharpe_str = f" · Sharpe {sharpe:+.2f}" if sharpe is not None else ""
             return (
                 f"{base}: 1m {t['ret_1m']:+.1f}% · 3m {t['ret_3m']:+.1f}% · 1y {t['ret_1y']:+.1f}% · "
-                f"rango52s {t['range_pos_52w']:.0f}%{sharpe_str} · [técnico: {tech}] · {t['desc']}"
+                f"rango52s {t['range_pos_52w']:.0f}%{sharpe_str} · [técnico: {tech}]{tag}"
             )
 
         scored = [t for t in themes if t.get("factors")]

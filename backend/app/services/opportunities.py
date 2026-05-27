@@ -32,7 +32,16 @@ class OpportunityService:
         if self._fresh() and not force:
             return self._cache
 
-        themes = await self.scanner.scan_themes()
+        portfolio = await self.portfolio_service.calculate_portfolio()
+
+        # Exclude what the user already holds so discoveries are genuinely new.
+        held = set()
+        for p in (portfolio.get("positions") or []):
+            if p.get("ticker"):
+                held.add(str(p["ticker"]).upper())
+
+        # Scan the WIDE universe + Yahoo screeners, ranked objectively by the quant engine.
+        themes = await self.scanner.scan_universe(exclude_tickers=held)
         themes_str = self.scanner.render_for_prompt(themes)
 
         # Macro context (best-effort)
@@ -42,8 +51,6 @@ class OpportunityService:
             eu_macro = await ECBClient().snapshot()
         except Exception as exc:
             logger.warning("opportunities macro fetch partial: {}", exc)
-
-        portfolio = await self.portfolio_service.calculate_portfolio()
 
         # Recent news (already sentiment-classified by LLM) to give the analyst current context
         news_str = ""
@@ -67,10 +74,21 @@ class OpportunityService:
         result = await AnalystAgent().run(ctx)
         content = result.output
 
+        # Surface the top of each objective ranking to the UI (the universe is large).
+        scored = [t for t in themes if t.get("factors")]
+        top_mom = sorted(scored, key=lambda x: x.get("momentum_score", 0), reverse=True)[:12]
+        top_val = sorted(scored, key=lambda x: x.get("value_score", 0), reverse=True)[:12]
+        seen, top_themes = set(), []
+        for t in top_mom + top_val:
+            if t["ticker"] not in seen:
+                seen.add(t["ticker"])
+                top_themes.append(t)
+
         payload = {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "model": result.model,
-            "themes": themes,
+            "themes": top_themes,
+            "universe_size": len(themes),
             "market_summary": content.get("market_summary", ""),
             "opportunities": content.get("opportunities", []),
             "disclaimer": content.get("disclaimer", ""),
