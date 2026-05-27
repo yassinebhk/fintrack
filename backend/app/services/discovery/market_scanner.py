@@ -109,6 +109,30 @@ class MarketScanner:
     async def _theme_momentum(self, name: str, meta: dict) -> dict | None:
         return await self._analyze_ticker(meta["ticker"], name, meta["desc"])
 
+    # Major cryptos for the 'what's growing' trend analysis (Yahoo -USD series).
+    CRYPTO_BASKET = {
+        "BTC-USD": "Bitcoin", "ETH-USD": "Ethereum", "SOL-USD": "Solana",
+        "BNB-USD": "BNB", "XRP-USD": "XRP", "ADA-USD": "Cardano",
+        "AVAX-USD": "Avalanche", "DOGE-USD": "Dogecoin",
+    }
+
+    async def scan_crypto_basket(self) -> list[dict]:
+        """Score a basket of major cryptos (for trend/winners analysis, not as ETF picks)."""
+        sem = asyncio.Semaphore(8)
+        results = await asyncio.gather(
+            *(self._analyze_ticker(tk, name, "cripto", sem, fetch_price=False)
+              for tk, name in self.CRYPTO_BASKET.items())
+        )
+        items = [r for r in results if r]
+        for it in items:
+            it["category"] = "cripto"
+            it["region"] = "Cripto"
+        from app.services.discovery.quant_score import score_universe
+        if len(items) >= 2:
+            score_universe(items)
+        logger.info("crypto basket scan: {} of {} priced", len(items), len(self.CRYPTO_BASKET))
+        return items
+
     async def scan_universe(self, exclude_tickers: set[str] | None = None) -> list[dict]:
         """Scan the wide curated universe + Yahoo screeners, score everything with the
         quant engine, and return the ranking. This is what surfaces instruments the

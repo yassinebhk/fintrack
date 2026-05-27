@@ -153,6 +153,26 @@ class TelegramBotHandler:
                 await self.notifier.send_html(
                     f"💡 <b>Oportunidades del día</b>{regime_line}\n\n<i>{payload['market_summary']}</i>"
                 )
+            # 'What's growing' trend block (winners + shared patterns)
+            trends = payload.get("trends") or {}
+            if trends.get("top_growers_etf") or trends.get("patterns"):
+                tl = ["🚀 <b>Tendencias del momento</b>"]
+                etf = trends.get("top_growers_etf") or []
+                if etf:
+                    tl.append("<b>ETFs/fondos que más suben (3m):</b>")
+                    for g in etf[:5]:
+                        r3 = g.get("ret_3m")
+                        tl.append(f"• {g.get('name')} ({g.get('ticker')}){f': {r3:+.0f}%' if r3 is not None else ''}")
+                cr = trends.get("top_growers_crypto") or []
+                if cr:
+                    tl.append("<b>Cripto que más sube (3m):</b>")
+                    for g in cr[:4]:
+                        r3 = g.get("ret_3m")
+                        tl.append(f"• {g.get('name')} ({g.get('ticker')}){f': {r3:+.0f}%' if r3 is not None else ''}")
+                if trends.get("patterns"):
+                    tl.append("<b>🔁 Patrones comunes:</b>")
+                    tl += [f"• {p}" for p in trends["patterns"][:4]]
+                await self.notifier.send_html("\n".join(tl))
             sent_any_chart = False
             for op in opps:
                 caption = render_opportunity_caption(op)

@@ -54,8 +54,20 @@ class OpportunityService:
                 held.add(str(p["ticker"]).upper())
 
         # Scan the WIDE universe + Yahoo screeners, ranked objectively by the quant engine.
-        themes = await self.scanner.scan_universe(exclude_tickers=held)
+        # Crypto basket in parallel, only for the 'what's growing' trend analysis.
+        themes, crypto = await asyncio.gather(
+            self.scanner.scan_universe(exclude_tickers=held),
+            self.scanner.scan_crypto_basket(),
+        )
         themes_str = self.scanner.render_for_prompt(themes)
+
+        # Trend / winners layer (runs AFTER the ensemble): top growers + shared patterns.
+        from app.services.discovery.trends import analyze_trends, winner_affinity
+        trends = analyze_trends(themes, crypto)
+        profile = trends.get("profile") or {}
+        for t in themes:
+            t["winner_affinity"] = winner_affinity(t, profile)
+        trends_str = self._render_trends_for_prompt(trends)
 
         # Macro context (best-effort)
         us_macro, eu_macro = [], []
@@ -81,6 +93,7 @@ class OpportunityService:
             portfolio=portfolio,
             extras={
                 "themes_str": themes_str,
+                "trends_str": trends_str,
                 "macro": {"us": us_macro, "eu": eu_macro},
                 "news_str": news_str,
             },
@@ -112,6 +125,7 @@ class OpportunityService:
             "universe_size": len(themes),
             "market_regime": market_regime,
             "market_breadth": market_breadth,
+            "trends": trends,
             "market_summary": content.get("market_summary", ""),
             "opportunities": opportunities,
             "disclaimer": content.get("disclaimer", ""),
@@ -119,6 +133,32 @@ class OpportunityService:
         self._cache = payload
         self._cache_at = datetime.now(timezone.utc)
         return payload
+
+    def _render_trends_for_prompt(self, trends: dict) -> str:
+        """Compact 'what's growing + shared patterns' block for the analyst prompt."""
+        lines = ["TENDENCIAS DEL MOMENTO — qué más ha crecido (últimos meses) y patrones comunes:"]
+        gr = trends.get("top_growers_etf") or []
+        if gr:
+            lines.append("Top ETFs/fondos por crecimiento:")
+            for g in gr[:6]:
+                r3 = g.get("ret_3m")
+                lines.append(f"  · {g['name']} ({g['ticker']}): 3m {r3:+.0f}%" if r3 is not None
+                             else f"  · {g['name']} ({g['ticker']})")
+        cr = trends.get("top_growers_crypto") or []
+        if cr:
+            lines.append("Top cripto por crecimiento:")
+            for g in cr[:5]:
+                r3 = g.get("ret_3m")
+                lines.append(f"  · {g['name']} ({g['ticker']}): 3m {r3:+.0f}%" if r3 is not None
+                             else f"  · {g['name']} ({g['ticker']})")
+        if trends.get("patterns"):
+            lines.append("Patrones comunes detectados:")
+            lines += [f"  - {p}" for p in trends["patterns"]]
+        lines.append(
+            "Úsalo como CONTEXTO: si una idea encaja con el patrón ganador, dilo; si el patrón está "
+            "muy extendido (RSI alto), advierte del riesgo de comprar caro. No persigas máximos a ciegas."
+        )
+        return "\n".join(lines)
 
     async def _enrich_opportunities(
         self, opportunities: list[dict], news_items: list[dict], by_ticker: dict[str, dict] | None = None
@@ -138,6 +178,7 @@ class OpportunityService:
                 "momentum_score": t.get("momentum_score"),
                 "value_score": t.get("value_score"),
             }
+            opp["winner_affinity"] = t.get("winner_affinity")
             # Show the breakdown for the thesis the analyst chose (momentum vs value).
             which = "value" if opp.get("approach") in ("valor", "contrarian") else "momentum"
             bd = (t.get("breakdown") or {}).get(which) or {}

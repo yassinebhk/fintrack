@@ -109,9 +109,13 @@ class AnalystAgent(Agent):
         rendered_portfolio = render_portfolio_for_prompt(portfolio)
         news_str = context.extras.get("news_str", "") or "(sin titulares)"
 
+        trends_str = context.extras.get("trends_str", "") or ""
+
         return (
             "## Datos de mercado (momentum real de sectores/temas)\n"
             f"{themes_str}\n\n"
+            "## Tendencias del momento (qué más ha crecido y patrones comunes)\n"
+            f"{trends_str}\n\n"
             "## Noticias recientes\n"
             f"{news_str}\n\n"
             "## Macro\n"

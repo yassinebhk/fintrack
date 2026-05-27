@@ -128,9 +128,26 @@ function renderOpportunities(data) {
     const rc = regimeColor[data.market_regime] || '#f59e0b';
     const regimeBanner = data.market_regime ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:${rc}18; border:1px solid ${rc}44; font-size:13px;">📡 <strong>Régimen de mercado:</strong> <span style="color:${rc}; text-transform:uppercase; font-weight:600;">${data.market_regime}</span>${data.market_breadth != null ? ` · ${Math.round(data.market_breadth*100)}% de activos sobre su tendencia de 200 sesiones` : ''}<br><span class="text-muted" style="font-size:11px;">En régimen alcista pesa más el momentum; en bajista, el valor/defensivo.</span></div>` : '';
 
+    const t = data.trends || {};
+    const growRow = (g) => `<tr><td>${g.name} <span class="text-muted" style="font-size:12px;">${g.ticker}</span></td><td class="text-right mono ${(g.ret_3m||0)>=0?'value-positive':'value-negative'}">${g.ret_3m!=null?(g.ret_3m>=0?'+':'')+Math.round(g.ret_3m)+'%':'—'}</td><td class="text-right">${g.above_sma200?'📈':'📉'}</td></tr>`;
+    const trendsCard = (t.top_growers_etf && t.top_growers_etf.length) ? `
+        <div class="card" style="margin-bottom:16px;">
+            <h3>🚀 Tendencias del momento — qué más ha crecido</h3>
+            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">Líderes de los últimos meses y los patrones que comparten. Es contexto: el ranking lo deciden los algoritmos; esto explica <em>qué tipo de activo</em> está funcionando (y avisa si está extendido).</p>
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:240px;">
+                    <strong style="font-size:13px;">📊 ETFs / fondos</strong>
+                    <table class="manager-table" style="margin-top:6px;"><thead><tr><th>Activo</th><th class="text-right">3m</th><th class="text-right">Tend.</th></tr></thead><tbody>${(t.top_growers_etf||[]).map(growRow).join('')}</tbody></table>
+                </div>
+                ${(t.top_growers_crypto && t.top_growers_crypto.length) ? `<div style="flex:1; min-width:240px;"><strong style="font-size:13px;">₿ Cripto</strong><table class="manager-table" style="margin-top:6px;"><thead><tr><th>Activo</th><th class="text-right">3m</th><th class="text-right">Tend.</th></tr></thead><tbody>${t.top_growers_crypto.map(growRow).join('')}</tbody></table></div>` : ''}
+            </div>
+            ${(t.patterns && t.patterns.length) ? `<div style="margin-top:12px;"><strong style="font-size:13px;">🔁 Patrones comunes:</strong><ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${t.patterns.map(p => `<li>${p}</li>`).join('')}</ul></div>` : ''}
+        </div>` : '';
+
     content.innerHTML = `
         ${regimeBanner}
         ${data.market_summary ? `<div class="integrations-banner-inner" style="margin-bottom:16px;"><div class="integrations-banner-icon">🧠</div><div class="integrations-banner-body"><strong>Resumen de mercado</strong><p style="margin:6px 0 0;">${data.market_summary}</p></div></div>` : ''}
+        ${trendsCard}
         ${opps}
         <div class="card" style="margin-top:16px;">
             <h3>📊 Ranking cuantitativo (motor empyrical + ta, datos reales)</h3>
