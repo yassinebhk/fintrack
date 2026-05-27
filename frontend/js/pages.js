@@ -351,11 +351,11 @@ const pageContent = {
             <li style="margin-left:14px;"><a href="#que-es">🎯 Qué es FinTrack y la visión</a></li>
             <li style="margin-left:14px;"><a href="#guia-uso">🧭 Guía de uso: pestaña por pestaña</a></li>
             <li style="margin-left:14px;"><a href="#el-cerebro">🧠 El cerebro: cómo descubre y recomienda (paso a paso)</a></li>
-            <li style="margin-top:6px;"><strong>En profundidad</strong></li>
+            <li style="margin-top:6px;"><strong>Cómo razona (los algoritmos)</strong></li>
             <li style="margin-left:14px;"><a href="#novedades">🆕 Novedades (asistente autónomo con IA)</a></li>
             <li style="margin-left:14px;"><a href="#algoritmos">🔬 Cómo funcionan nuestros algoritmos (teoría + ejemplos)</a></li>
+            <li style="margin-top:6px;"><strong>Referencia técnica (cómo está montado)</strong></li>
             <li style="margin-left:14px;"><a href="#arquitectura">🏗️ Arquitectura del Sistema</a></li>
-            <li style="margin-top:6px;"><strong>Referencia</strong></li>
             <li style="margin-left:14px;"><a href="#inicio-rapido">Inicio Rápido</a></li>
             <li style="margin-left:14px;"><a href="#configuracion">Configuración</a></li>
             <li style="margin-left:14px;"><a href="#añadir-posiciones">Añadir Posiciones</a></li>
@@ -500,69 +500,117 @@ const pageContent = {
     <!-- ==================== ALGORITMOS ==================== -->
     <section id="algoritmos">
         <h2>🔬 Cómo funcionan nuestros algoritmos (teoría + ejemplos)</h2>
+        <p>Esta sección explica <strong>la estadística que usamos para ranquear inversiones</strong> — el "porqué" de cada puntuación. Es independiente de <em>cómo está montada la app</em> (eso está más abajo, en <a href="#arquitectura">Referencia técnica</a>). Aquí hablamos de <strong>métodos</strong>, no de servidores.</p>
         <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;">
-            <strong>Honestidad ante todo:</strong> estos métodos <em>no predicen el precio futuro</em>. Miden tendencia, riesgo y posición relativa sobre datos ya ocurridos, y rankean. Cualquiera que prometa "predecir" el precio con un indicador, miente. Nuestro objetivo es ranquear con criterio estadístico, no adivinar.
+            <strong>Honestidad ante todo:</strong> estos métodos <em>no predicen el precio futuro</em>. Miden tendencia, riesgo y posición relativa sobre datos ya ocurridos, y rankean. Cualquiera que prometa "predecir" el precio con un indicador, miente. Nuestro objetivo es <strong>ranquear con criterio estadístico</strong>, no adivinar.
         </p>
+        <p>La idea global: cada activo pasa por <strong>varios "jueces" independientes</strong> (momentum, riesgo, técnico, régimen, volatilidad, reversión). Cada juez emite un voto numérico; los votos se combinan en dos puntuaciones — <strong>MOMENTUM</strong> (lo fuerte que sube con calidad) y <strong>VALOR</strong> (lo castigado pero sano) — y puedes ver el voto de cada juez en el desglose de cada idea. Vamos juez por juez.</p>
 
-        <h3>1) Momentum multi-periodo (estilo HQM)</h3>
-        <p>Es la anomalía más documentada (Jegadeesh &amp; Titman, 1993): lo que ha subido tiende a seguir subiendo a medio plazo. Promediamos el retorno a 1, 3, 6 y 12 meses.</p>
+        <h3>① Momentum multi-periodo (estilo HQM)</h3>
+        <p><strong>Qué mide:</strong> la fuerza de la tendencia combinando varios horizontes.<br>
+        <strong>Intuición:</strong> es la anomalía más documentada de las finanzas (Jegadeesh &amp; Titman, 1993): lo que ha subido de forma sostenida tiende a seguir subiendo a medio plazo. Usamos varios plazos (1, 3, 6 y 12 meses) para premiar la tendencia <em>sostenida</em> y no un pico de un solo mes.</p>
         <pre class="diagram-box">momentum = media( ret_1m , ret_3m , ret_6m , ret_12m )
-Ejemplo: un ETF +5% (1m), +18% (3m), +30% (6m), +45% (1a)
-       → momentum ≈ (5+18+30+45)/4 = +24,5%  (tendencia fuerte y sostenida)</pre>
 
-        <h3>2) Métricas de riesgo (librería empyrical, de Quantopian)</h3>
+Ejemplo A (sostenido):  +5% (1m), +18% (3m), +30% (6m), +45% (1a)
+        → (5+18+30+45)/4 = +24,5%   tendencia fuerte y consistente ✔
+Ejemplo B (espejismo):  +20% (1m), +2% (3m), −5% (6m), −10% (1a)
+        → (20+2−5−10)/4 = +1,75%    subida reciente sin base ✘</pre>
+        <p><strong>Qué decide:</strong> es el principal motor de la tesis MOMENTUM.</p>
+
+        <h3>② Métricas de riesgo ajustado (librería empyrical, de Quantopian)</h3>
+        <p><strong>Qué miden:</strong> no basta con cuánto sube algo, sino <em>cuánto riesgo</em> asumes para ese retorno.</p>
         <ul>
-            <li><strong>Ratio de Sharpe</strong> = retorno medio / volatilidad. Cuánto rinde por unidad de riesgo total. &gt;1 es bueno, &gt;2 muy bueno.</li>
-            <li><strong>Sortino</strong>: como Sharpe pero solo penaliza la <em>caída</em> (la volatilidad al alza no es "mala").</li>
-            <li><strong>Máximo drawdown</strong>: la peor caída desde un pico. Mide el dolor máximo histórico.</li>
-            <li><strong>Volatilidad anualizada</strong>: cuánto oscila el precio.</li>
+            <li><strong>Ratio de Sharpe</strong> = retorno / volatilidad total. Premio por unidad de riesgo. &gt;1 bueno, &gt;2 muy bueno.</li>
+            <li><strong>Sortino</strong>: como Sharpe pero solo penaliza la volatilidad <em>a la baja</em> (que algo suba a saltos no es "malo").</li>
+            <li><strong>Máximo drawdown</strong>: la peor caída desde un máximo. Mide el "dolor" máximo que habrías sufrido.</li>
+            <li><strong>Volatilidad anualizada</strong>: cuánto oscila, en términos anuales.</li>
         </ul>
-        <pre class="diagram-box">Activo A: +20% anual con volatilidad 10%  → Sharpe ≈ 2,0  (excelente)
-Activo B: +20% anual con volatilidad 40%  → Sharpe ≈ 0,5  (mismo retorno, mucho peor)
-El motor prefiere A: mismo premio, menos sustos.</pre>
+        <pre class="diagram-box">Activo A: +20% anual, volatilidad 10%  → Sharpe ≈ 2,0   excelente
+Activo B: +20% anual, volatilidad 40%  → Sharpe ≈ 0,5   mismo retorno, mucho peor
+El motor prefiere A: mismo premio con muchos menos sustos.</pre>
+        <p><strong>Qué decide:</strong> el Sharpe entra como "juez de calidad" tanto en MOMENTUM como en VALOR — evita recomendar algo que sube dando bandazos o que cae sin calidad.</p>
 
-        <h3>3) Indicadores técnicos (librería ta)</h3>
+        <h3>③ Indicadores técnicos (librería ta — RSI, MACD, medias, Bollinger)</h3>
+        <p><strong>Qué miden:</strong> el "pulso" de corto plazo y el <em>timing</em>.</p>
         <ul>
-            <li><strong>RSI(14)</strong>: 0-100. &lt;30 = sobreventa (posible entrada), &gt;70 = sobrecompra (cuidado).</li>
-            <li><strong>MACD</strong>: cruces que señalan cambios de tendencia (alcista/bajista).</li>
-            <li><strong>SMA50 vs SMA200</strong>: la "golden cross" (50 sobre 200 = alcista) / "death cross".</li>
-            <li><strong>Bandas de Bollinger %B</strong>: posición del precio dentro de su banda de volatilidad.</li>
+            <li><strong>RSI(14)</strong>: termómetro de 0 a 100. &lt;30 = sobreventa (posible entrada); &gt;70 = sobrecompra (cuidado, puede estar caro).</li>
+            <li><strong>MACD</strong>: detecta cambios de tendencia mediante el cruce de dos medias móviles (señal alcista/bajista).</li>
+            <li><strong>SMA50 vs SMA200</strong>: cuando la media de 50 días supera a la de 200 es una "golden cross" (alcista); al revés, "death cross".</li>
+            <li><strong>Bollinger %B</strong>: dónde está el precio dentro de su banda de volatilidad (cerca del techo o del suelo).</li>
         </ul>
+        <pre class="diagram-box">Ejemplo: RSI 72 + MACD alcista + precio sobre SMA200
+       → tendencia confirmada pero sobrecomprado: bueno por momentum,
+         pero el motor avisa de que el timing de entrada es arriesgado.</pre>
+        <p><strong>Qué decide:</strong> confirma la dirección (suma al MOMENTUM) y marca sobreventa (suma al VALOR).</p>
 
-        <h3>4) Volatilidad EWMA (RiskMetrics, λ=0,94)</h3>
-        <p>Volatilidad que <strong>pesa más los días recientes</strong>: reacciona antes a un cambio de régimen que la volatilidad simple. Estándar de la industria para dimensionar riesgo.</p>
+        <h3>④ Momentum absoluto / régimen de tendencia</h3>
+        <p><strong>Qué mide:</strong> si el activo está <em>por encima de su propia tendencia de largo plazo</em> (media de 200 sesiones). Es la idea del "Dual Momentum" de Gary Antonacci.<br>
+        <strong>Intuición:</strong> no basta con que suba más que otros (momentum relativo); también debe estar en tendencia alcista <em>en términos absolutos</em>. Así evitamos recomendar algo que "cae menos que el resto" pero sigue rompiendo a la baja.</p>
+        <pre class="diagram-box">dist_200 = (precio − media_200d) / media_200d
++0,15  → un 15% por encima de su tendencia (sano, alcista)
+−0,20  → un 20% por debajo (estructuralmente bajista, ojo)</pre>
 
-        <h3>5) Reversión a la media</h3>
-        <p>Mide cuántas desviaciones típicas está el precio respecto a su media de 50 sesiones. Muy por debajo = posible rebote (tesis valor/contrarian); muy por encima = estirado.</p>
+        <h3>⑤ Volatilidad EWMA (RiskMetrics, λ = 0,94)</h3>
+        <p><strong>Qué mide:</strong> el riesgo reciente, dando <strong>más peso a los últimos días</strong>. Reacciona antes que la volatilidad simple cuando el mercado se pone nervioso. Es el estándar de la industria (RiskMetrics de J.P. Morgan) para dimensionar riesgo.</p>
+        <pre class="diagram-box">var_hoy = 0,94 · var_ayer + 0,06 · retorno_hoy²   (media exponencial)
+Resultado: si la volatilidad se dispara esta semana, el motor lo "ve"
+           enseguida y penaliza ese activo, aunque su media anual sea baja.</pre>
+        <p><strong>Qué decide:</strong> penaliza la alta volatilidad en ambas tesis (preferimos llegar al mismo sitio con menos sobresaltos).</p>
+
+        <h3>⑥ Reversión a la media</h3>
+        <p><strong>Qué mide:</strong> cuántas desviaciones típicas se aleja el precio de su media de 50 sesiones.<br>
+        <strong>Intuición:</strong> los precios tienden a "volver" hacia su media. Muy por debajo puede ser una oportunidad de rebote (tesis valor/contrarian); muy por encima, que está estirado.</p>
         <pre class="diagram-box">z = (precio − media_50d) / desviación_típica_50d
-z = −2,0  → el precio está 2σ por debajo de su media (sobrevendido, candidato a rebote)</pre>
+z = −2,0  → 2σ por debajo de su media: sobrevendido, candidato a rebote
+z = +2,5  → muy estirado por encima: cuidado si entras ahora</pre>
+        <p><strong>Qué decide:</strong> es un motor clave de la tesis VALOR/CONTRARIAN.</p>
 
-        <h3>6) Régimen de mercado por amplitud</h3>
-        <p>Indicador clásico de "breadth": <strong>qué % de activos están sobre su media de 200 sesiones</strong>. &gt;55% = mercado alcista (pesa más el momentum); &lt;45% = bajista (pesa más lo defensivo/valor).</p>
+        <h3>⑦ Normalización transversal: z-score winsorizado</h3>
+        <p><strong>El problema:</strong> ¿cómo comparas "momentum +24%" con "Sharpe 2,1" o "RSI 35"? Son unidades distintas. <strong>La solución:</strong> convertimos cada métrica a "¿cuántas desviaciones típicas se aparta de la media de TODO el universo de hoy?". Así todo queda en la misma escala comparable, y recortamos los extremos a ±3σ (<em>winsorización</em>) para que un dato loco no distorsione el ranking.</p>
+        <pre class="diagram-box">z = (valor − media_del_universo) / desviación_del_universo , recortado a [−3, +3]
 
-        <h3>7) Normalización transversal: z-score winsorizado</h3>
-        <p>Para comparar ~130 activos entre sí, cada métrica se convierte a "desviaciones respecto a la media del universo" y se recortan los valores extremos a ±3σ (winsorización) para que un dato loco no distorsione el ranking.</p>
-        <pre class="diagram-box">z = (valor − media_universo) / desviación_universo , recortado a [−3, +3]
-Así "momentum +24%" se traduce a, p.ej., "+1,8σ": está muy por encima de la media de hoy.</pre>
+"momentum +24%" cuando la media del universo es +8% y σ=9%
+   → z = (24 − 8) / 9 ≈ +1,8σ   → "está claramente por encima de la media de hoy"</pre>
+        <p><strong>Por qué importa:</strong> hace que los criterios sean <em>comparables y combinables</em>. Cada "voto" de un juez es, en realidad, su z-score.</p>
 
-        <h3>8) El ensemble: cómo convergen los criterios</h3>
-        <p>Cada criterio es un <strong>juez</strong> que vota con su z-score; los votos se combinan con pesos en dos tesis. Ejemplo real del desglose de una idea de momentum:</p>
-        <pre class="diagram-box">Convicción (momentum) = suma ponderada de jueces:
-  momentum (tendencia)   +0,84
-  régimen (sobre 200d)   +0,66
-  riesgo (Sharpe)        +0,52
-  técnico (RSI/MACD)     +0,24
-  volatilidad (EWMA)     −0,43   ← penaliza por ser volátil (honesto)
-  ──────────────────────────────
-  → puntuación agregada  +2,01  → CONVICCIÓN ALTA</pre>
-        <p>El régimen de mercado modula los pesos (más momentum en alcista, más valor en bajista). La tesis <strong>valor/contrarian</strong> usa otros jueces: infravaloración, reversión, sobreventa y calidad (Sharpe), de modo que un activo barato pero malo no engaña al sistema.</p>
+        <h3>⑧ El ensemble: cómo convergen los criterios en una decisión</h3>
+        <p>Aquí está la idea que pediste: <strong>varios criterios convergiendo</strong>. Cada juez vota con su z-score; combinamos los votos con pesos en dos tesis. Lo importante: <strong>puedes ver el voto de cada juez</strong> (en la web, "🧮 Por qué lo puntúa así").</p>
+        <pre class="diagram-box">TESIS MOMENTUM = suma ponderada de jueces:
+  momentum (tendencia)   0,28 · z
+  régimen (sobre 200d)   0,22 · z
+  riesgo (Sharpe)        0,20 · z
+  técnico (RSI/MACD)     0,15 · z
+  volatilidad (EWMA)     0,15 · (−z)   ← penaliza ser volátil
 
-        <h3>9) Tendencias y "perfil ganador"</h3>
-        <p>Tras puntuar, miramos qué más ha crecido y qué <strong>rasgos comparten los líderes</strong> (tendencia, temas, regiones, volatilidad, RSI). Medimos cuánto se parece cada candidato a ese perfil. Es <strong>contexto</strong>, no una orden: si el patrón está muy extendido (RSI alto), se avisa del riesgo de comprar caro.</p>
+Ejemplo real (SOXX, semis):
+  momentum +0,84 · régimen +0,66 · Sharpe +0,52 · técnico +0,24 · volatilidad −0,43
+  ──────────────────────────────────────────────────────────────────
+  → puntuación agregada +2,01  → CONVICCIÓN ALTA</pre>
+        <p>La tesis <strong>VALOR/CONTRARIAN</strong> usa otros jueces con otros pesos: infravaloración (posición baja en su rango anual), reversión a la media, sobreventa (RSI bajo) y <em>calidad</em> (Sharpe). Ese juez de calidad evita que <strong>un activo barato pero malo</strong> (que cae por buenas razones) engañe al sistema.</p>
+        <p>Y por encima de todo, el <strong>régimen de mercado modula los pesos</strong>: en mercado alcista pesa más el momentum; en bajista, el valor/defensivo (siguiente punto).</p>
+
+        <h3>⑨ Régimen de mercado por amplitud (breadth)</h3>
+        <p><strong>Qué mide:</strong> el "clima" general del mercado, con un indicador clásico de amplitud: <strong>qué % de activos están sobre su media de 200 sesiones</strong>.</p>
+        <pre class="diagram-box">&gt; 55% de activos en tendencia alcista  → RÉGIMEN ALCISTA  (×1,10 momentum, ×0,95 valor)
+&lt; 45%                                  → RÉGIMEN BAJISTA  (×0,85 momentum, ×1,10 valor)
+en medio                                → NEUTRAL</pre>
+        <p><strong>Qué decide:</strong> adapta el sistema al contexto — no tiene sentido perseguir momentum en un mercado que se está girando a la baja.</p>
+
+        <h3>⑩ Tendencias y "perfil ganador"</h3>
+        <p>Después de puntuar, miramos qué más ha crecido (ETFs, fondos y cripto) y qué <strong>rasgos comparten los líderes</strong>: ¿están sobre su tendencia?, ¿qué temas/regiones dominan?, ¿están sobrecomprados? Medimos cuánto se parece cada candidato a ese "perfil ganador". Es <strong>contexto</strong>, no una orden: si el patrón está muy extendido (RSI alto), se avisa del riesgo de comprar caro.</p>
+
+        <h3>🔗 De la estadística a la explicación</h3>
+        <p>Todo lo anterior produce un <strong>ranking objetivo</strong>. Solo entonces entra la IA (Gemini), y <strong>únicamente para explicar</strong> en lenguaje claro las ideas mejor puntuadas (qué es, por qué ahora, riesgos, encaje). La IA <em>no</em> decide el orden ni inventa tickers. El recorrido completo está en <a href="#el-cerebro">El cerebro: cómo descubre y recomienda</a>.</p>
 
         <h3>📚 Lo que NO usamos (a propósito)</h3>
-        <p>Deep Learning (LSTM/Transformers) para "predecir precio": muy popular en YouTube, pero la investigación seria (Gu, Kelly &amp; Xiu, 2020) muestra que rara vez bate a métodos simples fuera de muestra y se sobreajusta con facilidad. El consenso (López de Prado) avisa: <strong>el enemigo no es el algoritmo, es el sobreajuste</strong>. Por eso nos quedamos en un núcleo de factores robustos, interpretables y defendibles.</p>
+        <p>Deep Learning (LSTM/Transformers) para "predecir precio": muy popular en YouTube, pero la investigación seria (Gu, Kelly &amp; Xiu, 2020) muestra que rara vez bate a métodos simples fuera de muestra y se sobreajusta con facilidad. El consenso (López de Prado) avisa: <strong>el enemigo no es el algoritmo, es el sobreajuste</strong>. Por eso nos quedamos en un núcleo de factores robustos, interpretables y defendibles — y por eso puedes <em>ver</em> el porqué de cada puntuación.</p>
     </section>
+
+    <!-- ==================== REFERENCIA TÉCNICA (separador) ==================== -->
+    <div style="margin:32px 0 8px; padding:14px 18px; border-radius:10px; background:#33415522; border:1px dashed #475569;">
+        <strong style="font-size:15px;">🔧 A partir de aquí: Referencia técnica (cómo está montada la app)</strong>
+        <p style="margin:6px 0 0; font-size:13px; color:#94a3b8;">Lo anterior era <em>qué hace y cómo razona</em>. Esta parte es para quien quiera saber <em>cómo está construido</em> por dentro: arquitectura, stack, instalación y API. Si solo quieres usar FinTrack, no necesitas leerla.</p>
+    </div>
 
     <!-- ==================== ARQUITECTURA DEL SISTEMA ==================== -->
     <section id="arquitectura" class="architecture-section">
