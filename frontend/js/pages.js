@@ -1168,10 +1168,10 @@ curl -X DELETE "http://localhost:8000/api/positions/GOOGL"</code></pre>
         </ul>
         
         <h3>¿Cómo cambio la moneda base?</h3>
-        <p>Edita <code>backend/main.py</code> y cambia <code>base_currency="EUR"</code> a tu moneda preferida.</p>
+        <p>Por defecto es <strong>EUR</strong>. Cambiarla requiere tocar el código del backend (la moneda base del servicio de cartera, en <code>app/services/portfolio.py</code> / configuración). No es un ajuste de interfaz por ahora.</p>
         
         <h3>¿Mis datos son privados?</h3>
-        <p>Sí. Todos los datos se almacenan localmente en tu ordenador. No se envía información a servidores externos más allá de las consultas de precios a Yahoo Finance y CoinGecko.</p>
+        <p>Es una aplicación <strong>personal y de un solo usuario</strong>, pensada solo para ti. Para funcionar como asistente en la nube, tus datos de cartera se guardan en una <strong>base de datos PostgreSQL privada</strong> (en Render), no en tu ordenador. Además se conecta a servicios externos para sus funciones: precios (Yahoo Finance, CoinGecko), noticias (RSS), el LLM que redacta los análisis (Google Gemini, con Groq de reserva) y el bot de Telegram. No se vende ni comparte tu información, pero ten en cuenta que <strong>sí viaja a esos servicios</strong> para prestar el servicio. El acceso del bot está restringido a tu chat de Telegram.</p>
         
         <h3>¿Puedo exportar mis datos?</h3>
         <p>Sí. Usa el botón de exportar (📥) en la tabla de posiciones para descargar un CSV, o accede directamente a los archivos en <code>backend/data/</code>.</p>
