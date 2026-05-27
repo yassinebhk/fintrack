@@ -29,8 +29,10 @@ function stopOppThinking() {
 
 let oppPollTimer = null;
 let oppPollStart = 0;
+let oppLastGeneratedAt = null;   // timestamp currently shown
+let oppWaitSince = null;         // when forcing, ignore the (stale) cache with this timestamp
 const OPP_POLL_MS = 6000;
-const OPP_POLL_MAX_MS = 5 * 60 * 1000; // give up after ~5 min
+const OPP_POLL_MAX_MS = 6 * 60 * 1000; // give up after ~6 min
 
 async function fetchOpp(force) {
     const resp = await fetch(`${OPP_API}/opportunities${force ? '?force=true' : ''}`);
@@ -50,8 +52,15 @@ function endOppLoading() {
 
 function finishOpp(data) {
     renderOpportunities(data);
+    oppLastGeneratedAt = data.generated_at || null;
     oppLoaded = true;
     endOppLoading();
+}
+
+// While forcing a refresh, the backend may keep serving the previous (still-fresh)
+// cache until the new scan finishes. Treat that stale payload as "still generating".
+function isStaleWhileForcing(data) {
+    return oppWaitSince && data.status === 'ready' && data.generated_at === oppWaitSince;
 }
 
 function scheduleOppPoll() {
@@ -65,7 +74,7 @@ function scheduleOppPoll() {
         }
         try {
             const data = await fetchOpp(false);
-            if (data.status === 'generating') { scheduleOppPoll(); return; }
+            if (data.status === 'generating' || isStaleWhileForcing(data)) { scheduleOppPoll(); return; }
             finishOpp(data);
         } catch (err) {
             // transient (e.g., instance busy) — keep trying until the max window
@@ -82,11 +91,12 @@ async function loadOpportunities(force = false) {
     loading.style.display = 'block';
     startOppThinking();
     oppPollStart = Date.now();
+    oppWaitSince = force ? oppLastGeneratedAt : null;  // wait for a NEW result when forcing
     if (force) content.innerHTML = '';
 
     try {
         const data = await fetchOpp(force);
-        if (data.status === 'generating') {
+        if (data.status === 'generating' || isStaleWhileForcing(data)) {
             scheduleOppPoll();   // keep spinner, poll until ready — never hangs
             return;
         }
