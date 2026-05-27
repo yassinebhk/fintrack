@@ -102,6 +102,109 @@ async def contribute(
     }
 
 
+class MovementIn(BaseModel):
+    action: str = Field(description="'aportar' o 'retirar'")
+    ticker: str = Field(min_length=1, max_length=32)
+    broker: str
+    eur_amount: float = Field(gt=0, description="Euros aportados/retirados")
+    asset_type: str | None = Field(default=None, description="stock|etf|fund|crypto (requerido si el activo es nuevo)")
+    isin: str | None = None
+    asset_name: str | None = None
+    executed_at: str | None = Field(default=None, description="YYYY-MM-DD; por defecto hoy")
+
+
+@router.post("/movement")
+async def register_movement(payload: MovementIn, session: AsyncSession = Depends(get_session)) -> dict:
+    """Register a real money movement from the user's broker apps.
+
+    - 'aportar' to an existing or NEW asset (creates it). Shares computed from the
+      live market price (correct market/currency via ISIN→ticker mapping).
+    - 'retirar' reduces (or closes) an existing position.
+    Date is selectable; defaults to today.
+    """
+    repo = PositionRepository(session)
+    tx_repo = TransactionRepository(session)
+    ticker = payload.ticker.upper().strip()
+    action = payload.action.lower().strip()
+
+    # Resolve date
+    if payload.executed_at:
+        try:
+            executed = datetime.fromisoformat(payload.executed_at)
+            if executed.tzinfo is None:
+                executed = executed.replace(tzinfo=timezone.utc)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Fecha inválida (usa YYYY-MM-DD)")
+    else:
+        executed = datetime.now(timezone.utc)
+
+    existing = await repo.get(ticker, payload.broker)
+
+    if action == "aportar":
+        asset_type = (existing.type if existing else payload.asset_type) or "stock"
+        price = await _current_price(ticker, asset_type)
+        if not price or price <= 0:
+            raise HTTPException(
+                status_code=502,
+                detail=f"No encontré un precio de mercado fiable para {ticker}. "
+                       f"Revisa el ISIN/ticker o el tipo de activo.",
+            )
+        shares_added = payload.eur_amount / price
+
+        if existing:
+            old_cost = existing.quantity * existing.avg_price
+            existing.quantity += shares_added
+            existing.avg_price = (old_cost + payload.eur_amount) / existing.quantity
+            new_qty = existing.quantity
+        else:
+            if not payload.asset_type:
+                raise HTTPException(status_code=400, detail="Es un activo nuevo: indica asset_type (stock/etf/fund/crypto)")
+            await repo.upsert(
+                ticker=ticker, quantity=shares_added, avg_price=price,
+                type=payload.asset_type, currency="EUR", broker=payload.broker,
+                isin=payload.isin, asset_name=payload.asset_name, source="manual_movement",
+            )
+            new_qty = shares_added
+
+        await tx_repo.add(
+            type="buy", ticker=ticker, quantity=shares_added, price=price,
+            currency="EUR", broker=payload.broker, executed_at=executed,
+            notes=f"Aportación {payload.eur_amount:.2f}€" + ("" if existing else " (nueva posición)"),
+        )
+        await session.flush()
+        return {
+            "message": "Aportación registrada", "action": "aportar", "ticker": ticker,
+            "broker": payload.broker, "eur": payload.eur_amount, "price_used": round(price, 6),
+            "shares_added": round(shares_added, 8), "new_quantity": round(new_qty, 8),
+            "is_new": existing is None,
+        }
+
+    elif action == "retirar":
+        if not existing:
+            raise HTTPException(status_code=404, detail=f"No tienes {ticker} en {payload.broker} para retirar")
+        price = await _current_price(ticker, existing.type)
+        if not price or price <= 0:
+            raise HTTPException(status_code=502, detail=f"No encontré precio para {ticker}")
+        shares_removed = min(existing.quantity, payload.eur_amount / price)
+        existing.quantity -= shares_removed
+        closed = existing.quantity <= 1e-9
+        if closed:
+            await repo.delete(ticker, payload.broker)
+        await tx_repo.add(
+            type="sell", ticker=ticker, quantity=shares_removed, price=price,
+            currency="EUR", broker=payload.broker, executed_at=executed,
+            notes=f"Retirada {payload.eur_amount:.2f}€" + (" (posición cerrada)" if closed else ""),
+        )
+        await session.flush()
+        return {
+            "message": "Retirada registrada", "action": "retirar", "ticker": ticker,
+            "broker": payload.broker, "eur": payload.eur_amount, "price_used": round(price, 6),
+            "shares_removed": round(shares_removed, 8), "closed": closed,
+        }
+
+    raise HTTPException(status_code=400, detail="action debe ser 'aportar' o 'retirar'")
+
+
 @router.get("")
 async def list_positions(session: AsyncSession = Depends(get_session)) -> list[dict]:
     rows = await PositionRepository(session).list_all()

@@ -642,10 +642,15 @@
 
                     <!-- Action Cards -->
                     <div class="manager-actions">
+                        <button type="button" class="action-card" onclick="showMovementModal()" style="border:1px solid var(--accent-primary);">
+                            <span class="action-icon">💶</span>
+                            <h4>Registrar movimiento</h4>
+                            <p>Aporté / retiré dinero en mi broker (€ + fecha)</p>
+                        </button>
                         <button type="button" class="action-card" onclick="showAddPositionModal()">
                             <span class="action-icon">➕</span>
                             <h4>Añadir Posición</h4>
-                            <p>Añade una nueva posición manualmente</p>
+                            <p>Añade una posición manualmente (participaciones)</p>
                         </button>
                         <button type="button" class="action-card" onclick="showImportPdfModal()">
                             <span class="action-icon">📄</span>
@@ -662,6 +667,73 @@
                             <h4>Añadir Rápido</h4>
                             <p>Añade múltiples posiciones a la vez</p>
                         </button>
+                    </div>
+
+                    <!-- Movement Modal -->
+                    <div class="modal" id="movementModal">
+                        <div class="modal-content modal-lg">
+                            <div class="modal-header">
+                                <h3>💶 Registrar movimiento</h3>
+                                <button class="modal-close" onclick="closeModal('movementModal')">×</button>
+                            </div>
+                            <p class="text-muted" style="margin:0 0 12px;">Refleja lo que has hecho en tu broker. El sistema calcula las participaciones con el precio de mercado del activo.</p>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Acción</label>
+                                    <select id="mvAction">
+                                        <option value="aportar">➕ Aporté dinero</option>
+                                        <option value="retirar">➖ Retiré / vendí</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Activo</label>
+                                    <select id="mvAsset" onchange="onMovementAssetChange()"></select>
+                                </div>
+                            </div>
+                            <div id="mvNewFields" style="display:none;">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Ticker o ISIN *</label>
+                                        <input type="text" id="mvTicker" placeholder="Ej. ICLN, IE00B1XNHC34">
+                                        <small class="text-muted">Mejor el ISIN (encuentro el mercado/divisa correctos)</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Tipo *</label>
+                                        <select id="mvType">
+                                            <option value="etf">ETF</option>
+                                            <option value="fund">Fondo</option>
+                                            <option value="stock">Acción</option>
+                                            <option value="crypto">Cripto</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Broker *</label>
+                                    <select id="mvBrokerNew">
+                                        <option value="TradeRepublic">Trade Republic</option>
+                                        <option value="MyInvestor">MyInvestor</option>
+                                        <option value="Kraken">Kraken</option>
+                                        <option value="DEGIRO">DEGIRO</option>
+                                        <option value="Otro">Otro</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Importe (€) *</label>
+                                    <input type="number" id="mvAmount" step="0.01" min="0" placeholder="100">
+                                </div>
+                                <div class="form-group">
+                                    <label>Fecha</label>
+                                    <input type="date" id="mvDate">
+                                </div>
+                            </div>
+                            <div id="mvResult" style="margin-top:10px;"></div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn-secondary" onclick="closeModal('movementModal')">Cancelar</button>
+                                <button type="button" class="btn-primary" id="mvSubmitBtn" onclick="submitMovement()">Registrar</button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- PDF Import Modal -->

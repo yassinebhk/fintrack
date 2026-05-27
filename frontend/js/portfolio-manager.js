@@ -402,6 +402,74 @@ async function handleEditPosition(event) {
 // Delete Position
 // ============================================
 
+function showMovementModal() {
+    const sel = document.getElementById('mvAsset');
+    const opts = (currentPositions || []).map(p =>
+        `<option value="${p.ticker}|${p.broker}">${p.ticker} (${p.broker})</option>`
+    ).join('');
+    sel.innerHTML = opts + '<option value="__new__">➕ Activo nuevo…</option>';
+    document.getElementById('mvDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('mvAmount').value = '';
+    document.getElementById('mvResult').innerHTML = '';
+    onMovementAssetChange();
+    showModal('movementModal');
+}
+
+function onMovementAssetChange() {
+    const isNew = document.getElementById('mvAsset').value === '__new__';
+    document.getElementById('mvNewFields').style.display = isNew ? 'block' : 'none';
+}
+
+async function submitMovement() {
+    const action = document.getElementById('mvAction').value;
+    const assetVal = document.getElementById('mvAsset').value;
+    const amount = parseFloat(document.getElementById('mvAmount').value);
+    const date = document.getElementById('mvDate').value || null;
+    const result = document.getElementById('mvResult');
+    const btn = document.getElementById('mvSubmitBtn');
+
+    if (isNaN(amount) || amount <= 0) {
+        result.innerHTML = '<div class="alert alert-error">Introduce un importe válido</div>';
+        return;
+    }
+
+    let body;
+    if (assetVal === '__new__') {
+        const ticker = document.getElementById('mvTicker').value.trim();
+        if (!ticker) { result.innerHTML = '<div class="alert alert-error">Indica el ticker o ISIN</div>'; return; }
+        body = {
+            action, ticker, broker: document.getElementById('mvBrokerNew').value,
+            eur_amount: amount, asset_type: document.getElementById('mvType').value,
+            isin: ticker.length === 12 ? ticker : null, executed_at: date,
+        };
+    } else {
+        const [ticker, broker] = assetVal.split('|');
+        body = { action, ticker, broker, eur_amount: amount, executed_at: date };
+    }
+
+    btn.disabled = true;
+    result.innerHTML = '<div class="alert alert-info">Registrando… buscando precio de mercado…</div>';
+    try {
+        const resp = await fetch(`${API_BASE}/positions/movement`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+        if (action === 'aportar') {
+            result.innerHTML = `<div class="alert alert-success">✅ Aportados ${amount.toFixed(2)}€ a ${data.ticker} · ${data.shares_added} part. @ ${data.price_used}€${data.is_new ? ' (posición nueva)' : ''}</div>`;
+        } else {
+            result.innerHTML = `<div class="alert alert-success">✅ Retirados ${amount.toFixed(2)}€ de ${data.ticker}${data.closed ? ' (posición cerrada)' : ''}</div>`;
+        }
+        loadManagerPositions();
+        if (typeof loadDashboard === 'function') loadDashboard();
+        if (window.showToast) window.showToast('Movimiento registrado', 'success');
+    } catch (err) {
+        result.innerHTML = `<div class="alert alert-error">❌ ${err.message}</div>`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
 async function contributeToPosition(ticker, broker) {
     const raw = prompt(`💶 ¿Cuántos EUROS has aportado a ${ticker} (${broker})?\n\nEl sistema calculará las participaciones automáticamente con el precio de hoy.`);
     if (raw === null) return;
