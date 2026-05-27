@@ -187,12 +187,78 @@ class NewsService:
                 unique.append(n)
         unique.sort(key=lambda x: x["datetime"], reverse=True)
 
+        # Upgrade sentiment from keyword-heuristic to LLM classification (batch, cached)
+        await self._classify_sentiment_llm(unique[:40])
+
         self._cache = unique
         self._expiry = datetime.now() + self._ttl
 
         if category != "all":
             unique = [n for n in unique if n["category"] == category]
         return unique[:limit]
+
+    async def _classify_sentiment_llm(self, items: list[dict]) -> None:
+        """Re-classify market sentiment of headlines with the LLM (1 batch call).
+
+        Falls back silently to the keyword heuristic already set on each item.
+        """
+        if not items:
+            return
+        from app.config import get_settings
+
+        settings = get_settings()
+        if not settings.has_gemini and not settings.has_groq:
+            return
+
+        try:
+            from app.llm import LLMMessage, get_llm_client
+
+            numbered = "\n".join(f"{i}. {it['title']}" for i, it in enumerate(items))
+            schema = {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "i": {"type": "integer"},
+                                "sentiment": {"type": "string", "enum": ["bullish", "bearish", "neutral"]},
+                            },
+                            "required": ["i", "sentiment"],
+                        },
+                    }
+                },
+                "required": ["items"],
+            }
+            client = get_llm_client()
+            resp = await client.generate(
+                [
+                    LLMMessage(
+                        role="system",
+                        content=(
+                            "Eres un analista de mercados. Clasifica el sentimiento de mercado de cada "
+                            "titular como bullish (alcista, buenas noticias para los precios), bearish "
+                            "(bajista) o neutral. Juzga el titular COMPLETO, no palabras sueltas: "
+                            "'mayor compra de Ethereum' o 'predice supercycle' es bullish, no bearish."
+                        ),
+                    ),
+                    LLMMessage(role="user", content=f"Titulares:\n{numbered}\n\nDevuelve JSON con items[].i e items[].sentiment."),
+                ],
+                model=settings.gemini_model_cheap,
+                max_tokens=2048,
+                temperature=0.0,
+                json_schema=schema,
+            )
+            data = resp.structured or {}
+            for entry in data.get("items", []):
+                idx = entry.get("i")
+                sent = entry.get("sentiment")
+                if isinstance(idx, int) and 0 <= idx < len(items) and sent in ("bullish", "bearish", "neutral"):
+                    items[idx]["impact"] = sent
+            logger.info("news sentiment re-classified by LLM ({} items)", len(data.get("items", [])))
+        except Exception as exc:
+            logger.warning("LLM sentiment classification failed, keeping keyword heuristic: {}", exc)
 
     async def get_news_for_asset(self, ticker: str, limit: int = 10) -> list[dict]:
         all_news = await self.get_news("all", 100)
