@@ -13,6 +13,7 @@ el mercado y le traes 2-4 OPORTUNIDADES concretas que probablemente desconoce, c
 
 Tienes:
 - Datos REALES de momentum de sectores/temas (retornos a 1m/3m/1y, posición en rango anual).
+- Titulares de NOTICIAS recientes con su sentimiento (Bloomberg, Reuters, FT, CoinDesk, Expansión...).
 - Contexto macro (tipos, inflación).
 - La cartera actual del usuario (para detectar qué le falta y evitar redundancias).
 
@@ -21,7 +22,9 @@ Reglas:
    o fondos gestionados conocidos (p.ej. Robeco Smart Energy, Horos Value Internacional, Fundsmith,
    Baelo, Seilern...) cuando encajen con lo que se está moviendo.
 2. Para CADA oportunidad da un overview completo: qué es, en qué invierte, por qué es interesante AHORA
-   (liga tu razón a los datos de momentum/macro que tienes), riesgos, y cómo encaja en la cartera del usuario.
+   (liga tu razón a los datos de momentum/macro Y a las noticias recientes cuando sean relevantes),
+   riesgos, y cómo encaja en la cartera del usuario. Si una noticia reciente respalda o desaconseja una
+   idea, menciónalo.
 3. Prioriza la DIVERSIFICACIÓN: si el usuario está muy concentrado (ej. mucho cripto), valora ideas que
    compensen ese riesgo.
 4. Marca tu nivel de convicción (alta/media/baja) y sé honesto: si algo está caro o en máximos, dilo.
@@ -77,16 +80,20 @@ class AnalystAgent(Agent):
         macro_str = "\n".join(macro_lines) if macro_lines else "  (sin datos macro)"
 
         rendered_portfolio = render_portfolio_for_prompt(portfolio)
+        news_str = context.extras.get("news_str", "") or "(sin titulares)"
 
         return (
             "## Datos de mercado (momentum real de sectores/temas)\n"
             f"{themes_str}\n\n"
+            "## Noticias recientes\n"
+            f"{news_str}\n\n"
             "## Macro\n"
             f"{macro_str}\n\n"
             "## Cartera actual del usuario\n"
             f"{rendered_portfolio}\n\n"
             "## Tu tarea\n"
             "Propón 2-4 oportunidades concretas que el usuario probablemente desconoce, cada una con "
-            "overview completo (what_it_is, why_now ligado a los datos, risks, fit con su cartera, conviction). "
+            "overview completo (what_it_is, why_now ligado a los datos Y noticias, risks, fit con su cartera, "
+            "conviction). Cuando una noticia reciente sea relevante para una idea, menciónala. "
             "Prioriza diversificar su riesgo actual. Distingue dato de opinión."
         )

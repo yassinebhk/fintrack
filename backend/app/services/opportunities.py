@@ -8,6 +8,7 @@ from app.agents.analyst_agent import AnalystAgent
 from app.agents.base import AgentContext
 from app.services.discovery import MarketScanner
 from app.services.market import ECBClient, FREDClient
+from app.services.news import NewsService
 from app.services.portfolio import PortfolioService
 
 
@@ -15,6 +16,7 @@ class OpportunityService:
     def __init__(self) -> None:
         self.scanner = MarketScanner()
         self.portfolio_service = PortfolioService()
+        self.news_service = NewsService()
         self._cache: dict | None = None
         self._cache_at: datetime | None = None
         self._ttl = timedelta(hours=12)
@@ -43,9 +45,24 @@ class OpportunityService:
 
         portfolio = await self.portfolio_service.calculate_portfolio()
 
+        # Recent news (already sentiment-classified by LLM) to give the analyst current context
+        news_str = ""
+        try:
+            news = await self.news_service.get_news("all", limit=25)
+            lines = ["Titulares recientes (con sentimiento):"]
+            for n in news[:25]:
+                lines.append(f"- [{n.get('source')}|{n.get('impact','neutral')}] {n.get('title','')[:160]}")
+            news_str = "\n".join(lines)
+        except Exception as exc:
+            logger.warning("opportunities news fetch failed: {}", exc)
+
         ctx = AgentContext(
             portfolio=portfolio,
-            extras={"themes_str": themes_str, "macro": {"us": us_macro, "eu": eu_macro}},
+            extras={
+                "themes_str": themes_str,
+                "macro": {"us": us_macro, "eu": eu_macro},
+                "news_str": news_str,
+            },
         )
         result = await AnalystAgent().run(ctx)
         content = result.output
