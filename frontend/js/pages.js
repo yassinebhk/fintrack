@@ -328,6 +328,8 @@ const pageContent = {
     <div class="table-of-contents">
         <h4>Índice</h4>
         <ul>
+            <li><a href="#novedades">🆕 Novedades (asistente autónomo con IA)</a></li>
+            <li><a href="#algoritmos">🧠 Cómo funcionan nuestros algoritmos (teoría + ejemplos)</a></li>
             <li><a href="#arquitectura">🏗️ Arquitectura del Sistema</a></li>
             <li><a href="#inicio-rapido">1. Inicio Rápido</a></li>
             <li><a href="#configuracion">2. Configuración</a></li>
@@ -337,6 +339,120 @@ const pageContent = {
             <li><a href="#faq">6. Preguntas Frecuentes</a></li>
         </ul>
     </div>
+
+    <!-- ==================== NOVEDADES ==================== -->
+    <section id="novedades">
+        <h2>🆕 Novedades — el salto a asistente autónomo con IA</h2>
+        <p>FinTrack pasó de ser un panel de cartera a un <strong>asistente de inversión que cada día rastrea el mercado, lo analiza con un motor cuantitativo y te trae oportunidades explicadas</strong>. Estas son las funcionalidades añadidas recientemente:</p>
+
+        <h3>🔎 Descubrimiento de oportunidades (datos, no opinión de la IA)</h3>
+        <ul>
+            <li><strong>Universo amplio</strong>: ~100 ETFs/fondos reales (sectores, regiones, factores, temáticos, materias primas, renta fija) + <strong>screeners dinámicos de Yahoo</strong> (infravaloradas, growth de calidad) que cada día aportan nombres nuevos. Excluye lo que ya tienes en cartera, así las ideas son <em>de verdad</em> nuevas.</li>
+            <li><strong>Motor cuantitativo</strong> (librerías validadas <code>empyrical</code> + <code>ta</code>): puntúa cada activo de forma objetiva. La IA <strong>no decide</strong> qué recomendar; solo <strong>explica</strong> lo que el motor ranquea arriba, usando el ticker real verificado.</li>
+            <li><strong>Mix momentum + valor</strong>: dos rankings paralelos para no recomendar solo cosas en máximos.</li>
+        </ul>
+
+        <h3>🧩 Ensemble multi-criterio + régimen de mercado</h3>
+        <ul>
+            <li>Varios <strong>criterios independientes "votan"</strong> (momentum multi-periodo, momentum absoluto/tendencia, Sharpe/Sortino, técnico RSI/MACD, volatilidad EWMA, reversión a la media) y convergen en una convicción.</li>
+            <li><strong>Desglose transparente</strong>: en la web ves una barra por criterio ("🧮 Por qué lo puntúa así"); en Telegram, los 3 criterios principales. Nada de caja negra.</li>
+            <li><strong>Régimen de mercado por amplitud</strong> (% de activos sobre su media de 200 sesiones): en mercado alcista pesa más el momentum, en bajista el valor/defensivo.</li>
+        </ul>
+
+        <h3>🚀 Tendencias del momento (ganadores + patrones)</h3>
+        <ul>
+            <li>Detecta <strong>qué ETFs/fondos y cripto más han crecido</strong> en los últimos meses y extrae <strong>patrones comunes</strong> (¿están sobre su tendencia? ¿qué temas/regiones dominan? ¿están sobrecomprados?).</li>
+            <li>Mide la <strong>afinidad de cada candidato con el "perfil ganador" actual</strong>, como contexto adicional — con aviso honesto del riesgo de comprar caro.</li>
+        </ul>
+
+        <h3>📈 Cada oportunidad, con evidencia</h3>
+        <ul>
+            <li><strong>Gráfica de tendencia a 6 meses</strong> (verde/rojo según dirección) generada en el momento.</li>
+            <li><strong>Noticias que la respaldan</strong>, con fuente y enlace (la IA referencia titulares reales por índice, no inventa).</li>
+        </ul>
+
+        <h3>🤖 Telegram bidireccional</h3>
+        <ul>
+            <li><code>/oportunidades</code>, <code>/cartera</code>, <code>/aportar</code>; resumen diario con precios reales; nombres amigables (no ISINs); gráficas como imagen.</li>
+            <li><strong>Registro de movimientos reales</strong>: "mete 50€ al oro desde Kraken el día X" → calcula participaciones al precio de ese instante y mantiene el ledger real.</li>
+            <li><strong>Indicador "pensando"</strong> que se mantiene visible (typing) hasta que responde.</li>
+        </ul>
+
+        <h3>⚙️ Robustez e infraestructura</h3>
+        <ul>
+            <li><strong>Persistencia en PostgreSQL</strong> (sobrevive a los redeploys de Render).</li>
+            <li><strong>LLM Gemini con fallback a Groq</strong> ante límites de cuota; sentimiento de noticias clasificado por LLM.</li>
+            <li><strong>Pre-calentamiento diario a las 07:30</strong>: las oportunidades se generan por adelantado para que tu primera visita sea instantánea. Caché de 20h y bloqueo anti-escaneos concurrentes.</li>
+            <li>Indicador de "pensando" también en la web (spinner + mensajes rotativos) para el cálculo en frío.</li>
+        </ul>
+    </section>
+
+    <!-- ==================== ALGORITMOS ==================== -->
+    <section id="algoritmos">
+        <h2>🧠 Cómo funcionan nuestros algoritmos (teoría + ejemplos)</h2>
+        <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;">
+            <strong>Honestidad ante todo:</strong> estos métodos <em>no predicen el precio futuro</em>. Miden tendencia, riesgo y posición relativa sobre datos ya ocurridos, y rankean. Cualquiera que prometa "predecir" el precio con un indicador, miente. Nuestro objetivo es ranquear con criterio estadístico, no adivinar.
+        </p>
+
+        <h3>1) Momentum multi-periodo (estilo HQM)</h3>
+        <p>Es la anomalía más documentada (Jegadeesh &amp; Titman, 1993): lo que ha subido tiende a seguir subiendo a medio plazo. Promediamos el retorno a 1, 3, 6 y 12 meses.</p>
+        <pre class="diagram-box">momentum = media( ret_1m , ret_3m , ret_6m , ret_12m )
+Ejemplo: un ETF +5% (1m), +18% (3m), +30% (6m), +45% (1a)
+       → momentum ≈ (5+18+30+45)/4 = +24,5%  (tendencia fuerte y sostenida)</pre>
+
+        <h3>2) Métricas de riesgo (librería empyrical, de Quantopian)</h3>
+        <ul>
+            <li><strong>Ratio de Sharpe</strong> = retorno medio / volatilidad. Cuánto rinde por unidad de riesgo total. &gt;1 es bueno, &gt;2 muy bueno.</li>
+            <li><strong>Sortino</strong>: como Sharpe pero solo penaliza la <em>caída</em> (la volatilidad al alza no es "mala").</li>
+            <li><strong>Máximo drawdown</strong>: la peor caída desde un pico. Mide el dolor máximo histórico.</li>
+            <li><strong>Volatilidad anualizada</strong>: cuánto oscila el precio.</li>
+        </ul>
+        <pre class="diagram-box">Activo A: +20% anual con volatilidad 10%  → Sharpe ≈ 2,0  (excelente)
+Activo B: +20% anual con volatilidad 40%  → Sharpe ≈ 0,5  (mismo retorno, mucho peor)
+El motor prefiere A: mismo premio, menos sustos.</pre>
+
+        <h3>3) Indicadores técnicos (librería ta)</h3>
+        <ul>
+            <li><strong>RSI(14)</strong>: 0-100. &lt;30 = sobreventa (posible entrada), &gt;70 = sobrecompra (cuidado).</li>
+            <li><strong>MACD</strong>: cruces que señalan cambios de tendencia (alcista/bajista).</li>
+            <li><strong>SMA50 vs SMA200</strong>: la "golden cross" (50 sobre 200 = alcista) / "death cross".</li>
+            <li><strong>Bandas de Bollinger %B</strong>: posición del precio dentro de su banda de volatilidad.</li>
+        </ul>
+
+        <h3>4) Volatilidad EWMA (RiskMetrics, λ=0,94)</h3>
+        <p>Volatilidad que <strong>pesa más los días recientes</strong>: reacciona antes a un cambio de régimen que la volatilidad simple. Estándar de la industria para dimensionar riesgo.</p>
+
+        <h3>5) Reversión a la media</h3>
+        <p>Mide cuántas desviaciones típicas está el precio respecto a su media de 50 sesiones. Muy por debajo = posible rebote (tesis valor/contrarian); muy por encima = estirado.</p>
+        <pre class="diagram-box">z = (precio − media_50d) / desviación_típica_50d
+z = −2,0  → el precio está 2σ por debajo de su media (sobrevendido, candidato a rebote)</pre>
+
+        <h3>6) Régimen de mercado por amplitud</h3>
+        <p>Indicador clásico de "breadth": <strong>qué % de activos están sobre su media de 200 sesiones</strong>. &gt;55% = mercado alcista (pesa más el momentum); &lt;45% = bajista (pesa más lo defensivo/valor).</p>
+
+        <h3>7) Normalización transversal: z-score winsorizado</h3>
+        <p>Para comparar ~130 activos entre sí, cada métrica se convierte a "desviaciones respecto a la media del universo" y se recortan los valores extremos a ±3σ (winsorización) para que un dato loco no distorsione el ranking.</p>
+        <pre class="diagram-box">z = (valor − media_universo) / desviación_universo , recortado a [−3, +3]
+Así "momentum +24%" se traduce a, p.ej., "+1,8σ": está muy por encima de la media de hoy.</pre>
+
+        <h3>8) El ensemble: cómo convergen los criterios</h3>
+        <p>Cada criterio es un <strong>juez</strong> que vota con su z-score; los votos se combinan con pesos en dos tesis. Ejemplo real del desglose de una idea de momentum:</p>
+        <pre class="diagram-box">Convicción (momentum) = suma ponderada de jueces:
+  momentum (tendencia)   +0,84
+  régimen (sobre 200d)   +0,66
+  riesgo (Sharpe)        +0,52
+  técnico (RSI/MACD)     +0,24
+  volatilidad (EWMA)     −0,43   ← penaliza por ser volátil (honesto)
+  ──────────────────────────────
+  → puntuación agregada  +2,01  → CONVICCIÓN ALTA</pre>
+        <p>El régimen de mercado modula los pesos (más momentum en alcista, más valor en bajista). La tesis <strong>valor/contrarian</strong> usa otros jueces: infravaloración, reversión, sobreventa y calidad (Sharpe), de modo que un activo barato pero malo no engaña al sistema.</p>
+
+        <h3>9) Tendencias y "perfil ganador"</h3>
+        <p>Tras puntuar, miramos qué más ha crecido y qué <strong>rasgos comparten los líderes</strong> (tendencia, temas, regiones, volatilidad, RSI). Medimos cuánto se parece cada candidato a ese perfil. Es <strong>contexto</strong>, no una orden: si el patrón está muy extendido (RSI alto), se avisa del riesgo de comprar caro.</p>
+
+        <h3>📚 Lo que NO usamos (a propósito)</h3>
+        <p>Deep Learning (LSTM/Transformers) para "predecir precio": muy popular en YouTube, pero la investigación seria (Gu, Kelly &amp; Xiu, 2020) muestra que rara vez bate a métodos simples fuera de muestra y se sobreajusta con facilidad. El consenso (López de Prado) avisa: <strong>el enemigo no es el algoritmo, es el sobreajuste</strong>. Por eso nos quedamos en un núcleo de factores robustos, interpretables y defendibles.</p>
+    </section>
 
     <!-- ==================== ARQUITECTURA DEL SISTEMA ==================== -->
     <section id="arquitectura" class="architecture-section">
