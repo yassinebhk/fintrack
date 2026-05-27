@@ -79,6 +79,26 @@ def compute_factors(closes: list[float]) -> dict:
     hi, lo = float(s.max()), float(s.min())
     range_pos = (last - lo) / (hi - lo) if hi > lo else 0.5
 
+    # --- Trend regime (absolute momentum, Dual-Momentum style) ---
+    sma200 = float(s.rolling(min(200, len(s) - 1)).mean().iloc[-1])
+    sma50 = float(s.rolling(min(50, len(s) - 1)).mean().iloc[-1])
+    above_sma200 = bool(last > sma200) if sma200 else False
+    dist_sma200 = (last - sma200) / sma200 if sma200 else 0.0
+
+    # --- EWMA volatility (RiskMetrics, lambda=0.94) — recency-weighted risk ---
+    try:
+        ewma_var = (rets ** 2).ewm(alpha=0.06).mean().iloc[-1]
+        ewma_vol = float(np.sqrt(ewma_var) * np.sqrt(252)) if ewma_var > 0 else vol
+    except Exception:
+        ewma_vol = vol
+
+    # --- Mean reversion: how many std the price sits from its 50d mean ---
+    try:
+        std50 = float(s.rolling(min(50, len(s) - 1)).std().iloc[-1])
+        mean_rev_z = (last - sma50) / std50 if std50 else 0.0
+    except Exception:
+        mean_rev_z = 0.0
+
     return {
         "momentum": round(momentum, 4),
         "sharpe": round(sharpe, 2),
@@ -86,43 +106,116 @@ def compute_factors(closes: list[float]) -> dict:
         "max_drawdown": round(max_dd, 3),
         "volatility": round(vol, 3),
         "range_pos": round(range_pos, 3),
+        "above_sma200": above_sma200,
+        "dist_sma200": round(dist_sma200, 4),
+        "ewma_vol": round(ewma_vol, 3),
+        "mean_rev_z": round(mean_rev_z, 3),
     }
 
 
-def score_universe(items: list[dict]) -> list[dict]:
-    """Rank items by objective momentum_score and value_score.
+# Each "judge" votes via a cross-sectional z-score; weights say how much its vote
+# counts toward each thesis. Transparent on purpose — you can read why something ranks.
+_MOMENTUM_WEIGHTS = {
+    "momentum": 0.28,      # multi-period trend (HQM)
+    "regimen": 0.22,       # absolute momentum: above its 200d trend
+    "riesgo": 0.20,        # risk-adjusted return (Sharpe)
+    "tecnico": 0.15,       # RSI/MACD/trend confirmation
+    "volatilidad": 0.15,   # prefer lower (EWMA) volatility
+}
+_VALUE_WEIGHTS = {
+    "infravaloracion": 0.30,  # low in its 52w range
+    "reversion": 0.22,        # below its own mean (mean-reversion upside)
+    "sobreventa": 0.20,       # low RSI
+    "calidad": 0.18,          # still decent Sharpe despite the fall
+    "volatilidad": 0.10,      # prefer lower volatility
+}
 
-    Each item must carry item['factors'] (from compute_factors) and optionally
-    item['signals'] (from technical.compute_signals, for RSI).
-    Mutates items in place adding 'momentum_score' / 'value_score' and returns sorted-by-momentum.
+
+def _tech_raw(sig: dict) -> float:
+    """Compact technical confirmation score from the `ta` signals."""
+    if not sig:
+        return 0.0
+    score = (sig.get("rsi", 50) - 50) / 25.0  # >0 strong, <0 weak
+    if sig.get("macd_signal") == "alcista":
+        score += 0.5
+    elif sig.get("macd_signal") == "bajista":
+        score -= 0.5
+    if sig.get("trend") == "alcista":
+        score += 0.5
+    elif sig.get("trend") == "bajista":
+        score -= 0.5
+    return score
+
+
+def score_universe(items: list[dict]) -> list[dict]:
+    """Ensemble ranking: several independent 'judges' (momentum, regime, risk-adjusted
+    return, technicals, volatility, mean-reversion) each vote via a cross-sectional
+    z-score; the votes converge into momentum_score and value_score. Each item also
+    gets a 'breakdown' so the contribution of every judge is visible (no black box).
+
+    A market-breadth regime (% of assets above their 200d trend) mildly tilts the
+    weighting toward momentum in bull markets and toward value in bear markets.
     """
     valid = [it for it in items if it.get("factors")]
     if len(valid) < 2:
         for it in items:
             it["momentum_score"] = 0.0
             it["value_score"] = 0.0
+            it["breakdown"] = {}
         return items
 
-    momentum = [it["factors"]["momentum"] for it in valid]
-    sharpe = [it["factors"]["sharpe"] for it in valid]
-    range_pos = [it["factors"]["range_pos"] for it in valid]
-    rsi = [(it.get("signals") or {}).get("rsi", 50) for it in valid]
+    f = lambda key: [it["factors"].get(key, 0) for it in valid]  # noqa: E731
+    z = {
+        "momentum": _zscore(f("momentum")),
+        "sharpe": _zscore(f("sharpe")),
+        "range": _zscore(f("range_pos")),
+        "regimen": _zscore(f("dist_sma200")),
+        "ewma_vol": _zscore(f("ewma_vol")),
+        "mean_rev": _zscore(f("mean_rev_z")),
+        "rsi": _zscore([(it.get("signals") or {}).get("rsi", 50) for it in valid]),
+        "tecnico": _zscore([_tech_raw(it.get("signals") or {}) for it in valid]),
+    }
 
-    z_mom = _zscore(momentum)
-    z_sharpe = _zscore(sharpe)
-    z_range = _zscore(range_pos)
-    z_rsi = _zscore(rsi)
+    # Market regime from breadth: share of the universe above its own 200d trend.
+    breadth = sum(1 for it in valid if it["factors"].get("above_sma200")) / len(valid)
+    if breadth > 0.55:
+        regime, mom_tilt, val_tilt = "alcista", 1.10, 0.95
+    elif breadth < 0.45:
+        regime, mom_tilt, val_tilt = "bajista", 0.85, 1.10
+    else:
+        regime, mom_tilt, val_tilt = "neutral", 1.0, 1.0
 
     for i, it in enumerate(valid):
-        # MOMENTUM style: strong momentum + good risk-adjusted return + near highs
-        it["momentum_score"] = round(0.5 * z_mom[i] + 0.35 * z_sharpe[i] + 0.15 * z_range[i], 3)
-        # VALUE/CONTRARIAN style: beaten-down (low range, low RSI) but quality (decent sharpe)
-        it["value_score"] = round(-0.45 * z_range[i] - 0.25 * z_rsi[i] + 0.30 * z_sharpe[i], 3)
+        mom_parts = {
+            "momentum": _MOMENTUM_WEIGHTS["momentum"] * z["momentum"][i],
+            "regimen": _MOMENTUM_WEIGHTS["regimen"] * z["regimen"][i],
+            "riesgo": _MOMENTUM_WEIGHTS["riesgo"] * z["sharpe"][i],
+            "tecnico": _MOMENTUM_WEIGHTS["tecnico"] * z["tecnico"][i],
+            "volatilidad": _MOMENTUM_WEIGHTS["volatilidad"] * (-z["ewma_vol"][i]),
+        }
+        val_parts = {
+            "infravaloracion": _VALUE_WEIGHTS["infravaloracion"] * (-z["range"][i]),
+            "reversion": _VALUE_WEIGHTS["reversion"] * (-z["mean_rev"][i]),
+            "sobreventa": _VALUE_WEIGHTS["sobreventa"] * (-z["rsi"][i]),
+            "calidad": _VALUE_WEIGHTS["calidad"] * z["sharpe"][i],
+            "volatilidad": _VALUE_WEIGHTS["volatilidad"] * (-z["ewma_vol"][i]),
+        }
+        it["momentum_score"] = round(sum(mom_parts.values()) * mom_tilt, 3)
+        it["value_score"] = round(sum(val_parts.values()) * val_tilt, 3)
+        it["breakdown"] = {
+            "momentum": {k: round(v, 3) for k, v in mom_parts.items()},
+            "value": {k: round(v, 3) for k, v in val_parts.items()},
+        }
 
     for it in items:
         it.setdefault("momentum_score", 0.0)
         it.setdefault("value_score", 0.0)
+        it.setdefault("breakdown", {})
 
     items.sort(key=lambda x: x.get("momentum_score", 0), reverse=True)
-    logger.info("quant scoring done for {} items", len(valid))
+    logger.info("ensemble scoring done for {} items (regime={}, breadth={:.0%})", len(valid), regime, breadth)
+    # stash the regime where the caller (scanner/service) can read it off any item
+    for it in valid:
+        it["market_regime"] = regime
+        it["market_breadth"] = round(breadth, 3)
     return items

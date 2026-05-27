@@ -226,9 +226,19 @@ class MarketScanner:
         by_momentum = sorted(scored, key=lambda x: x.get("momentum_score", 0), reverse=True)
         by_value = sorted(scored, key=lambda x: x.get("value_score", 0), reverse=True)
 
+        regime = next((t.get("market_regime") for t in scored if t.get("market_regime")), "neutral")
+        breadth = next((t.get("market_breadth") for t in scored if t.get("market_breadth") is not None), None)
+        regime_line = (
+            f"RÉGIMEN DE MERCADO (por amplitud: % de activos sobre su tendencia de 200 sesiones): "
+            f"{regime.upper()}" + (f" ({breadth:.0%} en tendencia alcista)." if breadth is not None else ".")
+        )
+
         out = [
-            "RANKING CUANTITATIVO OBJETIVO (motor de scoring: empyrical + ta + z-score "
-            "transversal; el número entre [ ] es la puntuación, NO una opinión).",
+            "RANKING CUANTITATIVO OBJETIVO — ENSEMBLE de criterios (momentum multi-periodo, momentum "
+            "absoluto/régimen, Sharpe/Sortino, técnico RSI/MACD, volatilidad EWMA, reversión a la media), "
+            "combinados por z-score transversal. El número entre [ ] es la puntuación agregada, NO una opinión.",
+            regime_line,
+            "(En régimen alcista pesa más el momentum; en bajista, el valor/defensivo.)",
             "",
             "🔥 TOP MOMENTUM (mejor tendencia + retorno ajustado a riesgo — ordenado por momentum_score):",
         ]

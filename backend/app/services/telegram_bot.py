@@ -143,7 +143,16 @@ class TelegramBotHandler:
 
             # Market summary first, then one trend chart per idea (with the news that backs it).
             if payload.get("market_summary"):
-                await self.notifier.send_html(f"💡 <b>Oportunidades del día</b>\n\n<i>{payload['market_summary']}</i>")
+                regime = payload.get("market_regime")
+                breadth = payload.get("market_breadth")
+                regime_line = ""
+                if regime:
+                    emoji = {"alcista": "🟢", "bajista": "🔴", "neutral": "🟡"}.get(regime, "🟡")
+                    pct = f" ({round(breadth*100)}% sobre su tendencia 200d)" if breadth is not None else ""
+                    regime_line = f"\n{emoji} <b>Régimen:</b> {regime}{pct}"
+                await self.notifier.send_html(
+                    f"💡 <b>Oportunidades del día</b>{regime_line}\n\n<i>{payload['market_summary']}</i>"
+                )
             sent_any_chart = False
             for op in opps:
                 caption = render_opportunity_caption(op)

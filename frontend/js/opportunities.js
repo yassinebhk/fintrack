@@ -51,10 +51,45 @@ async function loadOpportunities(force = false) {
     }
 }
 
+const CRITERION_LABEL = {
+    momentum: 'Momentum (tendencia)',
+    regimen: 'Régimen (sobre 200d)',
+    riesgo: 'Riesgo (Sharpe)',
+    tecnico: 'Técnico (RSI/MACD)',
+    volatilidad: 'Volatilidad (EWMA)',
+    infravaloracion: 'Infravaloración',
+    reversion: 'Reversión a la media',
+    sobreventa: 'Sobreventa (RSI)',
+    calidad: 'Calidad (Sharpe)',
+};
+
+function renderBreakdown(op) {
+    const bd = op.score_breakdown;
+    if (!bd || !Object.keys(bd).length) return '';
+    const maxAbs = Math.max(...Object.values(bd).map(v => Math.abs(v)), 0.01);
+    const rows = Object.entries(bd).map(([k, v]) => {
+        const pct = Math.round(Math.abs(v) / maxAbs * 100);
+        const pos = v >= 0;
+        const barColor = pos ? '#10b981' : '#ef4444';
+        return `<div style="display:flex; align-items:center; gap:8px; margin:3px 0; font-size:12px;">
+            <span style="flex:0 0 150px; color:#94a3b8;">${CRITERION_LABEL[k] || k}</span>
+            <span style="flex:1; background:rgba(255,255,255,0.05); border-radius:4px; height:10px; position:relative;">
+                <span style="position:absolute; left:0; top:0; height:10px; width:${pct}%; background:${barColor}; border-radius:4px;"></span>
+            </span>
+            <span class="mono" style="flex:0 0 46px; text-align:right; color:${barColor};">${pos ? '+' : ''}${v.toFixed(2)}</span>
+        </div>`;
+    }).join('');
+    return `<details style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);">
+        <summary style="cursor:pointer; font-size:13px; color:#cbd5e1;">🧮 Por qué lo puntúa así (criterios que convergen)</summary>
+        <div style="margin-top:8px;">${rows}</div>
+    </details>`;
+}
+
 function renderOpportunities(data) {
     const content = document.getElementById('oppContent');
     const convColor = { alta: '#10b981', media: '#f59e0b', baja: '#64748b' };
     const kindIcon = { tema: '🌐', etf: '📊', fondo: '💼', sector: '🏭' };
+    const regimeColor = { alcista: '#10b981', bajista: '#ef4444', neutral: '#f59e0b' };
 
     const opps = (data.opportunities || []).map(op => {
         const color = convColor[op.conviction] || '#f59e0b';
@@ -75,6 +110,7 @@ function renderOpportunities(data) {
             <p style="margin:4px 0;"><strong>📈 Por qué ahora:</strong> ${op.why_now}</p>
             <p style="margin:4px 0;"><strong>⚠️ Riesgos:</strong> ${op.risks}</p>
             <p style="margin:4px 0;"><strong>🎯 Encaje en tu cartera:</strong> ${op.fit}</p>
+            ${renderBreakdown(op)}
             ${(op.news && op.news.length) ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);"><strong style="font-size:13px;">📰 Noticias que lo respaldan:</strong><ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${op.news.map(n => `<li><a href="${n.url}" target="_blank" rel="noopener" style="color:#60a5fa;">${n.title}</a> <span class="text-muted">(${n.source})</span></li>`).join('')}</ul></div>` : ''}
         </div>`;
     }).join('');
@@ -89,7 +125,11 @@ function renderOpportunities(data) {
         return `<tr><td>${t.theme}</td><td class="text-right">${fmtScore(t.momentum_score)}</td><td class="text-right">${fmtScore(t.value_score)}</td><td class="text-right mono ${cls}">${r3 != null ? (r3>=0?'+':'')+r3+'%' : '—'}</td><td class="text-right mono">${t.range_pos_52w != null ? t.range_pos_52w.toFixed(0)+'%' : '—'}</td></tr>`;
     }).join('');
 
+    const rc = regimeColor[data.market_regime] || '#f59e0b';
+    const regimeBanner = data.market_regime ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:${rc}18; border:1px solid ${rc}44; font-size:13px;">📡 <strong>Régimen de mercado:</strong> <span style="color:${rc}; text-transform:uppercase; font-weight:600;">${data.market_regime}</span>${data.market_breadth != null ? ` · ${Math.round(data.market_breadth*100)}% de activos sobre su tendencia de 200 sesiones` : ''}<br><span class="text-muted" style="font-size:11px;">En régimen alcista pesa más el momentum; en bajista, el valor/defensivo.</span></div>` : '';
+
     content.innerHTML = `
+        ${regimeBanner}
         ${data.market_summary ? `<div class="integrations-banner-inner" style="margin-bottom:16px;"><div class="integrations-banner-icon">🧠</div><div class="integrations-banner-body"><strong>Resumen de mercado</strong><p style="margin:6px 0 0;">${data.market_summary}</p></div></div>` : ''}
         ${opps}
         <div class="card" style="margin-top:16px;">

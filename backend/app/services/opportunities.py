@@ -89,8 +89,11 @@ class OpportunityService:
         content = result.output
 
         opportunities = content.get("opportunities", []) or []
-        # Enrich each idea with a 6-month trend chart + the headlines that back it.
-        await self._enrich_opportunities(opportunities, news_items)
+        # Enrich each idea with a 6-month trend chart + the headlines that back it +
+        # the ensemble score breakdown of the matching instrument.
+        await self._enrich_opportunities(opportunities, news_items, {t["ticker"]: t for t in themes})
+        market_regime = next((t.get("market_regime") for t in themes if t.get("market_regime")), "neutral")
+        market_breadth = next((t.get("market_breadth") for t in themes if t.get("market_breadth") is not None), None)
 
         # Surface the top of each objective ranking to the UI (the universe is large).
         scored = [t for t in themes if t.get("factors")]
@@ -107,6 +110,8 @@ class OpportunityService:
             "model": result.model,
             "themes": top_themes,
             "universe_size": len(themes),
+            "market_regime": market_regime,
+            "market_breadth": market_breadth,
             "market_summary": content.get("market_summary", ""),
             "opportunities": opportunities,
             "disclaimer": content.get("disclaimer", ""),
@@ -116,10 +121,28 @@ class OpportunityService:
         return payload
 
     async def _enrich_opportunities(
-        self, opportunities: list[dict], news_items: list[dict]
+        self, opportunities: list[dict], news_items: list[dict], by_ticker: dict[str, dict] | None = None
     ) -> None:
-        """Attach a 6-month trend chart_url and supporting news (with links) to each idea."""
+        """Attach a 6-month trend chart_url, supporting news (with links) and the
+        ensemble score breakdown of the matching instrument to each idea."""
         from app.services.charts import line_chart
+
+        by_ticker = by_ticker or {}
+
+        def attach_scores(opp: dict) -> None:
+            tk = (opp.get("ticker_or_isin") or "").strip().upper()
+            t = by_ticker.get(tk)
+            if not t:
+                return
+            opp["scores"] = {
+                "momentum_score": t.get("momentum_score"),
+                "value_score": t.get("value_score"),
+            }
+            # Show the breakdown for the thesis the analyst chose (momentum vs value).
+            which = "value" if opp.get("approach") in ("valor", "contrarian") else "momentum"
+            bd = (t.get("breakdown") or {}).get(which) or {}
+            # sorted by absolute contribution, biggest drivers first
+            opp["score_breakdown"] = dict(sorted(bd.items(), key=lambda kv: abs(kv[1]), reverse=True))
 
         def attach_news(opp: dict) -> None:
             refs = []
@@ -148,6 +171,7 @@ class OpportunityService:
 
         for opp in opportunities:
             attach_news(opp)
+            attach_scores(opp)
         await asyncio.gather(*(attach_chart(o) for o in opportunities))
 
 
@@ -199,6 +223,16 @@ def render_opportunity_caption(op: dict) -> str:
         f"<b>Por qué ahora:</b> {esc(op.get('why_now','')[:320])}",
         f"<b>Riesgos:</b> {esc(op.get('risks','')[:200])}",
     ]
+    bd = op.get("score_breakdown") or {}
+    if bd:
+        labels = {
+            "momentum": "Momentum", "regimen": "Régimen", "riesgo": "Sharpe",
+            "tecnico": "Técnico", "volatilidad": "Volatilidad", "infravaloracion": "Infravalorado",
+            "reversion": "Reversión", "sobreventa": "Sobreventa", "calidad": "Calidad",
+        }
+        top = list(bd.items())[:3]  # already sorted by |contribution|
+        chips = " · ".join(f"{labels.get(k,k)} {'+' if v>=0 else ''}{v:.2f}" for k, v in top)
+        lines.append(f"<b>🧮 Criterios:</b> <i>{esc(chips)}</i>")
     news = op.get("news") or []
     if news:
         lines.append("<b>📰 Noticias que lo respaldan:</b>")
