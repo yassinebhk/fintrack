@@ -85,13 +85,37 @@ class MarketScanner:
         return themes
 
     def render_for_prompt(self, themes: list[dict]) -> str:
-        lines = ["Momentum de sectores/temas (datos reales de ETFs de referencia):"]
-        for t in themes:
-            lines.append(
+        """Render themes split into HOT (momentum/highs) vs COLD (beaten-down/possible entry)."""
+        def line(t: dict) -> str:
+            if not all(t.get(k) is not None for k in ("ret_1m", "ret_3m", "ret_1y")):
+                return f"- {t['theme']} ({t['ticker']}): datos parciales · {t['desc']}"
+            return (
                 f"- {t['theme']} ({t['ticker']}): "
                 f"1m {t['ret_1m']:+.1f}% · 3m {t['ret_3m']:+.1f}% · 1y {t['ret_1y']:+.1f}% · "
-                f"posición en rango 52sem {t['range_pos_52w']:.0f}% · {t['desc']}"
-                if all(t.get(k) is not None for k in ("ret_1m", "ret_3m", "ret_1y"))
-                else f"- {t['theme']} ({t['ticker']}): datos parciales · {t['desc']}"
+                f"rango52s {t['range_pos_52w']:.0f}% · {t['desc']}"
             )
-        return "\n".join(lines)
+
+        # Classify: hot = near 52w highs / strong; cold = near lows / corrected (contrarian candidates)
+        hot, cold, mid = [], [], []
+        for t in themes:
+            rp = t.get("range_pos_52w")
+            if rp is None:
+                mid.append(t)
+            elif rp >= 70:
+                hot.append(t)
+            elif rp <= 40:
+                cold.append(t)
+            else:
+                mid.append(t)
+
+        out = ["Datos reales de momentum por tema (ETFs de referencia).", ""]
+        out.append("🔥 CALIENTES (cerca de máximos 52s — tesis MOMENTUM, ojo a que estén caros):")
+        out += [line(t) for t in hot] or ["  (ninguno)"]
+        out.append("")
+        out.append("🧊 EN CORRECCIÓN / ZONA BAJA (cerca de mínimos 52s — posibles tesis VALOR/CONTRARIAN si hay catalizador):")
+        out += [line(t) for t in cold] or ["  (ninguno)"]
+        if mid:
+            out.append("")
+            out.append("➖ INTERMEDIOS:")
+            out += [line(t) for t in mid]
+        return "\n".join(out)

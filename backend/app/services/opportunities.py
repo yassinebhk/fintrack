@@ -89,12 +89,15 @@ def render_opportunities_telegram(payload: dict) -> str:
         parts.append("")
 
     conv_emoji = {"alta": "🟢", "media": "🟡", "baja": "⚪"}
+    appr_emoji = {"momentum": "🔥", "valor": "🧊", "contrarian": "🧊"}
     for op in payload.get("opportunities", []):
         emoji = conv_emoji.get(op.get("conviction", "media"), "🟡")
+        ap = op.get("approach", "")
+        ap_tag = f" {appr_emoji.get(ap,'')}{esc(ap)}" if ap else ""
         name = esc(op.get("name", ""))
         kind = esc(op.get("kind", ""))
         tk = op.get("ticker_or_isin")
-        header = f"{emoji} <b>{name}</b> ({kind}{', ' + esc(tk) if tk else ''})"
+        header = f"{emoji} <b>{name}</b> ({kind}{', ' + esc(tk) if tk else ''}){ap_tag}"
         parts.append(header)
         parts.append(f"<b>Qué es:</b> {esc(op.get('what_it_is',''))}")
         parts.append(f"<b>Por qué ahora:</b> {esc(op.get('why_now',''))}")

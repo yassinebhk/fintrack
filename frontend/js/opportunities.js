@@ -34,11 +34,16 @@ function renderOpportunities(data) {
     const opps = (data.opportunities || []).map(op => {
         const color = convColor[op.conviction] || '#f59e0b';
         const icon = kindIcon[op.kind] || '💡';
+        const apprStyle = op.approach === 'momentum' ? 'background:#ef444422; color:#ef4444;' : 'background:#3b82f622; color:#3b82f6;';
+        const apprLabel = op.approach === 'momentum' ? '🔥 momentum' : (op.approach ? '🧊 ' + op.approach : '');
         return `
         <div class="card" style="margin-bottom:14px; border-left:3px solid ${color};">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
                 <h3 style="margin:0;">${icon} ${op.name}${op.ticker_or_isin ? ` <span class="text-muted" style="font-size:13px;">${op.ticker_or_isin}</span>` : ''}</h3>
-                <span style="background:${color}22; color:${color}; padding:2px 10px; border-radius:12px; font-size:12px; white-space:nowrap;">convicción ${op.conviction}</span>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+                    ${apprLabel ? `<span style="${apprStyle} padding:2px 10px; border-radius:12px; font-size:12px; white-space:nowrap;">${apprLabel}</span>` : ''}
+                    <span style="background:${color}22; color:${color}; padding:2px 10px; border-radius:12px; font-size:12px; white-space:nowrap;">convicción ${op.conviction}</span>
+                </div>
             </div>
             <p style="margin:8px 0 4px;"><strong>Qué es:</strong> ${op.what_it_is}</p>
             <p style="margin:4px 0;"><strong>📈 Por qué ahora:</strong> ${op.why_now}</p>

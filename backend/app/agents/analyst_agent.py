@@ -18,9 +18,15 @@ Tienes:
 - La cartera actual del usuario (para detectar qué le falta y evitar redundancias).
 
 Reglas:
+0. EQUILIBRIO MOMENTUM vs VALOR (MUY IMPORTANTE): no recomiendes solo lo que está en máximos. Propón un MIX:
+   - 1-2 ideas de MOMENTUM (tendencia fuerte, de la lista CALIENTES) — pero advierte si están caras/extendidas.
+   - 1-2 ideas de VALOR/CONTRARIAN (de la lista EN CORRECCIÓN/zona baja, o fondos value): activos sólidos
+     caídos o rezagados con catalizador y potencial de recuperación a meses. Comprar barato con criterio,
+     no solo perseguir lo que ya subió. Si algo está en mínimos pero el negocio es bueno, explícalo.
+   Un buen gestor combina ambas; evita que TODAS tus ideas estén en máximos.
 1. Propón oportunidades CONCRETAS y variadas: pueden ser temas/sectores, ETFs (UCITS si es para Europa),
    o fondos gestionados conocidos (p.ej. Robeco Smart Energy, Horos Value Internacional, Fundsmith,
-   Baelo, Seilern...) cuando encajen con lo que se está moviendo.
+   Baelo, Seilern...) cuando encajen.
 2. Para CADA oportunidad da un overview completo: qué es, en qué invierte, por qué es interesante AHORA
    (liga tu razón a los datos de momentum/macro Y a las noticias recientes cuando sean relevantes),
    riesgos, y cómo encaja en la cartera del usuario. Si una noticia reciente respalda o desaconseja una
@@ -46,6 +52,8 @@ SCHEMA = {
                 "properties": {
                     "name": {"type": "string", "description": "Nombre de la oportunidad (fondo/ETF/tema)"},
                     "kind": {"type": "string", "enum": ["tema", "etf", "fondo", "sector"]},
+                    "approach": {"type": "string", "enum": ["momentum", "valor", "contrarian"],
+                                 "description": "momentum=tendencia fuerte/máximos; valor/contrarian=barato o caído con potencial"},
                     "ticker_or_isin": {"type": "string", "description": "Ticker/ISIN si lo conoces, vacío si no"},
                     "what_it_is": {"type": "string", "description": "Qué es y en qué invierte (overview)"},
                     "why_now": {"type": "string", "description": "Por qué es interesante ahora, ligado a datos"},
@@ -53,7 +61,7 @@ SCHEMA = {
                     "fit": {"type": "string", "description": "Cómo encaja en la cartera del usuario"},
                     "conviction": {"type": "string", "enum": ["alta", "media", "baja"]},
                 },
-                "required": ["name", "kind", "what_it_is", "why_now", "risks", "fit", "conviction"],
+                "required": ["name", "kind", "approach", "what_it_is", "why_now", "risks", "fit", "conviction"],
             },
         },
         "disclaimer": {"type": "string"},
