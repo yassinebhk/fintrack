@@ -115,13 +115,37 @@ class TelegramBotHandler:
         await self.notifier.send_text("🔎 Analizando el mercado y buscando oportunidades… (~20-40s)")
         await self.notifier.send_chat_action("typing")
         try:
-            from app.services.opportunities import OpportunityService, render_opportunities_telegram
+            from app.services.opportunities import (
+                OpportunityService,
+                render_opportunities_telegram,
+                render_opportunity_caption,
+            )
 
             payload = await OpportunityService().generate()
-            if not payload.get("opportunities"):
+            opps = payload.get("opportunities") or []
+            if not opps:
                 await self.notifier.send_text("No pude generar oportunidades ahora mismo (posible límite de cuota). Reintenta en un rato.")
                 return
-            await self.notifier.send_html(render_opportunities_telegram(payload))
+
+            # Market summary first, then one trend chart per idea (with the news that backs it).
+            if payload.get("market_summary"):
+                await self.notifier.send_html(f"💡 <b>Oportunidades del día</b>\n\n<i>{payload['market_summary']}</i>")
+            sent_any_chart = False
+            for op in opps:
+                caption = render_opportunity_caption(op)
+                if op.get("chart_url"):
+                    await self.notifier.send_chat_action("upload_photo")
+                    ok = await self.notifier.send_photo(op["chart_url"], caption=caption)
+                    sent_any_chart = sent_any_chart or ok
+                    if not ok:  # chart failed → at least send the text
+                        await self.notifier.send_html(caption)
+                else:
+                    await self.notifier.send_html(caption)
+            # Fallback: if not a single chart went through, send the full text digest.
+            if not sent_any_chart:
+                await self.notifier.send_html(render_opportunities_telegram(payload))
+            else:
+                await self.notifier.send_html('🔗 <a href="https://fintrack-front.onrender.com">Ver todo en FinTrack</a>')
         except Exception as exc:
             logger.error("telegram opportunities failed: {}", exc)
             await self.notifier.send_text("No pude generar las oportunidades ahora mismo, intenta más tarde.")

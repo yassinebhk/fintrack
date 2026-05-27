@@ -69,6 +69,12 @@ SCHEMA = {
                     "risks": {"type": "string", "description": "Riesgos principales"},
                     "fit": {"type": "string", "description": "Cómo encaja en la cartera del usuario"},
                     "conviction": {"type": "string", "enum": ["alta", "media", "baja"]},
+                    "supporting_news_idx": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Índices [N] de los titulares de la lista de noticias que respaldan "
+                                       "esta idea (0-2). Deja vacío si ningún titular la respalda directamente.",
+                    },
                 },
                 "required": ["name", "kind", "approach", "what_it_is", "why_now", "risks", "fit", "conviction"],
             },
@@ -115,6 +121,7 @@ class AnalystAgent(Agent):
             "## Tu tarea\n"
             "Propón 2-4 oportunidades concretas que el usuario probablemente desconoce, cada una con "
             "overview completo (what_it_is, why_now ligado a los datos Y noticias, risks, fit con su cartera, "
-            "conviction). Cuando una noticia reciente sea relevante para una idea, menciónala. "
+            "conviction). Cuando un titular de la lista respalde una idea, cita su índice [N] en "
+            "supporting_news_idx (0-2 por idea) y aludídelo en why_now. "
             "Prioriza diversificar su riesgo actual. Distingue dato de opinión."
         )

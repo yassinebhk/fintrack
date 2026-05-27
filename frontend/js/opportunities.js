@@ -45,10 +45,12 @@ function renderOpportunities(data) {
                     <span style="background:${color}22; color:${color}; padding:2px 10px; border-radius:12px; font-size:12px; white-space:nowrap;">convicción ${op.conviction}</span>
                 </div>
             </div>
+            ${op.chart_url ? `<img src="${op.chart_url}" alt="Tendencia 6 meses de ${op.name}" loading="lazy" style="width:100%; max-width:560px; border-radius:8px; margin:10px 0; display:block;">` : ''}
             <p style="margin:8px 0 4px;"><strong>Qué es:</strong> ${op.what_it_is}</p>
             <p style="margin:4px 0;"><strong>📈 Por qué ahora:</strong> ${op.why_now}</p>
             <p style="margin:4px 0;"><strong>⚠️ Riesgos:</strong> ${op.risks}</p>
             <p style="margin:4px 0;"><strong>🎯 Encaje en tu cartera:</strong> ${op.fit}</p>
+            ${(op.news && op.news.length) ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);"><strong style="font-size:13px;">📰 Noticias que lo respaldan:</strong><ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${op.news.map(n => `<li><a href="${n.url}" target="_blank" rel="noopener" style="color:#60a5fa;">${n.title}</a> <span class="text-muted">(${n.source})</span></li>`).join('')}</ul></div>` : ''}
         </div>`;
     }).join('');
 

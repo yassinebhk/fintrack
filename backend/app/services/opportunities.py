@@ -52,13 +52,14 @@ class OpportunityService:
         except Exception as exc:
             logger.warning("opportunities macro fetch partial: {}", exc)
 
-        # Recent news (already sentiment-classified by LLM) to give the analyst current context
-        news_str = ""
+        # Recent news (already sentiment-classified by LLM) to give the analyst current context.
+        # Indexed so the analyst can reference the exact headlines that back each idea.
+        news_str, news_items = "", []
         try:
-            news = await self.news_service.get_news("all", limit=25)
-            lines = ["Titulares recientes (con sentimiento):"]
-            for n in news[:25]:
-                lines.append(f"- [{n.get('source')}|{n.get('impact','neutral')}] {n.get('title','')[:160]}")
+            news_items = (await self.news_service.get_news("all", limit=25))[:25]
+            lines = ["Titulares recientes (referénciables por su índice [N], con sentimiento):"]
+            for i, n in enumerate(news_items):
+                lines.append(f"[{i}] ({n.get('source')}|{n.get('impact','neutral')}) {n.get('title','')[:160]}")
             news_str = "\n".join(lines)
         except Exception as exc:
             logger.warning("opportunities news fetch failed: {}", exc)
@@ -73,6 +74,10 @@ class OpportunityService:
         )
         result = await AnalystAgent().run(ctx)
         content = result.output
+
+        opportunities = content.get("opportunities", []) or []
+        # Enrich each idea with a 6-month trend chart + the headlines that back it.
+        await self._enrich_opportunities(opportunities, news_items)
 
         # Surface the top of each objective ranking to the UI (the universe is large).
         scored = [t for t in themes if t.get("factors")]
@@ -90,12 +95,49 @@ class OpportunityService:
             "themes": top_themes,
             "universe_size": len(themes),
             "market_summary": content.get("market_summary", ""),
-            "opportunities": content.get("opportunities", []),
+            "opportunities": opportunities,
             "disclaimer": content.get("disclaimer", ""),
         }
         self._cache = payload
         self._cache_at = datetime.now(timezone.utc)
         return payload
+
+    async def _enrich_opportunities(
+        self, opportunities: list[dict], news_items: list[dict]
+    ) -> None:
+        """Attach a 6-month trend chart_url and supporting news (with links) to each idea."""
+        import asyncio
+
+        from app.services.charts import line_chart
+
+        def attach_news(opp: dict) -> None:
+            refs = []
+            for idx in (opp.get("supporting_news_idx") or [])[:2]:
+                if isinstance(idx, int) and 0 <= idx < len(news_items):
+                    n = news_items[idx]
+                    refs.append({"title": n.get("title", ""), "url": n.get("url", ""),
+                                 "source": n.get("source", ""), "impact": n.get("impact", "neutral")})
+            opp["news"] = refs
+
+        async def attach_chart(opp: dict) -> None:
+            ticker = (opp.get("ticker_or_isin") or "").strip().upper()
+            if not ticker:
+                return
+            try:
+                hist = await self.scanner.yahoo.get_history(ticker, period="6mo")
+                closes = [h["close"] for h in (hist or []) if h.get("close")]
+                labels = [h["date"] for h in (hist or []) if h.get("close")]
+                if len(closes) >= 20:
+                    up = closes[-1] >= closes[0]
+                    color = "#10b981" if up else "#ef4444"
+                    title = f"{opp.get('name', ticker)} · 6 meses"
+                    opp["chart_url"] = line_chart(title[:60], labels, closes, color=color)
+            except Exception as exc:
+                logger.debug("chart for {} failed: {}", ticker, exc)
+
+        for opp in opportunities:
+            attach_news(opp)
+        await asyncio.gather(*(attach_chart(o) for o in opportunities))
 
 
 def render_opportunities_telegram(payload: dict) -> str:
@@ -127,3 +169,31 @@ def render_opportunities_telegram(payload: dict) -> str:
         parts.append(f"<i>{esc(payload['disclaimer'])}</i>")
     parts.append('\n🔗 <a href="https://fintrack-front.onrender.com">Ver más en FinTrack</a>')
     return "\n".join(parts).strip()
+
+
+def render_opportunity_caption(op: dict) -> str:
+    """Compact HTML caption for an opportunity photo (Telegram caps captions at 1024)."""
+    from app.services.notifications.telegram import html_escape as esc
+
+    conv_emoji = {"alta": "🟢", "media": "🟡", "baja": "⚪"}
+    appr_emoji = {"momentum": "🔥", "valor": "🧊", "contrarian": "🧊"}
+    emoji = conv_emoji.get(op.get("conviction", "media"), "🟡")
+    ap = op.get("approach", "")
+    ap_tag = f" {appr_emoji.get(ap,'')}{esc(ap)}" if ap else ""
+    tk = op.get("ticker_or_isin")
+    lines = [
+        f"{emoji} <b>{esc(op.get('name',''))}</b>"
+        f"{' (' + esc(tk) + ')' if tk else ''}{ap_tag}",
+        f"<b>Qué es:</b> {esc(op.get('what_it_is','')[:280])}",
+        f"<b>Por qué ahora:</b> {esc(op.get('why_now','')[:320])}",
+        f"<b>Riesgos:</b> {esc(op.get('risks','')[:200])}",
+    ]
+    news = op.get("news") or []
+    if news:
+        lines.append("<b>📰 Noticias que lo respaldan:</b>")
+        for n in news[:2]:
+            title = esc((n.get("title", "") or "")[:110])
+            url = n.get("url", "")
+            src = esc(n.get("source", ""))
+            lines.append(f"• <a href=\"{url}\">{title}</a> <i>({src})</i>" if url else f"• {title} <i>({src})</i>")
+    return "\n".join(lines)[:1024]
