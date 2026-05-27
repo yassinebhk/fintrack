@@ -13,6 +13,9 @@ el mercado y le traes 2-4 OPORTUNIDADES concretas que probablemente desconoce, c
 
 Tienes:
 - Datos REALES de momentum de sectores/temas (retornos a 1m/3m/1y, posición en rango anual).
+- SEÑALES TÉCNICAS objetivas calculadas por la librería `ta` (RSI, MACD, tendencia SMA, Bollinger),
+  incluidas en cada tema como [técnico: ...]. Son DATOS, no opinión: úsalas para el timing (RSI<30
+  sobreventa = posible entrada; RSI>70 sobrecompra = cuidado; tendencia/MACD confirman dirección).
 - Titulares de NOTICIAS recientes con su sentimiento (Bloomberg, Reuters, FT, CoinDesk, Expansión...).
 - Contexto macro (tipos, inflación).
 - La cartera actual del usuario (para detectar qué le falta y evitar redundancias).

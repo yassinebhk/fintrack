@@ -62,6 +62,10 @@ class MarketScanner:
         lo = min(closes)
         range_pos = (last - lo) / (hi - lo) * 100 if hi > lo else 50.0
 
+        # Technical signals via the `ta` library (objective, not LLM opinion)
+        from app.services.discovery.technical import compute_signals
+        signals = compute_signals(closes)
+
         return {
             "theme": name,
             "ticker": ticker,
@@ -72,6 +76,7 @@ class MarketScanner:
             "ret_1y": round(ret(250), 2) if ret(250) is not None else None,
             "range_pos_52w": round(range_pos, 1),  # 0 = mínimo anual, 100 = máximo anual
             "day_change_pct": round(price.get("change_percent", 0), 2),
+            "signals": signals,
         }
 
     async def scan_themes(self) -> list[dict]:
@@ -86,13 +91,16 @@ class MarketScanner:
 
     def render_for_prompt(self, themes: list[dict]) -> str:
         """Render themes split into HOT (momentum/highs) vs COLD (beaten-down/possible entry)."""
+        from app.services.discovery.technical import signals_label
+
         def line(t: dict) -> str:
             if not all(t.get(k) is not None for k in ("ret_1m", "ret_3m", "ret_1y")):
                 return f"- {t['theme']} ({t['ticker']}): datos parciales · {t['desc']}"
+            tech = signals_label(t.get("signals"))
             return (
                 f"- {t['theme']} ({t['ticker']}): "
                 f"1m {t['ret_1m']:+.1f}% · 3m {t['ret_3m']:+.1f}% · 1y {t['ret_1y']:+.1f}% · "
-                f"rango52s {t['range_pos_52w']:.0f}% · {t['desc']}"
+                f"rango52s {t['range_pos_52w']:.0f}% · [técnico: {tech}] · {t['desc']}"
             )
 
         # Classify: hot = near 52w highs / strong; cold = near lows / corrected (contrarian candidates)
