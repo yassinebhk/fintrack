@@ -16,7 +16,7 @@ from app.services.portfolio import PortfolioService
 PORTFOLIO_INTRADAY_DROP_PCT = -3.0
 ASSET_INTRADAY_DROP_PCT = -7.0
 DRAWDOWN_THRESHOLD_PCT = -15.0
-DEDUPE_WINDOW_HOURS = 12
+DEDUPE_WINDOW_HOURS = 24
 
 
 class AlertsEngine:
@@ -85,23 +85,43 @@ class AlertsEngine:
             )
 
         # Rule 4: high-impact bearish news on held tickers
+        # Group bearish news by held asset → ONE digest alert per asset per day
+        # (avoids spamming one alert per headline). Only fires if >= 2 bearish headlines.
         held_tickers = {p["ticker"] for p in portfolio.get("positions", [])}
         news = await self.news_service.get_news("all", limit=40)
+        by_asset: dict[str, list[dict]] = {}
         for item in news:
-            if item.get("impact") == "bearish":
-                affected = set(item.get("impactedAssets", []))
-                hits = affected & held_tickers
-                if hits:
-                    created.append(
-                        await self._maybe_create(
-                            kind="news_bearish",
-                            severity="warning",
-                            title=f"Noticia bajista sobre {', '.join(hits)}",
-                            body=f"{item.get('source')}: {item.get('title')}",
-                            payload={"hits": list(hits), "url": item.get("url"), "source": item.get("source")},
-                            dedupe_key=f"news:{item.get('title', '')[:50]}",
-                        )
-                    )
+            if item.get("impact") != "bearish":
+                continue
+            hits = set(item.get("impactedAssets", [])) & held_tickers
+            for ticker in hits:
+                by_asset.setdefault(ticker, []).append(item)
+
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        for ticker, items in by_asset.items():
+            if len(items) < 2:
+                continue  # a single headline isn't a signal — skip the noise
+            top = items[:4]
+            lines = []
+            for it in top:
+                src = it.get("source", "")
+                title = it.get("title", "")
+                url = it.get("url", "")
+                lines.append(f"• {src}: {title}" + (f"\n  {url}" if url else ""))
+            body = (
+                f"{len(items)} titulares bajistas sobre {ticker} hoy:\n\n" + "\n".join(lines)
+            )
+            created.append(
+                await self._maybe_create(
+                    kind="news_bearish",
+                    severity="warning",
+                    title=f"📰 {len(items)} noticias bajistas sobre {ticker}",
+                    body=body,
+                    payload={"ticker": ticker, "count": len(items),
+                             "urls": [it.get("url") for it in top]},
+                    dedupe_key=f"news_bearish:{ticker}:{today_str}",  # max 1/asset/day
+                )
+            )
 
         return [c for c in created if c is not None]
 
