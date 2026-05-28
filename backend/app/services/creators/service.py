@@ -245,6 +245,7 @@ class CreatorsService:
 
         new_count = 0
         processed: list[dict] = []
+        skipped: list[dict] = []  # diagnostic per video (transcript fail, llm fail, …)
         for creator in CREATORS:
             if new_count >= max_llm_calls:
                 break
@@ -252,18 +253,22 @@ class CreatorsService:
                 cid = await self._resolve_channel_id(creator, resolved)
                 if not cid:
                     logger.info("creators: cannot resolve {}", creator["handle"])
+                    skipped.append({"creator": creator["name"], "reason": "channel_id no resuelto"})
                     continue
                 entries = await self._fetch_channel_rss(cid)
                 if not entries:
+                    skipped.append({"creator": creator["name"], "reason": "RSS vacío"})
                     continue
                 seen = set(seen_map.get(cid, []))
                 fresh = [e for e in entries if e["video_id"] not in seen][:max_new_per_channel]
-                # Mark all current entries as seen (avoid backlog blast on first run)
-                seen_map[cid] = list({*seen, *(e["video_id"] for e in entries)})[-_MAX_SEEN_PER_CHANNEL:]
-                # On the very first run for a channel there is no 'seen' history → don't
-                # backfill the whole feed; just mark them seen and pick the latest one.
+                # First run for this channel → don't backfill the whole feed, but only
+                # the latest video. Mark the older entries seen immediately. The latest
+                # gets marked only after we ATTEMPT it (so a transient transcript failure
+                # doesn't lose it forever).
                 if not seen and fresh:
                     fresh = [entries[0]]
+                    seen.update(e["video_id"] for e in entries[1:])
+                    seen_map[cid] = list(seen)[-_MAX_SEEN_PER_CHANNEL:]
 
                 for e in fresh:
                     if new_count >= max_llm_calls:
@@ -275,10 +280,16 @@ class CreatorsService:
                     )
                     if not transcript or len(transcript) < 400:
                         logger.info("creators: skipping {} (no transcript)", e["video_id"])
+                        skipped.append({"creator": creator["name"], "video_id": e["video_id"],
+                                          "title": e["title"][:80], "reason": "transcript no disponible"})
+                        seen.add(e["video_id"])  # don't keep retrying a captionless video
+                        seen_map[cid] = list(seen)[-_MAX_SEEN_PER_CHANNEL:]
                         continue
                     summary = await self._summarize(creator, e["title"], transcript)
                     if not summary:
-                        continue
+                        skipped.append({"creator": creator["name"], "video_id": e["video_id"],
+                                          "title": e["title"][:80], "reason": "fallo del LLM"})
+                        continue  # leave unseen so next cycle can retry
                     item = {
                         "creator": creator["name"],
                         "handle": creator["handle"],
@@ -295,17 +306,25 @@ class CreatorsService:
                     summaries.insert(0, item)
                     processed.append(item)
                     new_count += 1
+                    seen.add(e["video_id"])
+                    seen_map[cid] = list(seen)[-_MAX_SEEN_PER_CHANNEL:]
                     if deliver:
                         await self._notify(creator, e, summary["summary_markdown"])
             except Exception as exc:
                 logger.error("creators: channel {} pipeline failed: {}", creator["handle"], exc)
+                skipped.append({"creator": creator["name"], "reason": f"error pipeline: {str(exc)[:80]}"})
 
         summaries = summaries[:_MAX_SUMMARIES]
         await self._save(_DB_KEY_RESOLVED, resolved)
         await self._save(_DB_KEY_SEEN, seen_map)
         await self._save(_DB_KEY_SUMMARIES, summaries)
-        logger.info("creators: processed {} new videos", new_count)
-        return {"new_videos": new_count, "processed": processed, "total_cached": len(summaries)}
+        logger.info("creators: processed {} new videos (skipped {})", new_count, len(skipped))
+        return {
+            "new_videos": new_count,
+            "processed": processed,
+            "skipped": skipped,
+            "total_cached": len(summaries),
+        }
 
     async def latest(self, limit: int = 20) -> list[dict]:
         return (await self._load(_DB_KEY_SUMMARIES, []))[:limit]
