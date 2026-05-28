@@ -12,7 +12,7 @@ import httpx
 from loguru import logger
 
 from app.llm import LLMMessage, get_llm_client
-from app.services.creators.sources import CREATORS
+from app.services.creators.sources import CREATORS, NEWSLETTERS
 
 YT_HEADERS = {
     "User-Agent": (
@@ -267,6 +267,156 @@ class CreatorsService:
         except Exception as exc:
             logger.warning("creators: telegram delivery failed: {}", exc)
 
+    # ---------- newsletters (Substack / Wordpress / Blogger RSS) ----------
+    async def _fetch_newsletter_entries(self, feed_url: str) -> list[dict]:
+        """Parse a finance newsletter RSS/Atom feed. Returns entries with id, title,
+        url, published, and (where present) the embedded content/excerpt."""
+        try:
+            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as c:
+                r = await c.get(feed_url, headers=YT_HEADERS)
+            if r.status_code != 200:
+                return []
+            root = ET.fromstring(r.text)
+        except Exception as exc:
+            logger.warning("creators: newsletter feed {} failed: {}", feed_url, exc)
+            return []
+
+        out: list[dict] = []
+        # Both RSS 2.0 (item) and Atom (entry).
+        nodes = root.findall(".//{*}item") + root.findall(".//{*}entry")
+        for n in nodes:
+            title = (n.findtext("{*}title") or "").strip()
+            # link: <link>URL</link> in RSS; <link href="URL"/> in Atom.
+            link = (n.findtext("{*}link") or "").strip()
+            if not link:
+                link_el = n.find("{*}link")
+                if link_el is not None:
+                    link = link_el.attrib.get("href", "")
+            # id / guid (avoid empty)
+            entry_id = (n.findtext("{*}guid") or n.findtext("{*}id") or link).strip()
+            published = (n.findtext("{*}pubDate") or n.findtext("{*}published") or
+                         n.findtext("{*}updated") or "").strip()
+            # Body: try (in order) content:encoded, content, description, summary.
+            body = ""
+            for tag in ("{http://purl.org/rss/1.0/modules/content/}encoded",
+                        "{*}content", "{*}description", "{*}summary"):
+                t = n.find(tag)
+                if t is not None and (t.text or ""):
+                    body = t.text or ""
+                    break
+            if title and entry_id:
+                out.append({"id": entry_id, "title": title, "url": link,
+                             "published": published, "html": body})
+        return out
+
+    def _html_to_text(self, html: str) -> str:
+        """Strip tags + collapse whitespace. Conservative — keeps it lightweight."""
+        text = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html)
+        text = re.sub(r"<br\s*/?>", "\n", text)
+        text = re.sub(r"</p>", "\n\n", text)
+        text = re.sub(r"<[^>]+>", "", text)
+        text = re.sub(r"&nbsp;", " ", text)
+        text = re.sub(r"&amp;", "&", text)
+        text = re.sub(r"&lt;", "<", text)
+        text = re.sub(r"&gt;", ">", text)
+        text = re.sub(r"&quot;", '"', text)
+        text = re.sub(r"&#39;", "'", text)
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+    async def _fetch_article(self, url: str) -> str | None:
+        """If the RSS excerpt is too short, fetch the article page and extract text."""
+        try:
+            async with httpx.AsyncClient(timeout=25.0, follow_redirects=True) as c:
+                r = await c.get(url, headers=YT_HEADERS)
+            if r.status_code != 200 or not r.text:
+                return None
+            return self._html_to_text(r.text)
+        except Exception as exc:
+            logger.debug("creators: article fetch {} failed: {}", url, exc)
+            return None
+
+    async def _process_newsletters(self, summaries: list[dict], seen_map: dict,
+                                     processed: list[dict], skipped: list[dict],
+                                     new_count: int, max_llm_calls: int,
+                                     deliver: bool) -> int:
+        for nl in NEWSLETTERS:
+            if new_count >= max_llm_calls:
+                break
+            key = nl["feed"]
+            try:
+                entries = await self._fetch_newsletter_entries(key)
+                if not entries:
+                    skipped.append({"creator": nl["name"], "reason": "feed vacío o no parseable"})
+                    continue
+                seen = set(seen_map.get(key, []))
+                fresh = [e for e in entries if e["id"] not in seen][:1]
+                if not seen and fresh:
+                    fresh = [entries[0]]
+                    seen.update(e["id"] for e in entries[1:])
+                    seen_map[key] = list(seen)[-_MAX_SEEN_PER_CHANNEL:]
+
+                for e in fresh:
+                    if new_count >= max_llm_calls:
+                        break
+                    # Pull text: RSS body if rich, else fetch the article URL.
+                    text = self._html_to_text(e.get("html", ""))
+                    if len(text) < 1200 and e.get("url"):
+                        full = await self._fetch_article(e["url"])
+                        if full and len(full) > len(text):
+                            text = full
+                    if not text or len(text) < 400:
+                        skipped.append({"creator": nl["name"], "video_id": e["id"][:80],
+                                          "title": e["title"][:80],
+                                          "reason": "artículo vacío o demasiado corto"})
+                        seen.add(e["id"]); seen_map[key] = list(seen)[-_MAX_SEEN_PER_CHANNEL:]
+                        continue
+                    text = text[:_MAX_TRANSCRIPT_CHARS]
+                    fake_creator = {"name": nl["name"], "lang": nl["lang"], "focus": nl["focus"]}
+                    summary = await self._summarize(fake_creator, e["title"], text, source="transcript")
+                    if not summary:
+                        skipped.append({"creator": nl["name"], "title": e["title"][:80],
+                                          "reason": "fallo del LLM"})
+                        continue
+                    item = {
+                        "creator": nl["name"], "handle": "(newsletter)", "lang": nl["lang"],
+                        "focus": nl["focus"], "kind": "newsletter",
+                        "video_id": e["id"], "title": e["title"], "url": e["url"],
+                        "published": e["published"],
+                        "summary_markdown": summary["summary_markdown"],
+                        "source": "article", "model": summary["model"],
+                        "added_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                    summaries.insert(0, item)
+                    processed.append(item)
+                    new_count += 1
+                    seen.add(e["id"]); seen_map[key] = list(seen)[-_MAX_SEEN_PER_CHANNEL:]
+                    if deliver:
+                        await self._notify_newsletter(nl, e, summary["summary_markdown"])
+            except Exception as exc:
+                logger.error("creators: newsletter {} failed: {}", key, exc)
+                skipped.append({"creator": nl["name"], "reason": f"error: {str(exc)[:80]}"})
+        return new_count
+
+    async def _notify_newsletter(self, nl: dict, entry: dict, summary_md: str) -> None:
+        try:
+            from app.services.notifications.telegram import (
+                TelegramNotifier,
+                html_escape,
+            )
+
+            body = re.sub(r"^## (.+)$", r"<b>\1</b>", summary_md, flags=re.MULTILINE)
+            body = re.sub(r"</?(?!b|i|u|s|a|code|pre)[a-z]+[^>]*>", "", body)
+            head = (
+                f"📰 <b>{html_escape(nl['name'])}</b> ({nl['lang'].upper()})\n"
+                f"<i>{html_escape(nl['focus'])}</i>\n"
+                f"🔗 <a href=\"{entry['url']}\">{html_escape(entry['title'])}</a>\n\n"
+            )
+            await TelegramNotifier().send_html((head + body)[:3800])
+        except Exception as exc:
+            logger.warning("creators: newsletter telegram delivery failed: {}", exc)
+
     # ---------- public entry point ----------
     async def check_and_process(self, *, max_new_per_channel: int = 1,
                                   max_llm_calls: int = 4, deliver: bool = True) -> dict:
@@ -350,6 +500,11 @@ class CreatorsService:
             except Exception as exc:
                 logger.error("creators: channel {} pipeline failed: {}", creator["handle"], exc)
                 skipped.append({"creator": creator["name"], "reason": f"error pipeline: {str(exc)[:80]}"})
+
+        # Now run the newsletter feeds (Substack / Wordpress / Blogger RSS).
+        new_count = await self._process_newsletters(
+            summaries, seen_map, processed, skipped, new_count, max_llm_calls, deliver,
+        )
 
         summaries = summaries[:_MAX_SUMMARIES]
         await self._save(_DB_KEY_RESOLVED, resolved)

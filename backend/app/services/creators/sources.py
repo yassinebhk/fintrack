@@ -34,3 +34,22 @@ CREATORS: list[dict] = [
      "focus": "markets commentary (Ritholtz Wealth)",
      "channel_id": "UCBRpqrzuuqE8TZcWw75JSdw"},
 ]
+
+
+# Long-form finance newsletters / blogs (RSS, free, no API key needed). Same
+# pipeline as YouTubers: ingest → LLM summary → Telegram + cache.
+NEWSLETTERS: list[dict] = [
+    {"name": "Of Dollars and Data — Nick Maggiulli", "lang": "en",
+     "focus": "personal finance · data-driven",
+     "feed": "https://ofdollarsanddata.com/feed/"},
+    {"name": "A Wealth of Common Sense — Ben Carlson", "lang": "en",
+     "focus": "markets commentary",
+     "feed": "https://awealthofcommonsense.com/feed/"},
+    {"name": "Musings on Markets — Aswath Damodaran", "lang": "en",
+     "focus": "valuation · NYU",
+     "feed": "http://aswathdamodaran.blogspot.com/feeds/posts/default"},
+    {"name": "Lyn Alden", "lang": "en",
+     "focus": "macro · monetary",
+     "feed": "https://www.lynalden.com/feed/"},
+]
+
