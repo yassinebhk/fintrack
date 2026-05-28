@@ -520,3 +520,71 @@ class CreatorsService:
 
     async def latest(self, limit: int = 20) -> list[dict]:
         return (await self._load(_DB_KEY_SUMMARIES, []))[:limit]
+
+    # ---------- collaboration with GitHub Actions ----------
+    # Render's IP can't fetch YouTube transcripts (rate-limited). A GH-Actions
+    # workflow does it on its runner (not blocked) and POSTs the transcript here.
+    async def list_pending_transcripts(self) -> list[dict]:
+        """One pending video per curated YouTube channel (the latest unseen). The
+        workflow uses this list to know which transcripts to fetch + post back."""
+        seen_map = await self._load(_DB_KEY_SEEN, {})
+        pending: list[dict] = []
+        for creator in CREATORS:
+            cid = creator.get("channel_id")
+            if not cid:
+                continue
+            entries = await self._fetch_channel_rss(cid)
+            if not entries:
+                continue
+            seen = set(seen_map.get(cid, []))
+            fresh = [e for e in entries if e["video_id"] not in seen][:1]
+            if not seen and entries:
+                fresh = [entries[0]]  # first run for this channel → latest only
+            for e in fresh:
+                pending.append({
+                    "creator_name": creator["name"], "lang": creator["lang"],
+                    "focus": creator["focus"], "channel_id": cid,
+                    "video_id": e["video_id"], "title": e["title"], "url": e["url"],
+                })
+        return pending
+
+    async def ingest_transcript(self, *, channel_id: str, video_id: str, transcript: str,
+                                  title: str = "", url: str = "", deliver: bool = True) -> dict:
+        """Receive a transcript fetched by an external worker (GH Action), summarize
+        it via the LLM, persist it and (optionally) deliver to Telegram."""
+        creator = next((c for c in CREATORS if (c.get("channel_id") or "") == channel_id), None)
+        if not creator:
+            return {"status": "creator_not_found"}
+        text = (transcript or "").strip()
+        if len(text) < 400:
+            return {"status": "transcript_too_short", "length": len(text)}
+        text = text[:_MAX_TRANSCRIPT_CHARS]
+
+        summaries = await self._load(_DB_KEY_SUMMARIES, [])
+        if any(s.get("video_id") == video_id for s in summaries):
+            return {"status": "already_summarized"}
+
+        summary = await self._summarize(creator, title or video_id, text, source="transcript")
+        if not summary:
+            return {"status": "llm_failed"}
+
+        item = {
+            "creator": creator["name"], "handle": creator.get("handle", ""),
+            "lang": creator["lang"], "focus": creator["focus"],
+            "video_id": video_id, "title": title, "url": url,
+            "summary_markdown": summary["summary_markdown"],
+            "source": "transcript", "model": summary["model"],
+            "added_at": datetime.now(timezone.utc).isoformat(),
+        }
+        summaries.insert(0, item)
+        summaries = summaries[:_MAX_SUMMARIES]
+        seen_map = await self._load(_DB_KEY_SEEN, {})
+        seen = set(seen_map.get(channel_id, []))
+        seen.add(video_id)
+        seen_map[channel_id] = list(seen)[-_MAX_SEEN_PER_CHANNEL:]
+        await self._save(_DB_KEY_SUMMARIES, summaries)
+        await self._save(_DB_KEY_SEEN, seen_map)
+
+        if deliver:
+            await self._notify(creator, {"title": title or video_id, "url": url}, summary["summary_markdown"])
+        return {"status": "ok", "summary_chars": len(summary["summary_markdown"])}
