@@ -98,7 +98,8 @@ class CreatorsService:
                     return []
                 root = ET.fromstring(r.text)
                 ns = {"a": "http://www.w3.org/2005/Atom",
-                      "yt": "http://www.youtube.com/xml/schemas/2015"}
+                      "yt": "http://www.youtube.com/xml/schemas/2015",
+                      "media": "http://search.yahoo.com/mrss/"}
                 entries = []
                 for e in root.findall("a:entry", ns):
                     vid = e.findtext("yt:videoId", default="", namespaces=ns)
@@ -108,8 +109,15 @@ class CreatorsService:
                     if link_el is not None:
                         link = link_el.attrib.get("href", "")
                     published = e.findtext("a:published", default="", namespaces=ns)
+                    # The RSS already carries the video's description (no need for yt-dlp
+                    # to fetch it, which the cloud IP often gets rate-limited on).
+                    desc = ""
+                    group = e.find("media:group", ns)
+                    if group is not None:
+                        desc = (group.findtext("media:description", default="", namespaces=ns) or "").strip()
                     if vid:
-                        entries.append({"video_id": vid, "title": title, "url": link, "published": published})
+                        entries.append({"video_id": vid, "title": title, "url": link,
+                                          "published": published, "description": desc})
                 return entries
         except Exception as exc:
             logger.warning("creators: rss {} failed: {}", channel_id, exc)
@@ -133,7 +141,7 @@ class CreatorsService:
             out.append(l)
         return " ".join(out)
 
-    def _get_video_context(self, video_id: str, langs: list[str]) -> dict | None:
+    def _get_video_context(self, video_id: str, langs: list[str], rss_desc: str = "", rss_title: str = "") -> dict | None:
         """Try transcript first; if YouTube blocks the captions endpoint (common from
         cloud IPs), fall back to the video's description + title — much shorter but
         still summarizable. Returns {source, text, title} or None."""
@@ -143,16 +151,16 @@ class CreatorsService:
             logger.debug("yt-dlp missing: {}", exc)
             return None
 
-        info = None
+        info = {}
         try:
             opts = {"quiet": True, "skip_download": True, "no_warnings": True}
             with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+                info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False) or {}
         except Exception as exc:
+            # Don't bail — we still have RSS description as fallback.
             logger.debug("creators: yt-dlp info {} failed: {}", video_id, exc)
-            return None
 
-        title = (info or {}).get("title") or ""
+        title = info.get("title") or rss_title
 
         # 1) Try transcript via VTT subtitles.
         wanted = list(langs) + [f"{l}-419" for l in langs] + ["es", "es-419", "en", "en-US", "en-GB"]
@@ -176,16 +184,18 @@ class CreatorsService:
                 except Exception:
                     continue
 
-        # 2) Fallback to the video's own description (creators of finance content
-        #    usually write meaningful descriptions). Worse than a transcript but still
-        #    useful — and lets us deliver SOMETHING when YouTube blocks captions.
-        desc = (info.get("description") or "").strip()
-        tags = info.get("tags") or []
+        # 2) Fallback to the video's own description. Prefer yt-dlp's (richer); if
+        #    that failed too (cloud-IP rate limits), use the description embedded in
+        #    YouTube's RSS feed (always reachable from anywhere).
+        desc = ((info or {}).get("description") or "").strip()
+        tags = (info or {}).get("tags") or []
+        if not desc or len(desc) < 80:
+            desc = (rss_desc or "").strip()
         if desc and len(desc) > 80:
             text = desc
             if tags:
                 text += "\n\nTags: " + ", ".join(tags[:15])
-            return {"source": "description", "text": text[:_MAX_TRANSCRIPT_CHARS], "title": title}
+            return {"source": "description", "text": text[:_MAX_TRANSCRIPT_CHARS], "title": title or rss_title}
         return None
 
     # ---------- LLM summary ----------
@@ -300,7 +310,8 @@ class CreatorsService:
                         break
                     langs = ["es"] if creator["lang"] == "es" else ["en"]
                     ctx = await asyncio.get_event_loop().run_in_executor(
-                        None, self._get_video_context, e["video_id"], langs
+                        None, self._get_video_context, e["video_id"], langs,
+                        e.get("description", ""), e.get("title", ""),
                     )
                     if not ctx or not ctx.get("text") or len(ctx["text"]) < 80:
                         logger.info("creators: skipping {} (no context)", e["video_id"])
