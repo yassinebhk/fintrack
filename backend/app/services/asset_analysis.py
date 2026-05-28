@@ -20,8 +20,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from app.llm.factory import get_llm_client
-from app.llm.types import LLMMessage
+from app.llm import LLMMessage, get_llm_client
 from app.services.charts import area_chart, bar_chart, line_chart_multi
 from app.services.discovery.market_scanner import MarketScanner
 from app.services.discovery.quant_score import compute_factors
