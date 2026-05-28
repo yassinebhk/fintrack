@@ -133,56 +133,80 @@ class CreatorsService:
             out.append(l)
         return " ".join(out)
 
-    def _get_transcript(self, video_id: str, langs: list[str]) -> str | None:
-        """Robust transcript extraction via yt-dlp (auto-captions fallback). Cleans
-        VTT and dedupes consecutive line repeats. Returns None if no captions exist."""
+    def _get_video_context(self, video_id: str, langs: list[str]) -> dict | None:
+        """Try transcript first; if YouTube blocks the captions endpoint (common from
+        cloud IPs), fall back to the video's description + title — much shorter but
+        still summarizable. Returns {source, text, title} or None."""
         try:
             import yt_dlp
         except Exception as exc:
             logger.debug("yt-dlp missing: {}", exc)
             return None
 
+        info = None
         try:
             opts = {"quiet": True, "skip_download": True, "no_warnings": True}
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-            wanted = list(langs) + [f"{l}-419" for l in langs] + ["es", "es-419", "en", "en-US", "en-GB"]
-            wanted = list(dict.fromkeys(wanted))  # dedupe, preserve order
-            # Prefer manual subs; fall back to auto-generated.
-            for source in (info.get("subtitles") or {}, info.get("automatic_captions") or {}):
-                for lang in wanted:
-                    tracks = source.get(lang)
-                    if not tracks:
-                        continue
-                    url = next((t["url"] for t in tracks if t.get("ext") == "vtt"), tracks[0].get("url"))
-                    if not url:
-                        continue
+        except Exception as exc:
+            logger.debug("creators: yt-dlp info {} failed: {}", video_id, exc)
+            return None
+
+        title = (info or {}).get("title") or ""
+
+        # 1) Try transcript via VTT subtitles.
+        wanted = list(langs) + [f"{l}-419" for l in langs] + ["es", "es-419", "en", "en-US", "en-GB"]
+        wanted = list(dict.fromkeys(wanted))
+        for source in (info.get("subtitles") or {}, info.get("automatic_captions") or {}):
+            for lang in wanted:
+                tracks = source.get(lang)
+                if not tracks:
+                    continue
+                url = next((t["url"] for t in tracks if t.get("ext") == "vtt"), tracks[0].get("url"))
+                if not url:
+                    continue
+                try:
                     with httpx.Client(timeout=20.0) as c:
                         r = c.get(url)
                     if r.status_code != 200 or not r.text:
                         continue
                     text = self._clean_vtt(r.text)
                     if text and len(text) > 200:
-                        return text[:_MAX_TRANSCRIPT_CHARS]
-        except Exception as exc:
-            logger.debug("creators: transcript {} unavailable: {}", video_id, exc)
+                        return {"source": "transcript", "text": text[:_MAX_TRANSCRIPT_CHARS], "title": title}
+                except Exception:
+                    continue
+
+        # 2) Fallback to the video's own description (creators of finance content
+        #    usually write meaningful descriptions). Worse than a transcript but still
+        #    useful — and lets us deliver SOMETHING when YouTube blocks captions.
+        desc = (info.get("description") or "").strip()
+        tags = info.get("tags") or []
+        if desc and len(desc) > 80:
+            text = desc
+            if tags:
+                text += "\n\nTags: " + ", ".join(tags[:15])
+            return {"source": "description", "text": text[:_MAX_TRANSCRIPT_CHARS], "title": title}
         return None
 
     # ---------- LLM summary ----------
-    async def _summarize(self, creator: dict, video_title: str, transcript: str) -> dict | None:
+    async def _summarize(self, creator: dict, video_title: str, context_text: str,
+                          source: str = "transcript") -> dict | None:
+        source_label = "transcript completo" if source == "transcript" else "DESCRIPCIÓN del vídeo (no el transcript)"
         system = (
-            "Eres analista financiero. Resumes un vídeo de un divulgador con neutralidad "
-            "y rigor para que el lector pueda usarlo como insumo de mercado, NO como recomendación.\n"
-            "REGLAS:\n"
-            "- Usa SOLO lo que esté en el transcript. No inventes cifras ni hechos.\n"
+            "Eres analista financiero. Resumes el contenido de un vídeo de un divulgador con "
+            "neutralidad y rigor para que el lector pueda usarlo como insumo de mercado, NO como recomendación.\n"
+            "REGLAS ANTI-ALUCINACIÓN:\n"
+            "- Usa SOLO lo que aparezca en el texto que te paso. No inventes cifras ni hechos.\n"
+            f"- Te paso un {source_label}; si es solo la descripción, di al final 'Resumen basado en la descripción del vídeo, no en el transcript completo'.\n"
             "- Tono: profesional, español, conciso.\n"
             "- Marca claramente que es OPINIÓN del autor, no consejo de inversión.\n"
-            "- Si hay claims fuertes (predicciones, niveles concretos), reporta como 'el autor afirma…' o 'según el autor…'."
+            "- Si hay claims fuertes (predicciones, niveles concretos), reporta como 'según el autor…'."
         )
         user = (
             f"Divulgador: {creator['name']} ({creator['lang']}) · enfoque: {creator['focus']}\n"
-            f"Título del vídeo: {video_title}\n\n"
-            f"Transcript (puede estar truncado):\n{transcript}\n\n"
+            f"Título del vídeo: {video_title}\n"
+            f"Fuente: {source_label}\n\n"
+            f"Contenido:\n{context_text}\n\n"
             "Devuelve estrictamente este formato Markdown:\n"
             "## Tesis principal\n"
             "(1-2 frases)\n\n"
@@ -275,17 +299,18 @@ class CreatorsService:
                         logger.info("creators: hit global cap of {} LLM calls; deferring rest", max_llm_calls)
                         break
                     langs = ["es"] if creator["lang"] == "es" else ["en"]
-                    transcript = await asyncio.get_event_loop().run_in_executor(
-                        None, self._get_transcript, e["video_id"], langs
+                    ctx = await asyncio.get_event_loop().run_in_executor(
+                        None, self._get_video_context, e["video_id"], langs
                     )
-                    if not transcript or len(transcript) < 400:
-                        logger.info("creators: skipping {} (no transcript)", e["video_id"])
+                    if not ctx or not ctx.get("text") or len(ctx["text"]) < 80:
+                        logger.info("creators: skipping {} (no context)", e["video_id"])
                         skipped.append({"creator": creator["name"], "video_id": e["video_id"],
-                                          "title": e["title"][:80], "reason": "transcript no disponible"})
-                        seen.add(e["video_id"])  # don't keep retrying a captionless video
+                                          "title": e["title"][:80],
+                                          "reason": "ni transcript ni descripción"})
+                        seen.add(e["video_id"])  # don't keep retrying an empty video
                         seen_map[cid] = list(seen)[-_MAX_SEEN_PER_CHANNEL:]
                         continue
-                    summary = await self._summarize(creator, e["title"], transcript)
+                    summary = await self._summarize(creator, e["title"], ctx["text"], source=ctx["source"])
                     if not summary:
                         skipped.append({"creator": creator["name"], "video_id": e["video_id"],
                                           "title": e["title"][:80], "reason": "fallo del LLM"})
@@ -300,6 +325,7 @@ class CreatorsService:
                         "url": e["url"],
                         "published": e["published"],
                         "summary_markdown": summary["summary_markdown"],
+                        "source": ctx["source"],
                         "model": summary["model"],
                         "added_at": datetime.now(timezone.utc).isoformat(),
                     }
