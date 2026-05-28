@@ -419,7 +419,7 @@ class CreatorsService:
 
     # ---------- public entry point ----------
     async def check_and_process(self, *, max_new_per_channel: int = 1,
-                                  max_llm_calls: int = 4, deliver: bool = True) -> dict:
+                                  max_llm_calls: int = 8, deliver: bool = True) -> dict:
         """Pull RSS for each curated channel; for each genuinely new video, fetch
         the transcript, summarize via LLM, deliver to Telegram, and append to the
         cached summaries shown in the UI. Idempotent — uses DB to remember seen IDs."""
