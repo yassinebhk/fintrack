@@ -77,6 +77,17 @@ async def _opportunities_prewarm_job() -> None:
         logger.error("opportunities pre-warm failed: {}", exc)
 
 
+async def _creators_job() -> None:
+    """Check curated YouTube finance channels for new videos every few hours."""
+    try:
+        from app.services.creators import CreatorsService
+
+        result = await CreatorsService().check_and_process(deliver=True)
+        logger.info("creators job: {} new videos processed", result.get("new_videos", 0))
+    except Exception as exc:
+        logger.error("creators job failed: {}", exc)
+
+
 async def _alerts_job() -> None:
     try:
         created = await AlertsEngine().evaluate()
@@ -132,6 +143,17 @@ def setup_jobs() -> None:
             coalesce=True,
         )
         logger.info("scheduled: opportunities_prewarm @ 07:30 {}", settings.timezone)
+
+        sched.add_job(
+            _creators_job,
+            trigger=IntervalTrigger(hours=4),
+            id="creators_check",
+            name="Check curated YouTube creators every 4h",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("scheduled: creators_check every 4h")
 
         sched.add_job(
             _alerts_job,

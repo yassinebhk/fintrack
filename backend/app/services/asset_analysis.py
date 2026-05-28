@@ -35,6 +35,10 @@ from app.services.opportunities import get_opportunity_service
 # Benchmark per asset category/region. Auto-selected; falls back to SPY.
 def _benchmark_for(ticker: str, category: str = "", region: str = "") -> tuple[str, str]:
     t = (ticker or "").upper()
+    # Bitcoin itself: compare to traditional equities (more informative than vs itself).
+    if t == "BTC-USD":
+        return ("SPY", "S&P 500")
+    # Other crypto → compare to Bitcoin (the de-facto crypto benchmark).
     if t.endswith("-USD") or category == "cripto":
         return ("BTC-USD", "Bitcoin")
     if region in ("Europa", "España") or t.endswith(".L") or t.endswith(".DE") or t.endswith(".PA"):
