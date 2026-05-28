@@ -19,3 +19,4 @@ async def deep_analysis(ticker: str) -> dict:
     except Exception as exc:
         logger.exception("deep analysis failed for {}", ticker)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+# trigger redeploy (1779992522)
