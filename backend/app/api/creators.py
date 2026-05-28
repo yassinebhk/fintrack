@@ -14,10 +14,14 @@ async def latest(limit: int = 20) -> list[dict]:
 
 
 @router.post("/refresh")
-async def refresh(deliver: bool = False) -> dict:
-    """Manually trigger the creators pipeline (also runs on a daily cron)."""
+async def refresh(deliver: bool = False, reset: bool = False) -> dict:
+    """Manually trigger the creators pipeline (also runs on a daily cron).
+    `reset=true` clears the 'already seen' cache so the next run starts fresh."""
     try:
-        return await CreatorsService().check_and_process(deliver=deliver)
+        svc = CreatorsService()
+        if reset:
+            await svc._save("creators_seen_ids", {})
+        return await svc.check_and_process(deliver=deliver)
     except Exception as exc:
         logger.exception("creators refresh failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
