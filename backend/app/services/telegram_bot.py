@@ -94,6 +94,9 @@ MARKET_QUERY_PATTERNS = (
 GREETING_PATTERNS = ("hola", "buenas", "buenos días", "buenos dias", "buenas tardes", "buenas noches", "hey", "ey")
 THANKS_PATTERNS = ("gracias", "thanks", "mil gracias", "muchas gracias")
 
+DEEP_ANALYSIS_TRIGGERS = ("/analizar", "analiza ", "análisis de ", "analisis de ", "analizame ",
+                          "análisis profesional", "analisis profesional", "deep ")
+
 
 class TelegramBotHandler:
     def __init__(self) -> None:
@@ -129,6 +132,17 @@ class TelegramBotHandler:
         # BEFORE the contribution intent, since "invierto" overlaps both).
         if any(p in low for p in OPPORTUNITY_QUERY_PATTERNS):
             await self._send_opportunities()
+            return
+
+        # Deep per-asset analysis (must come before news/contribution; matches "/analizar TICKER" or "analiza X")
+        if any(low.startswith(t) or (' ' + t in ' ' + low) for t in DEEP_ANALYSIS_TRIGGERS):
+            target = self._extract_analysis_target(text)
+            if target:
+                await self._send_deep_analysis(target)
+            else:
+                await self.notifier.send_text(
+                    "¿Qué activo quieres analizar? Dime el ticker — p.ej. /analizar SOXX, /analizar MU, /analizar BTC-USD."
+                )
             return
 
         # News / market / briefing intents (natural language)
@@ -253,6 +267,117 @@ class TelegramBotHandler:
             await self.notifier.send_text("No pude generar las oportunidades ahora mismo, intenta más tarde.")
         finally:
             thinking.cancel()  # safety: always stop the indicator
+
+    def _extract_analysis_target(self, text: str) -> str | None:
+        """Pull a ticker out of '/analizar SOXX', 'analiza el MU', etc.
+        Also tries to match the user's words against tickers/names of the cached opportunities."""
+        import re
+        t = text.strip()
+        m = re.match(r"^/analizar\s+([A-Za-z0-9\.\-]+)", t)
+        if m:
+            return m.group(1).upper()
+        low = t.lower()
+        # 1) Any uppercase-looking token in the message (TICKER style)
+        for tok in re.findall(r"\b([A-Z][A-Z0-9\.\-]{1,12})\b", t):
+            if tok.lower() not in ("ETF", "ISIN", "FAQ", "AI", "IA"):
+                return tok.upper()
+        # 2) Match against tickers/names in the cached opportunities
+        try:
+            from app.services.opportunities import get_opportunity_service
+            cached = get_opportunity_service()._cache or {}
+            themes = (cached.get("themes") or []) + (cached.get("opportunities") or [])
+            for th in themes:
+                tk = (th.get("ticker") or th.get("ticker_or_isin") or "")
+                nm = (th.get("theme") or th.get("name") or "")
+                if tk and tk.lower() in low:
+                    return tk.upper()
+                if nm and nm.lower() in low:
+                    return tk.upper() if tk else None
+        except Exception:
+            pass
+        return None
+
+    async def _send_deep_analysis(self, ticker: str) -> None:
+        """Run the deep per-asset analysis and stream the results via Telegram."""
+        await self.notifier.send_text(
+            f"🔬 Análisis profesional de <b>{ticker}</b>… (~10-30s)"
+        )
+        thinking = asyncio.create_task(self._keep_thinking())
+        try:
+            from app.services.asset_analysis import analyze_asset
+            d = await analyze_asset(ticker)
+            thinking.cancel()
+
+            m = d.get("metrics", {}) or {}
+            sc = d.get("scores", {}) or {}
+            bench = (d.get("benchmark") or {}).get("name", "benchmark")
+
+            def s(n, d_=2):
+                return f"{n:+.{d_}f}" if isinstance(n, (int, float)) else "—"
+
+            header = (
+                f"🔬 <b>{html_escape(d.get('name', ticker))}</b> ({ticker})\n"
+                f"<i>{html_escape((d.get('category') or '').strip())} · {html_escape((d.get('region') or '').strip())} · vs {bench}</i>\n\n"
+                f"<b>Métricas</b>\n"
+                f"• CAGR {s(m.get('cagr_pct'))}% · Vol {m.get('volatility_pct','—')}%\n"
+                f"• Sharpe {s(m.get('sharpe'))} · Sortino {s(m.get('sortino'))}\n"
+                f"• Máx. drawdown {s(m.get('max_drawdown_pct'))}% · Calmar {m.get('calmar','—')}\n"
+                f"• Beta {m.get('beta','—')} · Alfa {s(m.get('alpha_annual_pct'))}% · Corr {m.get('correlation','—')}\n\n"
+                f"<b>Motor cuantitativo</b>\n"
+                f"• momentum_score {s(sc.get('momentum_score'))} · value_score {s(sc.get('value_score'))}\n"
+            )
+            bd = d.get("score_breakdown") or {}
+            if bd:
+                top = list(bd.items())[:4]
+                header += "• Criterios: " + " · ".join(f"{k} {v:+.2f}" for k, v in top)
+            await self.notifier.send_html(header)
+
+            # Each chart as a separate photo (drawdown / vol / vs-benchmark are key for a broker)
+            charts = d.get("charts", {}) or {}
+            for key, caption in [
+                ("price_with_smas", "Precio · SMA50 · SMA200"),
+                ("drawdown", "Drawdown histórico"),
+                ("returns_histogram", "Distribución de retornos diarios"),
+                ("rolling_volatility", "Volatilidad rodante 60d"),
+                ("relative_vs_benchmark", f"Rendimiento vs {bench}"),
+            ]:
+                url = charts.get(key)
+                if url:
+                    await self.notifier.send_chat_action("upload_photo")
+                    await self.notifier.send_photo(url, caption=f"📈 {caption}")
+
+            # News digest (multi-source, with sentiment)
+            news = d.get("news") or []
+            if news:
+                sent = d.get("news_sentiment") or {}
+                sources = d.get("news_sources") or []
+                lines = [
+                    f"📰 <b>Noticias del activo</b>",
+                    f"<i>🟢 {sent.get('bullish',0)} · 🔴 {sent.get('bearish',0)} · ⚪ {sent.get('neutral',0)}"
+                    + (f" · fuentes: {html_escape(', '.join(sources))}" if sources else "") + "</i>",
+                ]
+                emj = {"bullish": "🟢", "bearish": "🔴", "neutral": "⚪"}
+                for n in news[:6]:
+                    e = emj.get(n.get("impact", "neutral"), "⚪")
+                    title = html_escape((n.get("title", "") or "")[:140])
+                    src = html_escape(n.get("source", ""))
+                    url = n.get("url", "")
+                    lines.append(f"{e} <a href=\"{url}\">{title}</a> <i>({src})</i>" if url
+                                 else f"{e} {title} <i>({src})</i>")
+                await self.notifier.send_html("\n".join(lines))
+
+            # Broker-style narrative
+            if d.get("narrative"):
+                await self.notifier.send_html(
+                    f"🖋️ <b>Nota del analista</b>\n\n<i>{html_escape(d['narrative'][:3000])}</i>{PAGE_LINK}"
+                )
+        except ValueError as exc:
+            await self.notifier.send_text(f"No pude analizar {ticker}: {exc}")
+        except Exception as exc:
+            logger.error("telegram deep analysis failed for {}: {}", ticker, exc)
+            await self.notifier.send_text(f"Fallo al analizar {ticker}; reintenta en un momento.")
+        finally:
+            thinking.cancel()
 
     async def _send_news_digest(self) -> None:
         """Send the top recent headlines with sentiment + source + link."""
