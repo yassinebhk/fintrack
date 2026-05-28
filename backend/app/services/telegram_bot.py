@@ -299,8 +299,8 @@ class TelegramBotHandler:
 
     async def _send_deep_analysis(self, ticker: str) -> None:
         """Run the deep per-asset analysis and stream the results via Telegram."""
-        await self.notifier.send_text(
-            f"🔬 Análisis profesional de <b>{ticker}</b>… (~10-30s)"
+        await self.notifier.send_html(
+            f"🔬 Análisis profesional de <b>{html_escape(ticker)}</b>… (~10-30s)"
         )
         thinking = asyncio.create_task(self._keep_thinking())
         try:
@@ -390,7 +390,12 @@ class TelegramBotHandler:
                     f"🖋️ <b>Nota del analista</b>\n\n<i>{html_escape(d['narrative'][:3000])}</i>{PAGE_LINK}"
                 )
         except ValueError as exc:
-            await self.notifier.send_text(f"No pude analizar {ticker}: {exc}")
+            await self.notifier.send_html(
+                f"❌ <b>{html_escape(ticker)}</b> sin datos suficientes en Yahoo "
+                f"(<i>{html_escape(str(exc))}</i>). Comprueba el ticker: ¿quizás querías otro? "
+                f"Ejemplos válidos: <code>PLTR</code>, <code>SOXX</code>, <code>BTC-USD</code>, "
+                f"<code>0P0001DFE8.F</code> (Horos Value)."
+            )
         except Exception as exc:
             logger.error("telegram deep analysis failed for {}: {}", ticker, exc)
             await self.notifier.send_text(f"Fallo al analizar {ticker}; reintenta en un momento.")
