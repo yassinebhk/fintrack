@@ -1,0 +1,112 @@
+name: youtube-transcripts
+
+# Fetch transcripts from YouTube on the GH-Actions runner (its IP isn't blocked
+# by YouTube, unlike Render's), then POST them to our backend which summarizes
+# them with Gemini and delivers to Telegram.
+#
+# Required GitHub Secrets:
+#   FINTRACK_INGEST_SECRET  — same value as CREATORS_INGEST_SECRET in Render env
+#   FINTRACK_API_URL        — e.g. https://fintrack-front.onrender.com/api
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"   # every 4 hours
+  workflow_dispatch: {}      # manual trigger from the Actions tab
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install --quiet yt-dlp youtube-transcript-api httpx
+      - name: Fetch transcripts and post to backend
+        env:
+          API_URL: ${{ secrets.FINTRACK_API_URL }}
+          INGEST_SECRET: ${{ secrets.FINTRACK_INGEST_SECRET }}
+        run: |
+          python <<'PY'
+          import os, re, httpx
+          from youtube_transcript_api import YouTubeTranscriptApi
+          API = os.environ["API_URL"].rstrip("/")
+          SECRET = os.environ["INGEST_SECRET"]
+          if not SECRET:
+              raise SystemExit("FINTRACK_INGEST_SECRET is missing in repo secrets")
+
+          # 1) Ask backend which videos still need a transcript.
+          r = httpx.get(f"{API}/creators/pending-transcripts", params={"secret": SECRET}, timeout=30)
+          r.raise_for_status()
+          pending = r.json().get("pending", [])
+          print(f"::group::Pending ({len(pending)})")
+          for p in pending: print(f"  · {p['creator_name']}: {p['title'][:60]} ({p['video_id']})")
+          print("::endgroup::")
+
+          def fetch_transcript(video_id, langs):
+              """Try captions API first; fall back to yt-dlp auto-subs."""
+              try:
+                  tr = YouTubeTranscriptApi.get_transcript(video_id, languages=langs + ["es", "en"])
+                  return " ".join(t.get("text", "") for t in tr).strip()
+              except Exception as exc:
+                  print(f"    captions API failed: {type(exc).__name__}")
+              try:
+                  import yt_dlp
+                  opts = {"quiet": True, "skip_download": True, "no_warnings": True}
+                  with yt_dlp.YoutubeDL(opts) as ydl:
+                      info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+                  for src in ((info or {}).get("subtitles") or {}, (info or {}).get("automatic_captions") or {}):
+                      for lang in langs + ["es", "es-419", "en", "en-US", "en-GB"]:
+                          tracks = src.get(lang)
+                          if not tracks: continue
+                          url = next((t["url"] for t in tracks if t.get("ext") == "vtt"), tracks[0].get("url"))
+                          if not url: continue
+                          rr = httpx.get(url, timeout=20)
+                          if rr.status_code != 200 or not rr.text: continue
+                          text = re.sub(r"<[^>]+>", "", rr.text)
+                          out, recent = [], []
+                          for raw in text.splitlines():
+                              l = raw.strip()
+                              if not l or "-->" in l or l.startswith(("WEBVTT","Kind:","Language:","NOTE","STYLE")): continue
+                              if l in recent: continue
+                              recent.append(l); recent = recent[-6:]
+                              out.append(l)
+                          joined = " ".join(out)
+                          if len(joined) > 200: return joined
+              except Exception as exc:
+                  print(f"    yt-dlp failed: {type(exc).__name__}: {str(exc)[:80]}")
+              return None
+
+          ok = fail = 0
+          for p in pending:
+              langs = ["es"] if p["lang"] == "es" else ["en"]
+              print(f"→ {p['creator_name']}: {p['title'][:60]}")
+              text = fetch_transcript(p["video_id"], langs)
+              if not text or len(text) < 400:
+                  print("  ⏭ no transcript available")
+                  fail += 1
+                  continue
+              text = text[:18000]
+              r = httpx.post(
+                  f"{API}/creators/ingest-transcript",
+                  params={"secret": SECRET},
+                  json={
+                      "channel_id": p["channel_id"],
+                      "video_id": p["video_id"],
+                      "transcript": text,
+                      "title": p["title"],
+                      "url": p["url"],
+                      "deliver": True,
+                  },
+                  timeout=120,
+              )
+              if r.status_code == 200 and r.json().get("status") == "ok":
+                  print(f"  ✅ {r.json().get('summary_chars')} chars summarized & delivered")
+                  ok += 1
+              else:
+                  print(f"  ❌ ingest failed: {r.status_code} {r.text[:200]}")
+                  fail += 1
+
+          print(f"\nDone: {ok} ok, {fail} failed.")
+          PY
