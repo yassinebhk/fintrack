@@ -64,6 +64,36 @@ CONTRIBUTE_KEYWORDS = ("aporta", "aporté", "aporte", "mete", "metí", "meti", "
 
 CHART_KEYWORDS = ("gráfic", "grafic", "chart", "evolución", "evolucion", "muéstrame", "muestrame")
 
+# Natural-language ways of asking "what should I invest in?" — route to opportunities,
+# not to the contribution flow (which also matches "invierto") or the generic Q&A.
+OPPORTUNITY_QUERY_PATTERNS = (
+    "en que invierto", "en qué invierto", "que invierto hoy", "qué invierto hoy",
+    "donde invierto", "dónde invierto", "en que invertir", "en qué invertir",
+    "donde meto el dinero", "dónde meto el dinero", "donde meto la pasta", "dónde meto la pasta",
+    "que compro", "qué compro",
+    "que recomiend", "qué recomiend", "recomendacion", "recomendación",
+    "ideas de hoy", "ideas hoy", "ideas para hoy",
+    "que hago hoy", "qué hago hoy", "que hago con mi dinero", "qué hago con mi dinero",
+    "donde entrar", "dónde entrar", "en que entrar", "en qué entrar",
+    "que oportunidad", "qué oportunidad",
+)
+
+NEWS_QUERY_PATTERNS = (
+    "noticias", "titular", "qué pasa en el mercado", "que pasa en el mercado",
+    "qué hay de nuevo", "que hay de nuevo", "actualidad", "qué ha pasado hoy",
+    "que ha pasado hoy",
+)
+
+BRIEFING_QUERY_PATTERNS = ("briefing", "resumen del día", "resumen del dia", "informe diario")
+
+MARKET_QUERY_PATTERNS = (
+    "cómo está el mercado", "como esta el mercado", "estado del mercado",
+    "está alcista", "esta alcista", "está bajista", "esta bajista", "régimen del mercado", "regimen del mercado",
+)
+
+GREETING_PATTERNS = ("hola", "buenas", "buenos días", "buenos dias", "buenas tardes", "buenas noches", "hey", "ey")
+THANKS_PATTERNS = ("gracias", "thanks", "mil gracias", "muchas gracias")
+
 
 class TelegramBotHandler:
     def __init__(self) -> None:
@@ -93,6 +123,35 @@ class TelegramBotHandler:
 
         if low in ("/oportunidades", "oportunidades", "ideas", "recomendaciones", "que compro", "qué compro"):
             await self._send_opportunities()
+            return
+
+        # Natural-language "what should I invest in?" → opportunities (must come
+        # BEFORE the contribution intent, since "invierto" overlaps both).
+        if any(p in low for p in OPPORTUNITY_QUERY_PATTERNS):
+            await self._send_opportunities()
+            return
+
+        # News / market / briefing intents (natural language)
+        if any(p in low for p in NEWS_QUERY_PATTERNS):
+            await self._send_news_digest()
+            return
+        if any(p in low for p in BRIEFING_QUERY_PATTERNS):
+            await self._send_briefing()
+            return
+        if any(p in low for p in MARKET_QUERY_PATTERNS):
+            await self._send_market_state()
+            return
+
+        # Small talk — quick friendly replies (only when the message is JUST a greeting/thanks)
+        if low.rstrip("?¿!¡. ") in GREETING_PATTERNS:
+            await self.notifier.send_html(
+                "👋 ¡Hola! Soy <b>FinBot</b>. Prueba: <code>/cartera</code> · <code>/oportunidades</code> · "
+                "o pregúntame en lenguaje natural — <i>'¿en qué invierto hoy?'</i>, <i>'¿noticias?'</i>, "
+                "<i>'gráfica de bitcoin'</i>, <i>'mete 50€ al oro desde Kraken'</i>."
+            )
+            return
+        if low.rstrip("?¿!¡. ") in THANKS_PATTERNS:
+            await self.notifier.send_text("¡De nada! 😉")
             return
 
         # Chart intent?
@@ -194,6 +253,66 @@ class TelegramBotHandler:
             await self.notifier.send_text("No pude generar las oportunidades ahora mismo, intenta más tarde.")
         finally:
             thinking.cancel()  # safety: always stop the indicator
+
+    async def _send_news_digest(self) -> None:
+        """Send the top recent headlines with sentiment + source + link."""
+        await self.notifier.send_chat_action("typing")
+        try:
+            from app.services.news import NewsService
+            items = (await NewsService().get_news("all", limit=10))[:8]
+            if not items:
+                await self.notifier.send_text("No pude cargar noticias ahora mismo.")
+                return
+            emoji = {"bullish": "🟢", "bearish": "🔴", "neutral": "⚪"}
+            lines = ["📰 <b>Titulares recientes</b>"]
+            for n in items:
+                em = emoji.get(n.get("impact", "neutral"), "⚪")
+                title = html_escape((n.get("title", "") or "")[:140])
+                src = html_escape(n.get("source", ""))
+                url = n.get("url", "")
+                lines.append(f"{em} <a href=\"{url}\">{title}</a> <i>({src})</i>" if url
+                             else f"{em} {title} <i>({src})</i>")
+            await self.notifier.send_html("\n".join(lines))
+        except Exception as exc:
+            logger.error("telegram news digest failed: {}", exc)
+            await self.notifier.send_text("No pude cargar noticias ahora mismo.")
+
+    async def _send_briefing(self) -> None:
+        """Send today's AI briefing (cached / generates if needed)."""
+        await self.notifier.send_chat_action("typing")
+        try:
+            from app.services.briefing import BriefingService
+            res = await BriefingService().generate_today()
+            head = res.get("headline") or "Briefing del día"
+            body = res.get("summary_markdown") or ""
+            await self.notifier.send_html(f"📋 <b>{html_escape(head)}</b>\n\n{html_escape(body[:3000])}{PAGE_LINK}")
+        except Exception as exc:
+            logger.error("telegram briefing failed: {}", exc)
+            await self.notifier.send_text("No pude preparar el briefing ahora mismo.")
+
+    async def _send_market_state(self) -> None:
+        """Quick read of the current market regime from the cached opportunities scan."""
+        try:
+            from app.services.opportunities import get_opportunity_service
+            svc = get_opportunity_service()
+            payload = svc._cache or (await svc._load_from_db())  # don't trigger a 2-min scan here
+            if not payload:
+                await self.notifier.send_text(
+                    "Aún no tengo lectura reciente del mercado. Prueba /oportunidades para forzar el análisis."
+                )
+                return
+            regime = payload.get("market_regime") or "neutral"
+            breadth = payload.get("market_breadth")
+            em = {"alcista": "🟢", "bajista": "🔴", "neutral": "🟡"}.get(regime, "🟡")
+            pct = f" ({round(breadth * 100)}% sobre su tendencia 200d)" if breadth is not None else ""
+            patterns = (payload.get("trends") or {}).get("patterns") or []
+            extra = ("\n\n<b>Patrones detectados:</b>\n• " + "\n• ".join(patterns[:3])) if patterns else ""
+            await self.notifier.send_html(
+                f"{em} <b>Régimen de mercado:</b> {regime}{pct}.{extra}{PAGE_LINK}"
+            )
+        except Exception as exc:
+            logger.error("telegram market state failed: {}", exc)
+            await self.notifier.send_text("No pude leer el estado del mercado ahora mismo.")
 
     async def _send_chart(self, text: str) -> None:
         """Send a portfolio or per-asset evolution chart as an image."""
@@ -416,24 +535,56 @@ class TelegramBotHandler:
             )
         context_str = "\n".join(context)
 
+        # Enrich context with recent news + market regime (best-effort, never blocks)
+        news_block = ""
+        try:
+            from app.services.news import NewsService
+            ns = (await NewsService().get_news("all", limit=6))[:6]
+            if ns:
+                news_block = "\n\nTITULARES RECIENTES:\n" + "\n".join(
+                    f"- [{n.get('impact','neutral')}] {(n.get('title','') or '')[:140]} ({n.get('source','')})"
+                    for n in ns
+                )
+        except Exception:
+            pass
+        market_block = ""
+        try:
+            from app.services.opportunities import get_opportunity_service
+            svc = get_opportunity_service()
+            cached = svc._cache or (await svc._load_from_db())
+            if cached:
+                rg = cached.get("market_regime")
+                br = cached.get("market_breadth")
+                if rg:
+                    market_block = f"\n\nRÉGIMEN DE MERCADO: {rg}" + (f" ({round(br*100)}% sobre 200d)" if br is not None else "")
+        except Exception:
+            pass
+
         system = (
-            "Eres FinBot, asistente financiero del usuario por Telegram. Respondes en español, "
-            "breve y claro (esto se lee en el móvil). Usas SOLO los datos de la cartera que se te dan. "
-            "TIENES el dinero invertido (campo 'invertido' = cantidad × precio medio de compra), el valor "
-            "actual y la ganancia en € de cada activo y del total: úsalos para responder cuánto invirtió, "
-            "cuánto vale y cuánto ha ganado. NUNCA digas que no sabes el dinero invertido — está en los datos. "
-            "Refiérete a los activos por su NOMBRE (ej. 'Oro físico', 'Nasdaq-100', 'Fidelity MSCI World'), "
-            "no por su ISIN. Si te preguntan por 'el oro', 'el nasdaq', 'el msci', etc., asócialo al activo "
-            "correcto. No das consejos de compra/venta concretos. "
-            "Aclara, solo si es relevante, que en cripto el 'invertido' es el precio medio de Kraken y en "
-            "fondos es una estimación basada en el precio medio."
+            "Eres FinBot, asistente financiero personal del usuario por Telegram. Respondes en español, "
+            "BREVE y claro (se lee en el móvil). Tienes tres tipos de información: (1) los DATOS DE LA "
+            "CARTERA del usuario, (2) TITULARES de noticias recientes, (3) el RÉGIMEN del mercado.\n\n"
+            "Tu trabajo: responder cualquier pregunta razonable de inversión usando ESA información y "
+            "conocimiento general (conceptos como Sharpe, momentum, ETFs, etc.). NO inventes datos que no "
+            "tengas. Si el usuario pide IDEAS o RECOMENDACIONES concretas de qué comprar, dile que pulse "
+            "/oportunidades (el motor cuantitativo le dará un análisis completo). Si pide una GRÁFICA, "
+            "que use 'gráfica de [activo]'. Si quiere REGISTRAR una aportación, que diga 'mete X€ a [activo] "
+            "desde [broker]'.\n\n"
+            "Sobre la cartera: TIENES el campo 'invertido' (= cantidad × precio medio), el valor actual y la "
+            "ganancia en € de cada activo. Úsalos. NUNCA digas que no sabes el dinero invertido. Refiérete "
+            "a los activos por su NOMBRE (Oro físico, Nasdaq-100, Fidelity MSCI World), no por ISIN. "
+            "Asocia 'el oro', 'el nasdaq', 'el msci' al activo correcto.\n\n"
+            "No des órdenes de compra/venta. Sé honesto si una pregunta requiere datos que no tienes "
+            "(ej. precio en tiempo real de algo que no está en la cartera) y sugiere cómo obtenerlos. "
+            "En cripto el 'invertido' es el precio medio de Kraken; en fondos es estimado."
         )
+        full_context = f"DATOS DE LA CARTERA:\n{context_str}{news_block}{market_block}"
         try:
             client = get_llm_client()
             resp = await client.generate(
                 [
                     LLMMessage(role="system", content=system),
-                    LLMMessage(role="user", content=f"DATOS DE LA CARTERA:\n{context_str}\n\nPREGUNTA: {question}"),
+                    LLMMessage(role="user", content=f"{full_context}\n\nPREGUNTA: {question}"),
                 ],
                 max_tokens=800,
                 temperature=0.4,
