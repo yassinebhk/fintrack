@@ -315,16 +315,33 @@ class TelegramBotHandler:
             def s(n, d_=2):
                 return f"{n:+.{d_}f}" if isinstance(n, (int, float)) else "—"
 
+            def _nv(x, fmt="{:+.2f}"):  # None-safe formatter
+                return "n/d" if x is None else fmt.format(x)
+            psr = m.get("psr_pct")
+            jb_p = m.get("jarque_bera_p")
+            ir = m.get("information_ratio")
+            tr = m.get("treynor_pct")
             header = (
                 f"🔬 <b>{html_escape(d.get('name', ticker))}</b> ({ticker})\n"
-                f"<i>{html_escape((d.get('category') or '').strip())} · {html_escape((d.get('region') or '').strip())} · vs {bench}</i>\n\n"
-                f"<b>Métricas</b>\n"
-                f"• CAGR {s(m.get('cagr_pct'))}% · Vol {m.get('volatility_pct','—')}%\n"
-                f"• Sharpe {s(m.get('sharpe'))} · Sortino {s(m.get('sortino'))}\n"
-                f"• Máx. drawdown {s(m.get('max_drawdown_pct'))}% · Calmar {m.get('calmar','—')}\n"
-                f"• Beta {m.get('beta','—')} · Alfa {s(m.get('alpha_annual_pct'))}% · Corr {m.get('correlation','—')}\n\n"
+                f"<i>{html_escape((d.get('category') or '').strip())} · {html_escape((d.get('region') or '').strip())} · vs {bench} · Rf {m.get('rf_annual_pct','—')}%</i>\n\n"
+                f"<b>Rentabilidad / Riesgo</b>\n"
+                f"• CAGR {_nv(m.get('cagr_pct'))}% · Vol {m.get('volatility_pct','—')}%\n"
+                f"• Sharpe {_nv(m.get('sharpe'))} · Sortino {_nv(m.get('sortino'))} · Calmar {m.get('calmar','—')}\n"
+                f"• Máx. DD {_nv(m.get('max_drawdown_pct'))}% · duración {m.get('max_drawdown_days','—')}d (media {m.get('avg_drawdown_days','—')}d)\n\n"
+                f"<b>Cola y distribución</b>\n"
+                f"• VaR 95/99 {m.get('var_95_pct','—')}% / {m.get('var_99_pct','—')}%\n"
+                f"• CVaR 95/99 {m.get('cvar_95_pct','—')}% / {m.get('cvar_99_pct','—')}%\n"
+                f"• Skew {_nv(m.get('skewness'))} · Curtosis exc. {_nv(m.get('excess_kurtosis'))}\n"
+                f"• Jarque-Bera p={_nv(jb_p,'{:.4f}')} ({'no-normal' if (jb_p is not None and jb_p<0.05) else '≈normal'})\n"
+                f"• PSR (prob. Sharpe&gt;0) {_nv(psr,'{:.1f}')}%\n\n"
+                f"<b>Frente al benchmark</b>\n"
+                f"• Beta {m.get('beta','—')} · α anual {_nv(m.get('alpha_annual_pct'))}%"
+                f" (t={_nv(m.get('alpha_t_stat'),'{:+.2f}')}, p={_nv(m.get('alpha_p_value'),'{:.4f}')})\n"
+                f"• Corr {m.get('correlation','—')} · R² {m.get('r_squared_pct','—')}%\n"
+                f"• Info Ratio {_nv(ir)} · Tracking err {m.get('tracking_error_pct','—')}%\n"
+                f"• Treynor {_nv(tr)}% · Up-cap {m.get('up_capture_pct','—')}% · Down-cap {m.get('down_capture_pct','—')}%\n\n"
                 f"<b>Motor cuantitativo</b>\n"
-                f"• momentum_score {s(sc.get('momentum_score'))} · value_score {s(sc.get('value_score'))}\n"
+                f"• momentum {_nv(sc.get('momentum_score'))} · valor {_nv(sc.get('value_score'))}\n"
             )
             bd = d.get("score_breakdown") or {}
             if bd:
@@ -339,6 +356,7 @@ class TelegramBotHandler:
                 ("drawdown", "Drawdown histórico"),
                 ("returns_histogram", "Distribución de retornos diarios"),
                 ("rolling_volatility", "Volatilidad rodante 60d"),
+                ("rolling_sharpe", "Sharpe rodante 60d"),
                 ("relative_vs_benchmark", f"Rendimiento vs {bench}"),
             ]:
                 url = charts.get(key)

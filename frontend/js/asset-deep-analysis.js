@@ -56,25 +56,56 @@ function _signedCls(n) { return n == null ? '' : (n >= 0 ? 'value-positive' : 'v
 function _signedFmt(n, d = 2) { return n == null ? '—' : (n >= 0 ? '+' : '') + Number(n).toFixed(d); }
 
 function _metricsBlock(m) {
-    const cells = [
-        ['Precio', _fmt(m.last_price, 4)],
-        ['CAGR', _signedFmt(m.cagr_pct) + '%', _signedCls(m.cagr_pct)],
-        ['Volatilidad anual', _fmt(m.volatility_pct) + '%'],
-        ['Sharpe', _signedFmt(m.sharpe), _signedCls(m.sharpe)],
-        ['Sortino', _signedFmt(m.sortino), _signedCls(m.sortino)],
-        ['Máx. drawdown', _signedFmt(m.max_drawdown_pct) + '%' + (m.max_drawdown_date ? ` <span class="text-muted" style="font-size:11px;">(${m.max_drawdown_date})</span>` : ''), 'value-negative'],
-        ['Calmar', _fmt(m.calmar)],
-        ['Beta', m.beta == null ? '—' : _fmt(m.beta)],
-        ['Alfa anual', m.alpha_annual_pct == null ? '—' : _signedFmt(m.alpha_annual_pct) + '%', _signedCls(m.alpha_annual_pct)],
-        ['Correlación', m.correlation == null ? '—' : _fmt(m.correlation)],
-        ['Años cubiertos', _fmt(m.years_covered)],
+    const groups = [
+        {title: 'Rentabilidad y riesgo', cells: [
+            ['Precio', _fmt(m.last_price, 4)],
+            ['CAGR', _signedFmt(m.cagr_pct) + '%', _signedCls(m.cagr_pct)],
+            ['Volatilidad anual', _fmt(m.volatility_pct) + '%'],
+            [`Sharpe (Rf ${_fmt(m.rf_annual_pct)}%)`, _signedFmt(m.sharpe), _signedCls(m.sharpe)],
+            ['Sortino', _signedFmt(m.sortino), _signedCls(m.sortino)],
+            ['Calmar', _fmt(m.calmar)],
+            ['Años cubiertos', _fmt(m.years_covered)],
+        ]},
+        {title: 'Drawdown', cells: [
+            ['Máx. drawdown', _signedFmt(m.max_drawdown_pct) + '%' + (m.max_drawdown_date ? ` <span class="text-muted" style="font-size:11px;">(${m.max_drawdown_date})</span>` : ''), 'value-negative'],
+            ['Duración máx. (días)', m.max_drawdown_days == null ? '—' : m.max_drawdown_days],
+            ['Duración media (días)', m.avg_drawdown_days == null ? '—' : m.avg_drawdown_days],
+        ]},
+        {title: 'Riesgo de cola (histórico)', cells: [
+            ['VaR 95% diario', _fmt(m.var_95_pct) + '%'],
+            ['VaR 99% diario', _fmt(m.var_99_pct) + '%'],
+            ['CVaR 95% (ES)', m.cvar_95_pct == null ? '—' : _fmt(m.cvar_95_pct) + '%'],
+            ['CVaR 99% (ES)', m.cvar_99_pct == null ? '—' : _fmt(m.cvar_99_pct) + '%'],
+        ]},
+        {title: 'Distribución de retornos', cells: [
+            ['Asimetría (skew)', _signedFmt(m.skewness)],
+            ['Curtosis exceso', _signedFmt(m.excess_kurtosis)],
+            ['Jarque-Bera (p)', m.jarque_bera_p == null ? '—' : _fmt(m.jarque_bera_p, 4) + (m.jarque_bera_p < 0.05 ? ' · no-normal' : ' · ≈normal')],
+            ['PSR (prob. Sharpe > 0)', m.psr_pct == null ? '—' : _fmt(m.psr_pct, 1) + '%'],
+        ]},
+        {title: `Frente al benchmark`, cells: [
+            ['Beta', m.beta == null ? '—' : _fmt(m.beta)],
+            ['Alfa anual', m.alpha_annual_pct == null ? '—' : _signedFmt(m.alpha_annual_pct) + '%', _signedCls(m.alpha_annual_pct)],
+            ['t-stat alfa', m.alpha_t_stat == null ? '—' : _signedFmt(m.alpha_t_stat) + (m.alpha_p_value != null ? ` <span class="text-muted" style="font-size:11px;">(p=${_fmt(m.alpha_p_value, 4)})</span>` : '')],
+            ['Correlación', m.correlation == null ? '—' : _fmt(m.correlation)],
+            ['R²', m.r_squared_pct == null ? '—' : _fmt(m.r_squared_pct, 1) + '%'],
+            ['Information Ratio', m.information_ratio == null ? '—' : _signedFmt(m.information_ratio), _signedCls(m.information_ratio)],
+            ['Tracking error', m.tracking_error_pct == null ? '—' : _fmt(m.tracking_error_pct) + '%'],
+            ['Treynor', m.treynor_pct == null ? '— <span class="text-muted" style="font-size:11px;">(β muy bajo)</span>' : _signedFmt(m.treynor_pct) + '%'],
+            ['Up-capture', m.up_capture_pct == null ? '—' : _fmt(m.up_capture_pct, 1) + '%'],
+            ['Down-capture', m.down_capture_pct == null ? '—' : _fmt(m.down_capture_pct, 1) + '%'],
+        ]},
     ];
-    return `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin:14px 0;">
-        ${cells.map(([k, v, cls]) => `<div style="background:rgba(255,255,255,0.03); border-radius:8px; padding:10px 12px;">
-            <div style="color:#94a3b8; font-size:12px;">${k}</div>
-            <div class="mono ${cls || ''}" style="font-size:16px; margin-top:2px;">${v}</div>
-        </div>`).join('')}
-    </div>`;
+    return groups.map(g => `
+        <div style="margin:14px 0;">
+            <h4 style="margin:0 0 8px; font-size:14px; color:#cbd5e1;">${g.title}</h4>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px;">
+                ${g.cells.map(([k, v, cls]) => `<div style="background:rgba(255,255,255,0.03); border-radius:8px; padding:10px 12px;">
+                    <div style="color:#94a3b8; font-size:12px;">${k}</div>
+                    <div class="mono ${cls || ''}" style="font-size:15px; margin-top:2px;">${v}</div>
+                </div>`).join('')}
+            </div>
+        </div>`).join('');
 }
 
 function _breakdownBars(bd) {
@@ -143,6 +174,7 @@ function renderDeepAnalysis(d) {
     ${chartImg(charts.drawdown, 'Drawdown histórico')}
     ${chartImg(charts.returns_histogram, 'Distribución de retornos diarios')}
     ${chartImg(charts.rolling_volatility, 'Volatilidad rodante 60d')}
+    ${chartImg(charts.rolling_sharpe, 'Sharpe rodante 60d')}
     ${chartImg(charts.relative_vs_benchmark, 'Rendimiento vs benchmark')}
 
     <h3 style="margin-top:18px;">📰 Noticias del activo (varias fuentes)</h3>
