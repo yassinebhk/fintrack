@@ -7,6 +7,7 @@ from app.models.broker_sync import BrokerSync
 from app.models.json_cache import JsonCache
 from app.models.position import Position
 from app.models.price_cache import PriceCache
+from app.models.recommendation import RecommendationTrack
 from app.models.snapshot import Snapshot
 from app.models.ticker_mapping import TickerMapping
 from app.models.transaction import Transaction
@@ -19,6 +20,7 @@ __all__ = [
     "JsonCache",
     "Position",
     "PriceCache",
+    "RecommendationTrack",
     "Snapshot",
     "TickerMapping",
     "Transaction",

@@ -19,6 +19,7 @@ from app.api import (
     polymarket,
     portfolio,
     positions,
+    scorecard,
     telegram,
     transactions,
 )
@@ -43,5 +44,6 @@ def build_api_router() -> APIRouter:
     router.include_router(creators.router)
     router.include_router(polymarket.router)
     router.include_router(opportunities.router)
+    router.include_router(scorecard.router)
     router.include_router(telegram.router)
     return router

@@ -124,6 +124,10 @@ class TelegramBotHandler:
             await self._send_quick_summary()
             return
 
+        if low in ("/scorecard", "scorecard", "aciertos", "rendimiento del sistema", "qué tal acierta"):
+            await self._send_scorecard()
+            return
+
         if low in ("/oportunidades", "oportunidades", "ideas", "recomendaciones", "que compro", "qué compro"):
             await self._send_opportunities()
             return
@@ -401,6 +405,50 @@ class TelegramBotHandler:
             await self.notifier.send_text(f"Fallo al analizar {ticker}; reintenta en un momento.")
         finally:
             thinking.cancel()
+
+    async def _send_scorecard(self) -> None:
+        """How the engine's past recommendations actually performed (out-of-sample)."""
+        await self.notifier.send_chat_action("typing")
+        try:
+            from app.services.scorecard import summary
+            d = await summary()
+            total = d.get("total_recommendations_tracked", 0)
+            evald = d.get("evaluated_any", 0)
+            if total == 0:
+                await self.notifier.send_html(
+                    "📊 <b>Scorecard del sistema</b>\n\nAún no hay recomendaciones registradas. "
+                    "Se irán acumulando cada día; el rendimiento out-of-sample necesita semanas para ser fiable."
+                )
+                return
+            lines = [
+                "📊 <b>Scorecard del sistema (out-of-sample)</b>",
+                f"<i>{total} recomendaciones seguidas · {evald} ya con resultado a 1 mes</i>",
+                "",
+            ]
+            for key in ("ret_1m", "ret_3m", "ret_6m"):
+                h = d["horizons"][key]
+                ret, alpha = h.get("return"), h.get("alpha_vs_benchmark")
+                if not ret:
+                    lines.append(f"<b>{h['label']}:</b> aún sin datos (no han madurado)")
+                    continue
+                a = f" · alpha {alpha['avg']:+.1f}%" if alpha else ""
+                lines.append(
+                    f"<b>{h['label']}</b> (n={ret['n']}): retorno medio {ret['avg']:+.1f}% · "
+                    f"aciertos {ret['hit_rate_pct']:.0f}%{a}"
+                )
+            # Approach breakdown at 3m
+            ba = d.get("by_approach_3m") or {}
+            if any(v for v in ba.values()):
+                lines.append("\n<b>Por enfoque (3m):</b>")
+                for k, v in ba.items():
+                    if v:
+                        lines.append(f"• {k}: {v['avg']:+.1f}% · aciertos {v['hit_rate_pct']:.0f}% (n={v['n']})")
+            lines.append("\n<i>Es el rendimiento DESPUÉS de recomendar, no promesa futura. "
+                         "Necesita historial para ser significativo.</i>")
+            await self.notifier.send_html("\n".join(lines) + PAGE_LINK)
+        except Exception as exc:
+            logger.error("telegram scorecard failed: {}", exc)
+            await self.notifier.send_text("No pude generar el scorecard ahora mismo.")
 
     async def _send_news_digest(self) -> None:
         """Send the top recent headlines with sentiment + source + link."""

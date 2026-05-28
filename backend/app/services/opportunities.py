@@ -207,6 +207,13 @@ class OpportunityService:
         self._cache = payload
         self._cache_at = datetime.now(timezone.utc)
         await self._persist(payload)  # survive redeploys
+
+        # Snapshot the recommendations for out-of-sample tracking (the scorecard).
+        try:
+            from app.services.scorecard import snapshot_recommendations
+            await snapshot_recommendations(payload)
+        except Exception as exc:
+            logger.warning("scorecard snapshot failed: {}", exc)
         return payload
 
     def _render_trends_for_prompt(self, trends: dict) -> str:

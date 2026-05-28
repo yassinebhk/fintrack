@@ -77,6 +77,17 @@ async def _opportunities_prewarm_job() -> None:
         logger.error("opportunities pre-warm failed: {}", exc)
 
 
+async def _scorecard_job() -> None:
+    """Evaluate matured recommendations (1m/3m/6m forward returns) once a day."""
+    try:
+        from app.services.scorecard import evaluate_due
+
+        n = await evaluate_due()
+        logger.info("scorecard eval: {} horizon points filled", n)
+    except Exception as exc:
+        logger.error("scorecard eval failed: {}", exc)
+
+
 async def _creators_job() -> None:
     """Check curated YouTube finance channels for new videos every few hours."""
     try:
@@ -154,6 +165,17 @@ def setup_jobs() -> None:
             coalesce=True,
         )
         logger.info("scheduled: creators_check every 4h")
+
+        sched.add_job(
+            _scorecard_job,
+            trigger=CronTrigger(hour=6, minute=30, timezone=settings.timezone),
+            id="scorecard_eval",
+            name="Evaluate matured recommendations at 06:30",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("scheduled: scorecard_eval @ 06:30 {}", settings.timezone)
 
         sched.add_job(
             _alerts_job,
