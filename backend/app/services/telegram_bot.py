@@ -128,6 +128,11 @@ class TelegramBotHandler:
             await self._send_scorecard()
             return
 
+        if low in ("/revision", "/revisión", "revisa mi cartera", "revisión", "revision",
+                    "¿vendo o mantengo?", "vendo o mantengo", "qué hago con mis posiciones"):
+            await self._send_position_review()
+            return
+
         if low in ("/oportunidades", "oportunidades", "ideas", "recomendaciones", "que compro", "qué compro"):
             await self._send_opportunities()
             return
@@ -405,6 +410,40 @@ class TelegramBotHandler:
             await self.notifier.send_text(f"Fallo al analizar {ticker}; reintenta en un momento.")
         finally:
             thinking.cancel()
+
+    async def _send_position_review(self) -> None:
+        """Objective keep/trim/rotate review per holding (anti-disposition-effect)."""
+        await self.notifier.send_text("🔍 Revisando tus posiciones (señales objetivas, sin sesgo de tu precio de entrada)…")
+        await self.notifier.send_chat_action("typing")
+        try:
+            from app.services.position_review import review_portfolio
+            d = await review_portfolio()
+            reviews = d.get("reviews") or []
+            if not reviews:
+                await self.notifier.send_text("No tengo posiciones que revisar.")
+                return
+            emoji = {"ROTAR": "🔴", "REDUCIR": "🟠", "VIGILAR": "🟡", "MANTENER": "🟢", "SIN_DATOS": "⚪"}
+            s = d.get("summary", {})
+            head = (f"🔍 <b>Revisión de tu cartera</b>\n"
+                    f"🔴 Rotar {s.get('rotar',0)} · 🟠 Reducir {s.get('reducir',0)} · "
+                    f"🟡 Vigilar {s.get('vigilar',0)} · 🟢 Mantener {s.get('mantener',0)}")
+            await self.notifier.send_html(head)
+            for r in reviews:
+                e = emoji.get(r["signal"], "⚪")
+                m = r.get("metrics") or {}
+                lines = [
+                    f"{e} <b>{html_escape(r['name'])}</b> ({html_escape(r['ticker'])}) — <b>{r['signal']}</b>",
+                    f"<i>P&L (contexto): {r.get('pnl_pct',0):+.1f}% · peso {r.get('weight_pct',0):.0f}%</i>",
+                ]
+                for reason in r.get("reasons", [])[:3]:
+                    lines.append(f"• {html_escape(reason)}")
+                if r.get("bias_flag"):
+                    lines.append(html_escape(r["bias_flag"]))
+                await self.notifier.send_html("\n".join(lines))
+            await self.notifier.send_html(f"<i>{html_escape(d.get('disclaimer',''))}</i>{PAGE_LINK}")
+        except Exception as exc:
+            logger.error("telegram position review failed: {}", exc)
+            await self.notifier.send_text("No pude revisar tus posiciones ahora mismo.")
 
     async def _send_scorecard(self) -> None:
         """How the engine's past recommendations actually performed (out-of-sample)."""
