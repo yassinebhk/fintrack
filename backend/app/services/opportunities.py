@@ -146,7 +146,28 @@ class OpportunityService:
         except Exception as exc:
             logger.error("background opportunities generation failed: {}", exc)
 
+    async def _run_scan(self) -> tuple[list[dict], list[dict]]:
+        """The HEAVY part: scan + score the wide universe + crypto basket. This is
+        what OOMs the 512MB free tier, so it can also be run on a GitHub-Actions
+        runner (7GB) and the result fed to finalize_from_scan() instead."""
+        themes, crypto = await asyncio.gather(
+            self.scanner.scan_universe(),
+            self.scanner.scan_crypto_basket(),
+        )
+        return themes, crypto
+
+    async def finalize_from_scan(self, themes: list[dict], crypto: list[dict]) -> dict:
+        """The LIGHT part: given pre-scored themes + crypto (computed here or by the
+        GH-Actions worker), run trends + macro + news + the LLM analyst + enrichment,
+        persist and snapshot. Cheap enough for the free tier."""
+        async with self._lock:
+            return await self._finalize(themes, crypto)
+
     async def _generate_locked(self) -> dict:
+        themes, crypto = await self._run_scan()
+        return await self._finalize(themes, crypto)
+
+    async def _finalize(self, themes: list[dict], crypto: list[dict]) -> dict:
         portfolio = await self.portfolio_service.calculate_portfolio()
 
         # Exclude what the user already holds so discoveries are genuinely new.
@@ -154,13 +175,10 @@ class OpportunityService:
         for p in (portfolio.get("positions") or []):
             if p.get("ticker"):
                 held.add(str(p["ticker"]).upper())
+        # Filter held out of the scored themes (scan no longer excludes them itself,
+        # so the same scan result can be reused regardless of portfolio changes).
+        themes = [t for t in themes if (t.get("ticker") or "").upper() not in held]
 
-        # Scan the WIDE universe + Yahoo screeners, ranked objectively by the quant engine.
-        # Crypto basket in parallel, only for the 'what's growing' trend analysis.
-        themes, crypto = await asyncio.gather(
-            self.scanner.scan_universe(exclude_tickers=held),
-            self.scanner.scan_crypto_basket(),
-        )
         themes_str = self.scanner.render_for_prompt(themes)
 
         # Trend / winners layer (runs AFTER the ensemble): top growers + shared patterns.
