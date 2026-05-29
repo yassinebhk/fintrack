@@ -162,16 +162,21 @@ class OpportunityService:
         async with self._lock:
             return await self._finalize(themes, crypto)
 
-    def start_finalize_from_scan(self, themes: list[dict], crypto: list[dict]) -> None:
+    def start_finalize_from_scan(self, themes: list[dict], crypto: list[dict], deliver: bool = False) -> None:
         """Fire-and-forget: accept a scan and finalize in the BACKGROUND so the HTTP
         request returns immediately (the LLM + enrichment can take >100s, past
-        Render's gateway timeout → 502). The frontend polls for the fresh result."""
+        Render's gateway timeout → 502). The frontend polls for the fresh result.
+        If deliver=True (the daily GH scan), push the result to Telegram when done."""
         async def _run():
             try:
                 await self.finalize_from_scan(themes, crypto)
                 logger.info("ingest-scan: background finalize done")
+                if deliver:
+                    from app.services.telegram_bot import TelegramBotHandler
+                    await TelegramBotHandler()._send_opportunities()
+                    logger.info("ingest-scan: opportunities delivered to Telegram")
             except Exception as exc:
-                logger.error("ingest-scan: background finalize failed: {}", exc)
+                logger.error("ingest-scan: background finalize/deliver failed: {}", exc)
         # Dedicated slot — not shared with anything else.
         if self._finalizing is None or self._finalizing.done():
             self._finalizing = asyncio.create_task(_run())

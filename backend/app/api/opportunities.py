@@ -31,6 +31,7 @@ async def get_opportunities(force: bool = False) -> dict:
 class ScanIn(BaseModel):
     themes: list[dict]
     crypto: list[dict] = []
+    deliver: bool = True   # the daily GH scan delivers to Telegram by default
 
 
 @router.get("/llm-diag")
@@ -65,6 +66,17 @@ async def llm_diag(secret: str = "") -> dict:
     return out
 
 
+@router.post("/send-telegram")
+async def send_telegram(secret: str = "") -> dict:
+    """Push the current opportunities to the configured Telegram chat (server-side,
+    uses the bot's rich delivery: summary + regime + trends + one chart per idea)."""
+    if not _INGEST_SECRET or secret != _INGEST_SECRET:
+        raise HTTPException(status_code=401, detail="invalid secret")
+    from app.services.telegram_bot import TelegramBotHandler
+    await TelegramBotHandler()._send_opportunities()
+    return {"status": "sent"}
+
+
 @router.post("/ingest-scan")
 async def ingest_scan(payload: ScanIn, secret: str = "") -> dict:
     """Receive a pre-computed (already scored) universe scan from the GitHub-Actions
@@ -76,6 +88,7 @@ async def ingest_scan(payload: ScanIn, secret: str = "") -> dict:
         raise HTTPException(status_code=400, detail="themes is empty")
     # Accept and finalize in the BACKGROUND — the LLM+enrichment can exceed Render's
     # ~100s gateway timeout (→ 502). Return immediately so the worker sees success.
-    get_opportunity_service().start_finalize_from_scan(payload.themes, payload.crypto)
+    get_opportunity_service().start_finalize_from_scan(
+        payload.themes, payload.crypto, deliver=payload.deliver)
     return {"status": "accepted", "themes_received": len(payload.themes),
-            "crypto_received": len(payload.crypto)}
+            "crypto_received": len(payload.crypto), "will_deliver": payload.deliver}
