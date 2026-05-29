@@ -75,7 +75,7 @@ function scheduleOppPoll() {
         }
         try {
             const data = await fetchOpp(false);
-            if (data.status === 'generating' || isStaleWhileForcing(data)) { scheduleOppPoll(); return; }
+            if (data.status === 'generating' || data.status === 'stale' || isStaleWhileForcing(data)) { scheduleOppPoll(); return; }
             finishOpp(data);
         } catch (err) {
             // transient (e.g., instance busy) — keep trying until the max window
@@ -99,6 +99,17 @@ async function loadOpportunities(force = false) {
         const data = await fetchOpp(force);
         if (data.status === 'generating' || isStaleWhileForcing(data)) {
             scheduleOppPoll();   // keep spinner, poll until ready — never hangs
+            return;
+        }
+        if (data.status === 'stale') {
+            // Show the last analysis now, but keep polling for the fresh one.
+            renderOpportunities(data);
+            oppLoaded = true;
+            scheduleOppPoll();
+            const c = document.getElementById('oppContent');
+            if (c) c.insertAdjacentHTML('afterbegin',
+                '<div class="alert" style="background:#f59e0b22; border:1px solid #f59e0b55; border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:13px;">⏳ Mostrando el último análisis mientras se genera uno nuevo…</div>');
+            endOppLoading();
             return;
         }
         finishOpp(data);

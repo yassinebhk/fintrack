@@ -60,6 +60,27 @@ class OpportunityService:
             logger.warning("could not load opportunities from DB: {}", exc)
         return None
 
+    async def _load_any_from_db(self) -> dict | None:
+        """Load the last persisted payload ignoring TTL — used to serve SOMETHING
+        (clearly marked as stale) instead of a perpetual 'generating' on the free
+        tier, where a fresh scan may not complete reliably."""
+        try:
+            from sqlalchemy import select
+
+            from app.db import session_scope
+            from app.models import JsonCache
+
+            async with session_scope() as s:
+                row = (await s.execute(select(JsonCache).where(JsonCache.key == _DB_KEY))).scalar_one_or_none()
+            if row and row.payload:
+                updated = row.updated_at
+                if updated and updated.tzinfo is None:
+                    updated = updated.replace(tzinfo=timezone.utc)
+                return {"payload": row.payload, "updated_at": updated.isoformat() if updated else None}
+        except Exception as exc:
+            logger.warning("could not load stale opportunities from DB: {}", exc)
+        return None
+
     async def _persist(self, payload: dict) -> None:
         try:
             from app.db import session_scope, upsert_insert
@@ -109,6 +130,13 @@ class OpportunityService:
         # Need a fresh scan — run it in the background, return immediately.
         if self._generating is None or self._generating.done():
             self._generating = asyncio.create_task(self._background_generate())
+        # Serve the last known payload (even if stale) so the UI is never empty while
+        # the free-tier scan churns. Marked so the frontend can show a "actualizando" hint.
+        stale = await self._load_any_from_db()
+        if stale and stale.get("payload"):
+            return {**stale["payload"], "status": "stale",
+                    "stale_since": stale.get("updated_at"),
+                    "message": "Mostrando el último análisis mientras se actualiza…"}
         return {"status": "generating", "message": "Analizando el mercado y buscando oportunidades…"}
 
     async def _background_generate(self) -> None:

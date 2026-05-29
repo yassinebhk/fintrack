@@ -118,7 +118,7 @@ class MarketScanner:
 
     async def scan_crypto_basket(self) -> list[dict]:
         """Score a basket of major cryptos (for trend/winners analysis, not as ETF picks)."""
-        sem = asyncio.Semaphore(8)
+        sem = asyncio.Semaphore(3)  # cap peak memory (512MB free tier)
         results = await asyncio.gather(
             *(self._analyze_ticker(tk, name, "cripto", sem, fetch_price=False)
               for tk, name in self.CRYPTO_BASKET.items())
@@ -145,7 +145,7 @@ class MarketScanner:
         for tk, info in (await self._screener_candidates()).items():
             candidates.setdefault(tk, info)
 
-        sem = asyncio.Semaphore(8)  # throttle so Yahoo doesn't rate-limit us
+        sem = asyncio.Semaphore(3)  # low concurrency to cap peak memory on 512MB free tier (also throttles Yahoo)
         tasks = [
             self._analyze_ticker(tk, info["name"], info.get("cat", "descubierto"), sem, fetch_price=False)
             for tk, info in candidates.items()
