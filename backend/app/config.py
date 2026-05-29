@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     gemini_model_fallback: str = "gemini-2.5-flash-lite"
     groq_api_key: str = ""
     anthropic_api_key: str = ""
+    # Additional free OpenAI-compatible providers for the fallback chain.
+    openrouter_api_key: str = ""
+    cerebras_api_key: str = ""
+    openrouter_model: str = "meta-llama/llama-3.3-70b-instruct:free"
+    cerebras_model: str = "llama-3.3-70b"
 
     # Brokers
     kraken_api_key: str = ""
