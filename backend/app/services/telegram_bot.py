@@ -424,16 +424,21 @@ class TelegramBotHandler:
                 return
             emoji = {"ROTAR": "🔴", "REDUCIR": "🟠", "VIGILAR": "🟡", "MANTENER": "🟢", "SIN_DATOS": "⚪"}
             s = d.get("summary", {})
+            att = s.get('attention_eur', 0) or 0
             head = (f"🔍 <b>Revisión de tu cartera</b>\n"
                     f"🔴 Rotar {s.get('rotar',0)} · 🟠 Reducir {s.get('reducir',0)} · "
-                    f"🟡 Vigilar {s.get('vigilar',0)} · 🟢 Mantener {s.get('mantener',0)}")
+                    f"🟡 Vigilar {s.get('vigilar',0)} · 🟢 Mantener {s.get('mantener',0)}\n"
+                    f"💰 Dinero que pide atención: <b>{att:,.0f}€</b>")
             await self.notifier.send_html(head)
-            for r in reviews:
+            # Skip the noise: don't spam a message per insignificant 2€ position.
+            shown = [r for r in reviews if not r.get("immaterial")]
+            for r in shown:
                 e = emoji.get(r["signal"], "⚪")
                 m = r.get("metrics") or {}
                 lines = [
                     f"{e} <b>{html_escape(r['name'])}</b> ({html_escape(r['ticker'])}) — <b>{r['signal']}</b>",
-                    f"<i>P&L (contexto): {r.get('pnl_pct',0):+.1f}% · peso {r.get('weight_pct',0):.0f}%</i>",
+                    f"<i>Invertido {r.get('invested_eur',0):,.0f}€ → {r.get('value_eur',0):,.0f}€ "
+                    f"({r.get('pnl_pct',0):+.1f}%) · peso {r.get('weight_pct',0):.0f}%</i>",
                 ]
                 for reason in r.get("reasons", [])[:3]:
                     lines.append(f"• {html_escape(reason)}")

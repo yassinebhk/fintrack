@@ -25,6 +25,21 @@ _DD_WATCH = -15.0      # drawdown from peak (%) → caution
 _DD_HIGH = -25.0       # drawdown from peak (%) → elevated risk
 _OVERWEIGHT = 30.0     # single-position weight (%) → concentration risk
 _OVERWEIGHT_SOFT = 22.0
+# Materiality: how much real money is at stake. A signal on a near-zero position
+# is noise — acting on it changes nothing. We weight urgency by € at stake.
+_IMMATERIAL_EUR = 30.0     # below this € value → acting is pointless
+_IMMATERIAL_WEIGHT = 1.0   # and below this % of the portfolio
+
+
+def _materiality(value_eur: float, weight: float) -> tuple[str, bool]:
+    """Return (label, is_immaterial). Immaterial = too little money to matter."""
+    if value_eur < _IMMATERIAL_EUR and weight < _IMMATERIAL_WEIGHT:
+        return ("insignificante", True)
+    if weight >= 15 or value_eur >= 1000:
+        return ("alta", False)
+    if weight >= 5 or value_eur >= 300:
+        return ("media", False)
+    return ("baja", False)
 
 
 def _history_ticker(ticker: str, asset_type: str) -> str:
@@ -101,14 +116,19 @@ def _evaluate(pos: dict, m: dict) -> dict:
 
     # --- Disposition-effect detection (the bias the user asked to avoid) ---
     bias = None
+    value_eur = pos.get("market_value_base", 0) or 0
+    invested_eur = pos.get("cost_basis", 0) or 0
+    pnl_eur = pos.get("gain_loss", 0) or 0
     if pnl_pct <= -10 and thesis_broken:
-        bias = (f"⚠️ Sesgo: llevas {pnl_pct:.0f}% de pérdida y la tendencia está ROTA. "
-                "Aguantar 'hasta recuperar lo invertido' es efecto disposición — tu precio de entrada "
-                "no influye en lo que el activo hará ahora. Decide por la tesis, no por volver a 0.")
+        bias = (f"⚠️ Sesgo: invertiste {invested_eur:.0f}€ y hoy valen {value_eur:.0f}€ "
+                f"({pnl_eur:+.0f}€, {pnl_pct:.0f}%), con la tendencia ROTA. Aguantar 'hasta recuperar "
+                "lo invertido' es efecto disposición — tu precio de entrada no influye en lo que el "
+                "activo hará ahora. Decide por la tesis, no por volver a 0.")
     elif pnl_pct >= 30 and thesis_intact:
-        bias = (f"⚠️ Sesgo: llevas +{pnl_pct:.0f}% y la tendencia sigue FUERTE. "
-                "Vender solo por 'asegurar la ganancia' también es efecto disposición — cortar a los "
-                "ganadores que siguen subiendo. Si reduces, que sea por concentración/riesgo, no por el verde.")
+        bias = (f"⚠️ Sesgo: {invested_eur:.0f}€ invertidos valen hoy {value_eur:.0f}€ "
+                f"({pnl_eur:+.0f}€, +{pnl_pct:.0f}%) y la tendencia sigue FUERTE. Vender solo por "
+                "'asegurar la ganancia' también es efecto disposición — cortar a los ganadores que "
+                "siguen subiendo. Si reduces, que sea por concentración/riesgo, no por el verde.")
 
     return {"signal": signal, "reasons": reasons, "bias_flag": bias,
             "metrics": {
@@ -122,7 +142,51 @@ def _evaluate(pos: dict, m: dict) -> dict:
             }}
 
 
-async def review_portfolio() -> dict:
+_REVIEW_KEY = "position_review"
+_REVIEW_TTL_HOURS = 6
+
+
+async def review_portfolio(force: bool = False) -> dict:
+    """Cached entry point: serve the last review (≤6h) unless force=True. The review
+    fetches history for every holding (~slow on free tier), so caching keeps it
+    instant. Cache lives in json_cache (survives redeploys)."""
+    from datetime import datetime, timedelta, timezone
+
+    if not force:
+        try:
+            from sqlalchemy import select
+
+            from app.db import session_scope
+            from app.models import JsonCache
+            async with session_scope() as s:
+                row = (await s.execute(select(JsonCache).where(JsonCache.key == _REVIEW_KEY))).scalar_one_or_none()
+            if row and row.payload:
+                upd = row.updated_at
+                if upd and upd.tzinfo is None:
+                    upd = upd.replace(tzinfo=timezone.utc)
+                if upd and datetime.now(timezone.utc) - upd < timedelta(hours=_REVIEW_TTL_HOURS):
+                    return {**row.payload, "cached_at": upd.isoformat()}
+        except Exception as exc:
+            logger.debug("position_review cache read failed: {}", exc)
+
+    result = await _compute_review()
+    try:
+        from app.db import session_scope, upsert_insert
+        from app.models import JsonCache
+        stmt = upsert_insert()(JsonCache).values(
+            key=_REVIEW_KEY, payload=result, updated_at=datetime.now(timezone.utc)
+        ).on_conflict_do_update(
+            index_elements=["key"],
+            set_={"payload": result, "updated_at": datetime.now(timezone.utc)},
+        )
+        async with session_scope() as s:
+            await s.execute(stmt)
+    except Exception as exc:
+        logger.debug("position_review cache write failed: {}", exc)
+    return result
+
+
+async def _compute_review() -> dict:
     """Per-holding objective keep/trim/rotate signals with explanations + bias flags."""
     from app.services.portfolio import PortfolioService
 
@@ -145,26 +209,50 @@ async def review_portfolio() -> dict:
             })
             continue
         ev = _evaluate(pos, m)
+        value_eur = round(pos.get("market_value_base", 0) or 0, 2)
+        invested_eur = round(pos.get("cost_basis", 0) or 0, 2)
+        weight = round(pos.get("weight", 0) or 0, 1)
+        pnl_eur = round(pos.get("gain_loss", 0) or 0, 2)
+        mat_label, immaterial = _materiality(value_eur, weight)
+
+        reasons = list(ev["reasons"])
+        bias_flag = ev["bias_flag"]
+        # Materiality context: a signal on a near-zero position is irrelevant.
+        if immaterial:
+            reasons.append(
+                f"💤 Importe insignificante (~{value_eur:.0f}€, {weight:.1f}% de tu cartera): "
+                "la señal es correcta pero actuar aquí no cambia nada — prioriza lo que pesa."
+            )
+            bias_flag = None  # don't nag about bias on a 2€ position
+
         reviews.append({
             "ticker": ticker,
             "name": pos.get("name") or ticker,
             "type": pos.get("type"),
             "broker": pos.get("broker"),
             "signal": ev["signal"],
-            "reasons": ev["reasons"],
-            "bias_flag": ev["bias_flag"],
+            "materiality": mat_label,
+            "immaterial": immaterial,
+            "reasons": reasons,
+            "bias_flag": bias_flag,
             "metrics": ev["metrics"],
-            # P&L shown as CONTEXT only (not the decision driver):
+            # P&L + amounts shown as CONTEXT (and used for materiality, not as the driver):
             "pnl_pct": round(pos.get("gain_loss_pct", 0) or 0, 2),
-            "pnl_eur": round(pos.get("gain_loss", 0) or 0, 2),
-            "invested_eur": round(pos.get("cost_basis", 0) or 0, 2),
-            "value_eur": round(pos.get("market_value_base", 0) or 0, 2),
-            "weight_pct": round(pos.get("weight", 0) or 0, 1),
+            "pnl_eur": pnl_eur,
+            "invested_eur": invested_eur,
+            "value_eur": value_eur,
+            "weight_pct": weight,
         })
 
-    # Order by urgency: ROTAR > REDUCIR > VIGILAR > MANTENER > SIN_DATOS
+    # Order by urgency AND money at stake: material ROTAR/REDUCIR first, immaterial last.
     rank = {"ROTAR": 0, "REDUCIR": 1, "VIGILAR": 2, "MANTENER": 3, "SIN_DATOS": 4}
-    reviews.sort(key=lambda r: rank.get(r["signal"], 9))
+    reviews.sort(key=lambda r: (r.get("immaterial", False), rank.get(r["signal"], 9), -r.get("value_eur", 0)))
+
+    # € that actually need attention = material ROTAR/REDUCIR positions.
+    attention_eur = round(sum(
+        r["value_eur"] for r in reviews
+        if r["signal"] in ("ROTAR", "REDUCIR") and not r.get("immaterial")
+    ), 2)
 
     return {
         "reviews": reviews,
@@ -173,6 +261,8 @@ async def review_portfolio() -> dict:
             "reducir": sum(1 for r in reviews if r["signal"] == "REDUCIR"),
             "vigilar": sum(1 for r in reviews if r["signal"] == "VIGILAR"),
             "mantener": sum(1 for r in reviews if r["signal"] == "MANTENER"),
+            "rotar_material": sum(1 for r in reviews if r["signal"] == "ROTAR" and not r.get("immaterial")),
+            "attention_eur": attention_eur,
         },
         "disclaimer": (
             "Análisis objetivo basado en señales prospectivas (tendencia, momentum, riesgo desde "
