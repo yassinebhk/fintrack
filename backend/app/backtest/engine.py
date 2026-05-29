@@ -11,7 +11,8 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from app.backtest.strategies import get_strategy
+from app.backtest.strategies import STRATEGIES, get_strategy
+from app.backtest.validation import purged_walk_forward, sharpe_metrics
 from app.services.market import CoinGeckoService, YahooFinanceService
 
 
@@ -200,6 +201,32 @@ def _simulate(prices: pd.DataFrame, trades: pd.DataFrame, weights: dict[str, flo
 # Metrics
 # ---------------------------------------------------------------------------
 
+def _contribution_adjusted_returns(equity: pd.Series, executed_trades: list[dict]) -> pd.Series:
+    """Serie de retornos diarios neta de aportaciones (time-weighted).
+
+    daily return = (equity_t - equity_{t-1} - inflow_t) / equity_{t-1}, donde
+    inflow_t son las aportaciones/retiradas externas del día. Se reutiliza tanto
+    para las métricas in-sample como para PSR/DSR.
+    """
+    if equity.empty or len(equity) < 2:
+        return pd.Series(dtype=float)
+
+    inflows = pd.Series(0.0, index=equity.index)
+    for t in executed_trades:
+        d = pd.Timestamp(t["date"])
+        if d not in inflows.index:
+            continue
+        if t["action"] == "buy":
+            inflows.loc[d] += t["amount_eur"]
+        elif t["action"] == "sell":
+            inflows.loc[d] -= t["amount_eur"]
+
+    eq_prev = equity.shift(1)
+    pnl = (equity - eq_prev - inflows) / eq_prev.replace(0, np.nan)
+    returns = pnl.dropna()
+    return returns[np.isfinite(returns)]
+
+
 def _compute_metrics(equity: pd.Series, executed_trades: list[dict]) -> dict:
     if equity.empty or len(equity) < 2:
         return {}
@@ -228,22 +255,8 @@ def _compute_metrics(equity: pd.Series, executed_trades: list[dict]) -> dict:
     years = max(days / 365.25, 0.01)
     cagr = ((final / max(net_invested, 1.0)) ** (1 / years) - 1) * 100 if net_invested > 0 and final > 0 else 0.0
 
-    # Compute returns on a *contribution-adjusted* basis: build a Series of net cash inflows by date,
-    # then daily return = (equity_t - equity_{t-1} - inflow_t) / equity_{t-1}
-    inflows = pd.Series(0.0, index=equity.index)
-    for t in executed_trades:
-        d = pd.Timestamp(t["date"])
-        if d not in inflows.index:
-            continue
-        if t["action"] == "buy":
-            inflows.loc[d] += t["amount_eur"]
-        elif t["action"] == "sell":
-            inflows.loc[d] -= t["amount_eur"]
-    # Daily P&L not driven by inflows
-    eq_prev = equity.shift(1)
-    pnl = (equity - eq_prev - inflows) / eq_prev.replace(0, np.nan)
-    returns = pnl.dropna()
-    returns = returns[np.isfinite(returns)]
+    # Returns on a *contribution-adjusted* (time-weighted) basis.
+    returns = _contribution_adjusted_returns(equity, executed_trades)
 
     if len(returns) > 1:
         vol = float(returns.std() * np.sqrt(252) * 100)
@@ -290,6 +303,38 @@ def _compute_metrics(equity: pd.Series, executed_trades: list[dict]) -> dict:
     }
 
 
+def _periodic_sharpe(returns: pd.Series) -> float:
+    """Sharpe *por periodo* (sin anualizar) de una serie de retornos."""
+    r = returns[np.isfinite(returns)]
+    if len(r) < 2:
+        return 0.0
+    std = r.std(ddof=1)
+    return float(r.mean() / std) if std > 0 else 0.0
+
+
+def _trial_sharpes(prices: pd.DataFrame, weights: dict[str, float], base_params: dict) -> list[float]:
+    """Sharpe por periodo de cada estrategia del registro sobre el mismo histórico.
+
+    Estos son los "trials" usados por el Deflated Sharpe Ratio: cuantas más
+    estrategias se prueban y más dispersos sus Sharpes, mayor el listón a batir.
+    """
+    sharpes: list[float] = []
+    for sdef in STRATEGIES.values():
+        try:
+            sp = {**sdef.params, **{k: v for k, v in base_params.items() if k in sdef.params}}
+            sp["weights"] = weights
+            t_df = sdef.runner(prices, **sp)
+            eq, ex = _simulate(prices, t_df, weights)
+            first_pos = eq[eq > 0].first_valid_index() if not eq.empty else None
+            if first_pos is not None:
+                eq = eq.loc[first_pos:]
+            ret = _contribution_adjusted_returns(eq, ex)
+            sharpes.append(_periodic_sharpe(ret))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("trial sharpe for {} failed: {}", sdef.key, exc)
+    return sharpes
+
+
 # ---------------------------------------------------------------------------
 # Top-level entry point
 # ---------------------------------------------------------------------------
@@ -320,6 +365,36 @@ async def run_backtest(spec: BacktestSpec) -> BacktestResult:
     trades_df = strategy.runner(prices, **params)
     equity, executed = _simulate(prices, trades_df, weights)
     metrics = _compute_metrics(equity, executed)
+
+    # --- Validación robusta al overfitting (López de Prado) -----------------
+    # Sharpe *por periodo* de cada estrategia probada sobre el mismo histórico
+    # → sirven de "trials" para deflactar el Sharpe (corrección por selección).
+    chosen_returns = _contribution_adjusted_returns(equity, executed)
+    trial_sharpes = _trial_sharpes(prices, weights, params)
+    n_trials = len(STRATEGIES)
+    validation = sharpe_metrics(
+        chosen_returns.to_numpy(),
+        trial_sharpes_periodic=trial_sharpes,
+        n_trials=n_trials,
+    )
+    metrics["psr"] = validation["psr"]
+    metrics["deflated_sharpe"] = validation["deflated_sharpe"]
+    metrics["n_trials"] = validation["n_trials"]
+    metrics["validation"] = validation
+
+    # --- Walk-forward purgado + embargo (out-of-sample) ---------------------
+    def _run_fold(fold_prices: pd.DataFrame) -> pd.Series:
+        fold_weights = {t: 1.0 / len(fold_prices.columns) for t in fold_prices.columns}
+        fold_params = {**params, "weights": fold_weights}
+        fold_trades = strategy.runner(fold_prices, **fold_params)
+        fold_equity, _ = _simulate(fold_prices, fold_trades, fold_weights)
+        return fold_equity
+
+    try:
+        metrics["out_of_sample"] = purged_walk_forward(prices, _run_fold)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("walk-forward evaluation failed: {}", exc)
+        metrics["out_of_sample"] = {"folds": [], "aggregate": {}, "note": "error"}
 
     equity_curve = [
         {"date": d.strftime("%Y-%m-%d"), "value": round(float(v), 2)}
