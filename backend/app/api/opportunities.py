@@ -33,6 +33,38 @@ class ScanIn(BaseModel):
     crypto: list[dict] = []
 
 
+@router.get("/llm-diag")
+async def llm_diag(secret: str = "") -> dict:
+    """List available models for the OpenAI-compatible providers (to fix model names)."""
+    if not _INGEST_SECRET or secret != _INGEST_SECRET:
+        raise HTTPException(status_code=401, detail="invalid secret")
+    import httpx
+
+    from app.config import get_settings
+    s = get_settings()
+    out: dict = {}
+    targets = [
+        ("openrouter", "https://openrouter.ai/api/v1/models", s.openrouter_api_key),
+        ("cerebras", "https://api.cerebras.ai/v1/models", s.cerebras_api_key),
+    ]
+    for name, url, key in targets:
+        if not key:
+            out[name] = "no key"
+            continue
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as c:
+                r = await c.get(url, headers={"Authorization": f"Bearer {key}"})
+            if r.status_code != 200:
+                out[name] = f"HTTP {r.status_code}: {r.text[:120]}"
+                continue
+            data = r.json()
+            ids = [m.get("id") for m in (data.get("data") or [])]
+            out[name] = ids[:30]
+        except Exception as exc:
+            out[name] = f"error: {str(exc)[:120]}"
+    return out
+
+
 @router.post("/ingest-scan")
 async def ingest_scan(payload: ScanIn, secret: str = "") -> dict:
     """Receive a pre-computed (already scored) universe scan from the GitHub-Actions
