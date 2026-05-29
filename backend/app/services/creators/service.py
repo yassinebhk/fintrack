@@ -241,7 +241,7 @@ class CreatorsService:
             return {"summary_markdown": md, "model": resp.model}
         except Exception as exc:
             logger.warning("creators: LLM summary failed: {}", exc)
-            self._last_llm_error = str(exc)[:300]  # surfaced in refresh diagnostics
+            self._last_llm_error = str(exc)[:900]  # surfaced in refresh diagnostics
             return None
 
     # ---------- Telegram delivery ----------

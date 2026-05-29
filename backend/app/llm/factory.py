@@ -44,8 +44,8 @@ class ChainLLMClient:
                     json_schema=json_schema,
                 )
             except Exception as exc:
-                errors.append(f"{name}: {str(exc)[:120]}")
-                logger.warning("LLM provider {} failed ({}); trying next", name, str(exc)[:100])
+                errors.append(f"{name}: {str(exc)[:200]}")
+                logger.warning("LLM provider {} failed ({}); trying next", name, str(exc)[:150])
         raise RuntimeError("all LLM providers failed — " + " || ".join(errors))
 
 
