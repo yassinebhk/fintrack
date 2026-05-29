@@ -1,0 +1,64 @@
+name: opportunities-scan
+
+# The heavy 130+ instrument universe scan OOMs Render's 512MB free tier. Run it
+# here on GitHub's 7GB runner instead: scan + score everything with the project's
+# own code, then POST the scored result to the backend, which does the light part
+# (LLM analyst + enrichment) and serves it.
+#
+# Required GitHub Secrets (same as the transcripts workflow):
+#   FINTRACK_INGEST_SECRET  — same value as CREATORS_INGEST_SECRET in Render env
+#   FINTRACK_API_URL        — e.g. https://fintrack-front.onrender.com/api
+
+on:
+  schedule:
+    - cron: "0 5 * * *"    # 07:00 Madrid (CEST) — before the morning view
+    - cron: "0 6 * * *"    # 07:00 Madrid (CET, winter)
+  workflow_dispatch: {}
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install backend deps
+        run: pip install --quiet -r backend/requirements.txt
+      - name: Run universe scan and post to backend
+        env:
+          API_URL: ${{ secrets.FINTRACK_API_URL }}
+          INGEST_SECRET: ${{ secrets.FINTRACK_INGEST_SECRET }}
+          DATABASE_URL: "sqlite+aiosqlite:///./scan.db"
+        run: |
+          cd backend
+          python <<'PY'
+          import os, asyncio, httpx
+          from app.services.discovery.market_scanner import MarketScanner
+
+          async def main():
+              sc = MarketScanner()
+              themes, crypto = await asyncio.gather(
+                  sc.scan_universe(), sc.scan_crypto_basket()
+              )
+              scored = [t for t in themes if t.get("factors")]
+              print(f"Scanned {len(themes)} themes ({len(scored)} scored), {len(crypto)} crypto")
+              if len(scored) < 10:
+                  raise SystemExit("Too few scored instruments; aborting (won't overwrite good data)")
+
+              api = os.environ["API_URL"].rstrip("/")
+              secret = os.environ["INGEST_SECRET"]
+              if not secret:
+                  raise SystemExit("FINTRACK_INGEST_SECRET missing")
+              r = httpx.post(
+                  f"{api}/opportunities/ingest-scan",
+                  params={"secret": secret},
+                  json={"themes": themes, "crypto": crypto},
+                  timeout=180,
+              )
+              print("ingest-scan ->", r.status_code, r.text[:300])
+              r.raise_for_status()
+
+          asyncio.run(main())
+          PY
