@@ -42,10 +42,8 @@ async def ingest_scan(payload: ScanIn, secret: str = "") -> dict:
         raise HTTPException(status_code=401, detail="invalid secret")
     if not payload.themes:
         raise HTTPException(status_code=400, detail="themes is empty")
-    try:
-        result = await get_opportunity_service().finalize_from_scan(payload.themes, payload.crypto)
-        return {"status": "ok", "opportunities": len(result.get("opportunities", [])),
-                "universe_size": result.get("universe_size")}
-    except Exception as exc:
-        logger.exception("ingest-scan failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    # Accept and finalize in the BACKGROUND — the LLM+enrichment can exceed Render's
+    # ~100s gateway timeout (→ 502). Return immediately so the worker sees success.
+    get_opportunity_service().start_finalize_from_scan(payload.themes, payload.crypto)
+    return {"status": "accepted", "themes_received": len(payload.themes),
+            "crypto_received": len(payload.crypto)}

@@ -163,6 +163,19 @@ class OpportunityService:
         async with self._lock:
             return await self._finalize(themes, crypto)
 
+    def start_finalize_from_scan(self, themes: list[dict], crypto: list[dict]) -> None:
+        """Fire-and-forget: accept a scan and finalize in the BACKGROUND so the HTTP
+        request returns immediately (the LLM + enrichment can take >100s, past
+        Render's gateway timeout → 502). The frontend polls for the fresh result."""
+        async def _run():
+            try:
+                await self.finalize_from_scan(themes, crypto)
+                logger.info("ingest-scan: background finalize done")
+            except Exception as exc:
+                logger.error("ingest-scan: background finalize failed: {}", exc)
+        if self._generating is None or self._generating.done():
+            self._generating = asyncio.create_task(_run())
+
     async def _generate_locked(self) -> dict:
         themes, crypto = await self._run_scan()
         return await self._finalize(themes, crypto)
