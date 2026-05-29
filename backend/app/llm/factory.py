@@ -74,8 +74,9 @@ def get_llm_client(prefer: str | None = None) -> LLMClient:
     if not available:
         raise RuntimeError("No LLM provider configured (set GEMINI_API_KEY / GROQ_API_KEY / ...)")
 
-    # Priority: configured choice first, then a sensible free order.
-    order = [choice, "gemini", "groq", "openrouter", "cerebras"]
+    # Priority: configured choice first, then a sensible free order. Cerebras
+    # (generous free tier) before OpenRouter (whose free models are heavily limited).
+    order = [choice, "gemini", "groq", "cerebras", "openrouter"]
     seen, chain = set(), []
     for name in order:
         if name in available and name not in seen:

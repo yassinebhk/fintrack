@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     cerebras_api_key: str = ""
     openrouter_model: str = "meta-llama/llama-3.3-70b-instruct:free"
-    cerebras_model: str = "llama-3.3-70b"
+    cerebras_model: str = "gpt-oss-120b"  # verified available on the account (llama-3.3-70b → 404)
 
     # Brokers
     kraken_api_key: str = ""
