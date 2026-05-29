@@ -13,12 +13,10 @@ from app.llm.gemini import GeminiClient
 from app.llm.groq import GroqClient
 
 
-_FALLBACK_TRIGGERS = ("429", "resource_exhausted", "quota", "503", "unavailable", "500")
-
-
 def _should_fallback(exc: Exception) -> bool:
-    msg = str(exc).lower()
-    return any(t in msg for t in _FALLBACK_TRIGGERS)
+    # The secondary is also free, so ANY failure of the primary is worth a fallback
+    # attempt — not just quota/availability. Maximizes the chance of a usable answer.
+    return True
 
 
 class FallbackLLMClient:
@@ -53,17 +51,24 @@ class FallbackLLMClient:
             logger.warning(
                 "{} failed ({}); falling back to {}",
                 self.primary_name,
-                str(exc)[:80],
+                str(exc)[:120],
                 self.secondary_name,
             )
             # secondary picks its own default model (don't pass Gemini model name to Groq)
-            return await self.secondary.generate(
-                messages,
-                model=None,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                json_schema=json_schema,
-            )
+            try:
+                return await self.secondary.generate(
+                    messages,
+                    model=None,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    json_schema=json_schema,
+                )
+            except Exception as exc2:
+                # Surface BOTH errors so we can tell which provider broke and why.
+                raise RuntimeError(
+                    f"both LLM providers failed — {self.primary_name}: {str(exc)[:160]} || "
+                    f"{self.secondary_name}: {str(exc2)[:160]}"
+                ) from exc2
 
 
 def get_llm_client(prefer: str | None = None) -> LLMClient:

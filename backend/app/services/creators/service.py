@@ -241,6 +241,7 @@ class CreatorsService:
             return {"summary_markdown": md, "model": resp.model}
         except Exception as exc:
             logger.warning("creators: LLM summary failed: {}", exc)
+            self._last_llm_error = str(exc)[:300]  # surfaced in refresh diagnostics
             return None
 
     # ---------- Telegram delivery ----------
@@ -377,7 +378,7 @@ class CreatorsService:
                     summary = await self._summarize(fake_creator, e["title"], text, source="transcript")
                     if not summary:
                         skipped.append({"creator": nl["name"], "title": e["title"][:80],
-                                          "reason": "fallo del LLM"})
+                                          "reason": "fallo del LLM: " + (getattr(self, "_last_llm_error", "") or "?")})
                         continue
                     item = {
                         "creator": nl["name"], "handle": "(newsletter)", "lang": nl["lang"],
@@ -474,7 +475,7 @@ class CreatorsService:
                     summary = await self._summarize(creator, e["title"], ctx["text"], source=ctx["source"])
                     if not summary:
                         skipped.append({"creator": creator["name"], "video_id": e["video_id"],
-                                          "title": e["title"][:80], "reason": "fallo del LLM"})
+                                          "title": e["title"][:80], "reason": "fallo del LLM: " + (getattr(self, "_last_llm_error", "") or "?")})
                         continue  # leave unseen so next cycle can retry
                     item = {
                         "creator": creator["name"],
