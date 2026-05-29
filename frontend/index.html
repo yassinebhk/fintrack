@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260529a">
+    <link rel="stylesheet" href="css/styles.css?v=20260529b">
 </head>
 <body>
     <div class="app">
@@ -243,6 +243,17 @@
                     </section>
 
                     <!-- Positions Table -->
+                    <section class="position-review-section">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>🔍 Revisión objetiva: ¿mantener / reducir / rotar?</h3>
+                                <button class="btn-primary" id="btnReviewPositions" onclick="loadPositionReview()">Analizar mis posiciones</button>
+                            </div>
+                            <p class="text-muted" style="font-size:12px; margin:0 0 4px;">Señal prospectiva por activo (tendencia, momentum, riesgo desde máximos, concentración). <strong>No</strong> se basa en tu precio de entrada — eso sería el "efecto disposición". Avisa cuando tu instinto sería ese sesgo.</p>
+                            <div id="positionReviewContent"></div>
+                        </div>
+                    </section>
+
                     <section class="positions-section">
                         <div class="card card-positions">
                             <div class="card-header">
@@ -1520,17 +1531,18 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="js/app.js?v=20260529a"></script>
-    <script src="js/calculators.js?v=20260529a"></script>
-    <script src="js/news.js?v=20260529a"></script>
-    <script src="js/portfolio-manager.js?v=20260529a"></script>
-    <script src="js/ai-advisor.js?v=20260529a"></script>
-    <script src="js/asset-analysis.js?v=20260529a"></script>
-    <script src="js/backtest.js?v=20260529a"></script>
-    <script src="js/opportunities.js?v=20260529a"></script>
-    <script src="js/asset-deep-analysis.js?v=20260529a"></script>
-    <script src="js/transactions.js?v=20260529a"></script>
-    <script src="js/polymarket.js?v=20260529a"></script>
-    <script src="js/pages.js?v=20260529a"></script>
+    <script src="js/app.js?v=20260529b"></script>
+    <script src="js/calculators.js?v=20260529b"></script>
+    <script src="js/news.js?v=20260529b"></script>
+    <script src="js/portfolio-manager.js?v=20260529b"></script>
+    <script src="js/ai-advisor.js?v=20260529b"></script>
+    <script src="js/asset-analysis.js?v=20260529b"></script>
+    <script src="js/backtest.js?v=20260529b"></script>
+    <script src="js/opportunities.js?v=20260529b"></script>
+    <script src="js/asset-deep-analysis.js?v=20260529b"></script>
+    <script src="js/transactions.js?v=20260529b"></script>
+    <script src="js/position-review.js?v=20260529b"></script>
+    <script src="js/polymarket.js?v=20260529b"></script>
+    <script src="js/pages.js?v=20260529b"></script>
 </body>
 </html>
