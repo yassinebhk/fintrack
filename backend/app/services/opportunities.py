@@ -28,6 +28,7 @@ class OpportunityService:
         self._ttl = timedelta(hours=20)
         self._lock = asyncio.Lock()
         self._generating: asyncio.Task | None = None  # background scan in flight
+        self._finalizing: asyncio.Task | None = None   # background finalize from GH scan
 
     def _fresh(self) -> bool:
         return (
@@ -117,27 +118,25 @@ class OpportunityService:
             return await self._generate_locked()
 
     async def peek_or_start(self, *, force: bool = False) -> dict:
-        """Non-blocking entry point for the HTTP endpoint: returns the cached payload
-        instantly if available, otherwise kicks off generation in the BACKGROUND and
-        returns {status: 'generating'} so the request never hangs (and Render never
-        cuts a 2-min connection). The frontend polls until it's ready."""
-        if self._fresh() and not force:
+        """Read-only, non-blocking entry point for the HTTP endpoint. Serves the
+        cached payload (fresh or stale) and NEVER starts the heavy 130-instrument
+        scan on Render — that OOMs the free tier. Fresh data is produced off-box by
+        the GitHub-Actions scan worker → /ingest-scan → background finalize. So the
+        web just reads; refreshes come from the daily GH scan (or a manual dispatch)."""
+        if self._fresh():
             return {**self._cache, "status": "ready"}
-        if not force:
-            cached = await self._load_from_db()
-            if cached:
-                return {**cached, "status": "ready"}
-        # Need a fresh scan — run it in the background, return immediately.
-        if self._generating is None or self._generating.done():
-            self._generating = asyncio.create_task(self._background_generate())
-        # Serve the last known payload (even if stale) so the UI is never empty while
-        # the free-tier scan churns. Marked so the frontend can show a "actualizando" hint.
+        cached = await self._load_from_db()
+        if cached:
+            return {**cached, "status": "ready"}
+        # No fresh cache → serve the last known payload (even if stale) so the UI is
+        # never empty. A fresh one arrives via the GH scan worker, not from here.
         stale = await self._load_any_from_db()
         if stale and stale.get("payload"):
             return {**stale["payload"], "status": "stale",
                     "stale_since": stale.get("updated_at"),
-                    "message": "Mostrando el último análisis mientras se actualiza…"}
-        return {"status": "generating", "message": "Analizando el mercado y buscando oportunidades…"}
+                    "message": "Mostrando el último análisis; el escaneo diario lo actualiza."}
+        return {"status": "generating",
+                "message": "Aún no hay análisis. El escaneo diario lo generará en breve."}
 
     async def _background_generate(self) -> None:
         try:
@@ -173,8 +172,9 @@ class OpportunityService:
                 logger.info("ingest-scan: background finalize done")
             except Exception as exc:
                 logger.error("ingest-scan: background finalize failed: {}", exc)
-        if self._generating is None or self._generating.done():
-            self._generating = asyncio.create_task(_run())
+        # Dedicated slot — not shared with anything else.
+        if self._finalizing is None or self._finalizing.done():
+            self._finalizing = asyncio.create_task(_run())
 
     async def _generate_locked(self) -> dict:
         themes, crypto = await self._run_scan()

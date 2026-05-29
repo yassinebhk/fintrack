@@ -61,22 +61,6 @@ async def _briefing_job() -> None:
         logger.error("scheduled briefing failed: {}", exc)
 
 
-async def _opportunities_prewarm_job() -> None:
-    """Generate today's opportunities ahead of time so the morning's first view
-    (web or Telegram) is instant instead of waiting ~1-2 min for a cold scan."""
-    try:
-        from app.services.opportunities import get_opportunity_service
-
-        payload = await get_opportunity_service().generate(force=True)
-        logger.info(
-            "opportunities pre-warmed: {} ideas over {} instruments",
-            len(payload.get("opportunities", [])),
-            payload.get("universe_size"),
-        )
-    except Exception as exc:
-        logger.error("opportunities pre-warm failed: {}", exc)
-
-
 async def _scorecard_job() -> None:
     """Evaluate matured recommendations (1m/3m/6m forward returns) once a day."""
     try:
@@ -144,16 +128,9 @@ def setup_jobs() -> None:
         )
         logger.info("scheduled: daily_briefing @ 08:00 {}", settings.timezone)
 
-        sched.add_job(
-            _opportunities_prewarm_job,
-            trigger=CronTrigger(hour=7, minute=30, timezone=settings.timezone),
-            id="opportunities_prewarm",
-            name="Pre-warm daily opportunities at 07:30",
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-        )
-        logger.info("scheduled: opportunities_prewarm @ 07:30 {}", settings.timezone)
+        # NOTE: the heavy opportunities scan is now done off-box by the GitHub-Actions
+        # worker (opportunities-scan.yml) → /api/opportunities/ingest-scan, because it
+        # OOMs Render's 512MB free tier. So we no longer pre-warm it here.
 
         sched.add_job(
             _creators_job,
