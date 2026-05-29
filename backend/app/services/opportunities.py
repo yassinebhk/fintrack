@@ -222,6 +222,11 @@ class OpportunityService:
         except Exception as exc:
             logger.warning("opportunities news fetch failed: {}", exc)
 
+        market_regime = next((t.get("market_regime") for t in themes if t.get("market_regime")), "neutral")
+        market_breadth = next((t.get("market_breadth") for t in themes if t.get("market_breadth") is not None), None)
+
+        # Try the LLM analyst; if EVERY provider is exhausted, degrade gracefully to a
+        # data-driven template so the user still gets the ranked ideas + metrics.
         ctx = AgentContext(
             portfolio=portfolio,
             extras={
@@ -231,15 +236,22 @@ class OpportunityService:
                 "news_str": news_str,
             },
         )
-        result = await AnalystAgent().run(ctx)
-        content = result.output
-
-        opportunities = content.get("opportunities", []) or []
+        model_used = "plantilla (sin IA)"
+        market_summary = ""
+        try:
+            result = await AnalystAgent().run(ctx)
+            content = result.output
+            opportunities = content.get("opportunities", []) or []
+            market_summary = content.get("market_summary", "")
+            model_used = result.model
+        except Exception as exc:
+            logger.warning("analyst LLM unavailable ({}); using data-driven template", str(exc)[:120])
+            opportunities = self._template_opportunities(themes)
+            market_summary = self._template_market_summary(market_regime, market_breadth, trends)
+            content = {"disclaimer": "Generado automáticamente desde los datos (IA no disponible ahora)."}
         # Enrich each idea with a 6-month trend chart + the headlines that back it +
         # the ensemble score breakdown of the matching instrument.
         await self._enrich_opportunities(opportunities, news_items, {t["ticker"]: t for t in themes})
-        market_regime = next((t.get("market_regime") for t in themes if t.get("market_regime")), "neutral")
-        market_breadth = next((t.get("market_breadth") for t in themes if t.get("market_breadth") is not None), None)
 
         # Surface the top of each objective ranking to the UI (the universe is large).
         scored = [t for t in themes if t.get("factors")]
@@ -253,13 +265,13 @@ class OpportunityService:
 
         payload = {
             "generated_at": datetime.now(timezone.utc).isoformat(),
-            "model": result.model,
+            "model": model_used,
             "themes": top_themes,
             "universe_size": len(themes),
             "market_regime": market_regime,
             "market_breadth": market_breadth,
             "trends": trends,
-            "market_summary": content.get("market_summary", ""),
+            "market_summary": market_summary,
             "opportunities": opportunities,
             "disclaimer": content.get("disclaimer", ""),
         }
@@ -274,6 +286,79 @@ class OpportunityService:
         except Exception as exc:
             logger.warning("scorecard snapshot failed: {}", exc)
         return payload
+
+    def _template_opportunities(self, themes: list[dict]) -> list[dict]:
+        """Build opportunities straight from the quant ranking when no LLM is
+        available — same shape as the LLM output, text generated from the data.
+        Keeps the core product alive (data, ranking, metrics) without any AI."""
+        scored = [t for t in themes if t.get("factors")]
+        if not scored:
+            return []
+        top_mom = sorted(scored, key=lambda x: x.get("momentum_score", 0), reverse=True)[:3]
+        top_val = sorted(scored, key=lambda x: x.get("value_score", 0), reverse=True)[:3]
+
+        def conviction(score: float) -> str:
+            return "alta" if score >= 1.0 else "media" if score >= 0.3 else "baja"
+
+        def signals_txt(t: dict) -> str:
+            s = t.get("signals") or {}
+            bits = []
+            if s.get("rsi") is not None:
+                bits.append(f"RSI {s['rsi']:.0f} ({s.get('rsi_signal','')})")
+            if s.get("trend"):
+                bits.append(f"tendencia {s['trend']}")
+            if s.get("macd_signal"):
+                bits.append(f"MACD {s['macd_signal']}")
+            return ", ".join(bits)
+
+        def make(t: dict, approach: str, score: float) -> dict:
+            f = t.get("factors") or {}
+            cat = t.get("category") or t.get("desc") or ""
+            why = (
+                f"El motor cuantitativo lo sitúa en lo más alto de {('MOMENTUM' if approach=='momentum' else 'VALOR')} "
+                f"(score {score:+.2f}). Datos: 3m {t.get('ret_3m','?')}% · 1y {t.get('ret_1y','?')}% · "
+                f"Sharpe {f.get('sharpe','?')} · rango52s {t.get('range_pos_52w','?')}%."
+            )
+            tech = signals_txt(t)
+            if tech:
+                why += f" Técnico: {tech}."
+            risks = (
+                "Volatilidad y posible sobrecompra (RSI alto)."
+                if (t.get("signals") or {}).get("rsi", 0) and t["signals"]["rsi"] > 70
+                else "Drawdown histórico y riesgo de mercado; revisa antes de entrar."
+            )
+            return {
+                "name": t.get("theme") or t.get("ticker"),
+                "kind": "etf",
+                "approach": approach,
+                "ticker_or_isin": t.get("ticker", ""),
+                "what_it_is": f"{cat}." if cat else "Instrumento del universo escaneado.",
+                "why_now": why,
+                "risks": risks,
+                "fit": "Revisa su encaje y correlación con lo que ya tienes en cartera.",
+                "conviction": conviction(score),
+                "supporting_news_idx": [],
+            }
+
+        out, seen = [], set()
+        for t in top_mom:
+            if t["ticker"] not in seen:
+                seen.add(t["ticker"])
+                out.append(make(t, "momentum", t.get("momentum_score", 0)))
+        for t in top_val:
+            if t["ticker"] not in seen:
+                seen.add(t["ticker"])
+                out.append(make(t, "valor", t.get("value_score", 0)))
+        return out
+
+    def _template_market_summary(self, regime: str, breadth: float | None, trends: dict) -> str:
+        pct = f" ({round(breadth*100)}% de activos sobre su tendencia de 200 sesiones)" if breadth is not None else ""
+        patterns = (trends or {}).get("patterns") or []
+        extra = (" " + patterns[0]) if patterns else ""
+        return (
+            f"Régimen de mercado: {regime}{pct}. Ranking generado por el motor cuantitativo "
+            f"(IA de redacción no disponible ahora mismo).{extra}"
+        )
 
     def _render_trends_for_prompt(self, trends: dict) -> str:
         """Compact 'what's growing + shared patterns' block for the analyst prompt."""
