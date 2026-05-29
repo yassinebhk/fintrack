@@ -243,6 +243,7 @@ class OpportunityService:
         )
         model_used = "plantilla (sin IA)"
         market_summary = ""
+        analyst_error = ""
         try:
             result = await AnalystAgent().run(ctx)
             content = result.output
@@ -250,7 +251,8 @@ class OpportunityService:
             market_summary = content.get("market_summary", "")
             model_used = result.model
         except Exception as exc:
-            logger.warning("analyst LLM unavailable ({}); using data-driven template", str(exc)[:120])
+            analyst_error = str(exc)[:500]
+            logger.warning("analyst LLM unavailable ({}); using data-driven template", str(exc)[:200])
             opportunities = self._template_opportunities(themes)
             market_summary = self._template_market_summary(market_regime, market_breadth, trends)
             content = {"disclaimer": "Generado automáticamente desde los datos (IA no disponible ahora)."}
@@ -278,6 +280,7 @@ class OpportunityService:
             "trends": trends,
             "market_summary": market_summary,
             "opportunities": opportunities,
+            "analyst_error": analyst_error,  # diagnostic: why the LLM analyst fell back
             "disclaimer": content.get("disclaimer", ""),
         }
         self._cache = payload
