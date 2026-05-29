@@ -27,32 +27,36 @@ _HORIZONS = {"ret_1m": 30, "ret_3m": 90, "ret_6m": 180}
 _EXCESS = {"ret_1m": "excess_1m", "ret_3m": "excess_3m", "ret_6m": "excess_6m"}
 
 
-async def _last_close(scanner: MarketScanner, ticker: str) -> float | None:
-    """Most recent close from Yahoo daily history (consistent price source)."""
-    try:
-        hist = await scanner.yahoo.get_history(ticker, period="1mo")
-        closes = [h["close"] for h in (hist or []) if h.get("close")]
-        return float(closes[-1]) if closes else None
-    except Exception as exc:
-        logger.debug("scorecard: price {} failed: {}", ticker, exc)
-        return None
+def _close_on_or_before(hist: list[dict], target: date) -> float | None:
+    """Last close at or before `target` from a Yahoo history list (dates 'YYYY-MM-DD')."""
+    chosen = None
+    for h in hist or []:
+        d = h.get("date")
+        c = h.get("close")
+        if not d or c is None:
+            continue
+        if d <= target.isoformat():
+            chosen = c
+        else:
+            break
+    return float(chosen) if chosen is not None else None
 
 
 async def snapshot_recommendations(payload: dict) -> int:
-    """Persist today's opportunities for forward tracking. Idempotent per day."""
+    """Persist today's opportunities for forward tracking — FAST: only ticker, scores
+    and benchmark id (no price fetches here, to keep generation off the hot path).
+    Baseline and forward prices are derived later by evaluate_due() from history.
+    Idempotent per day."""
     opps = payload.get("opportunities") or []
     if not opps:
         return 0
-    scanner = MarketScanner()
     today = datetime.now(timezone.utc).date()
     saved = 0
-
     async with session_scope() as s:
         for op in opps:
             ticker = (op.get("ticker_or_isin") or "").strip().upper()
             if not ticker:
                 continue
-            # Skip if we already snapshotted this ticker today.
             existing = (await s.execute(
                 select(RecommendationTrack).where(
                     RecommendationTrack.rec_date == today,
@@ -61,63 +65,68 @@ async def snapshot_recommendations(payload: dict) -> int:
             )).scalar_one_or_none()
             if existing:
                 continue
-
-            price = await _last_close(scanner, ticker)
-            if not price:
-                continue
             bench_ticker, _ = _benchmark_for(ticker, op.get("kind", ""), "")
-            bench_price = await _last_close(scanner, bench_ticker)
             scores = op.get("scores") or {}
             s.add(RecommendationTrack(
-                rec_date=today,
-                ticker=ticker,
-                name=op.get("name", "")[:128],
-                approach=op.get("approach", "")[:16],
-                conviction=op.get("conviction", "")[:16],
-                momentum_score=scores.get("momentum_score"),
-                value_score=scores.get("value_score"),
-                price_at_rec=price,
+                rec_date=today, ticker=ticker, name=op.get("name", "")[:128],
+                approach=op.get("approach", "")[:16], conviction=op.get("conviction", "")[:16],
+                momentum_score=scores.get("momentum_score"), value_score=scores.get("value_score"),
                 benchmark_ticker=bench_ticker,
-                bench_price_at_rec=bench_price,
             ))
             saved += 1
-    logger.info("scorecard: snapshotted {} recommendations", saved)
+    logger.info("scorecard: snapshotted {} recommendations (prices backfilled by evaluator)", saved)
     return saved
 
 
 async def evaluate_due() -> int:
-    """Fill forward returns for snapshots that have reached each horizon."""
+    """Fill baseline price (close on rec_date) + forward returns for snapshots that
+    have reached each horizon. One Yahoo history call per ticker (cached per run),
+    off the generation hot path."""
     scanner = MarketScanner()
     today = datetime.now(timezone.utc).date()
     updated = 0
+    hist_cache: dict[str, list[dict]] = {}
+
+    async def history(tk: str) -> list[dict]:
+        if tk not in hist_cache:
+            try:
+                hist_cache[tk] = await scanner.yahoo.get_history(tk, period="1y") or []
+            except Exception:
+                hist_cache[tk] = []
+        return hist_cache[tk]
 
     async with session_scope() as s:
         rows = (await s.execute(select(RecommendationTrack))).scalars().all()
-        # Cache current prices per ticker so we don't refetch within one run.
-        price_cache: dict[str, float | None] = {}
-
-        async def cur(tk: str) -> float | None:
-            if tk not in price_cache:
-                price_cache[tk] = await _last_close(scanner, tk)
-            return price_cache[tk]
 
         for r in rows:
             age_days = (today - r.rec_date).days
+            # Skip rows with no horizon due yet AND nothing to backfill.
+            if age_days < min(_HORIZONS.values()) and r.price_at_rec is not None:
+                continue
+
+            hist = await history(r.ticker)
+            if not hist:
+                continue
+            # Backfill baseline (close on/before rec_date) and benchmark baseline once.
+            if r.price_at_rec is None:
+                r.price_at_rec = _close_on_or_before(hist, r.rec_date)
+            if r.benchmark_ticker and r.bench_price_at_rec is None:
+                bh = await history(r.benchmark_ticker)
+                r.bench_price_at_rec = _close_on_or_before(bh, r.rec_date)
+            if not r.price_at_rec:
+                continue
+            now_price = float(hist[-1]["close"]) if hist and hist[-1].get("close") else None
+            if not now_price:
+                continue
+
             for field, horizon_days in _HORIZONS.items():
-                if getattr(r, field) is not None:
-                    continue  # already evaluated
-                if age_days < horizon_days:
-                    continue  # not due yet
-                if not r.price_at_rec:
-                    continue
-                now_price = await cur(r.ticker)
-                if not now_price:
+                if getattr(r, field) is not None or age_days < horizon_days:
                     continue
                 fwd = (now_price - r.price_at_rec) / r.price_at_rec * 100
                 setattr(r, field, round(fwd, 2))
-                # Excess vs benchmark (alpha), if we have benchmark prices.
                 if r.benchmark_ticker and r.bench_price_at_rec:
-                    bnow = await cur(r.benchmark_ticker)
+                    bh = await history(r.benchmark_ticker)
+                    bnow = float(bh[-1]["close"]) if bh and bh[-1].get("close") else None
                     if bnow:
                         bfwd = (bnow - r.bench_price_at_rec) / r.bench_price_at_rec * 100
                         setattr(r, _EXCESS[field], round(fwd - bfwd, 2))
