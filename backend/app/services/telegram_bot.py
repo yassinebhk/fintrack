@@ -232,8 +232,18 @@ class TelegramBotHandler:
                     emoji = {"alcista": "🟢", "bajista": "🔴", "neutral": "🟡"}.get(regime, "🟡")
                     pct = f" ({round(breadth*100)}% sobre su tendencia 200d)" if breadth is not None else ""
                     regime_line = f"\n{emoji} <b>Régimen:</b> {regime}{pct}"
+                # 🫧 Froth guard line (euphoria / concentration / extended ideas)
+                fr = payload.get("froth") or {}
+                froth_line = ""
+                if fr.get("euphoria_level") and (fr["euphoria_level"] != "baja" or fr.get("concentration_warning")):
+                    fe = {"alta": "🟣", "media": "🟠", "baja": "🟢"}.get(fr["euphoria_level"], "")
+                    froth_line = f"\n{fe} <b>Euforia:</b> {fr['euphoria_level']} ({fr.get('market_overbought_pct',0)}% sobrecomprado)"
+                    if fr.get("concentration_warning"):
+                        froth_line += f"\n{fr['concentration_warning']}"
+                    if fr.get("extended_ideas"):
+                        froth_line += f"\n🫧 Extendidas: {', '.join(fr['extended_ideas'])}"
                 await self.notifier.send_html(
-                    f"💡 <b>Oportunidades del día</b>{regime_line}\n\n<i>{payload['market_summary']}</i>"
+                    f"💡 <b>Oportunidades del día</b>{regime_line}{froth_line}\n\n<i>{payload['market_summary']}</i>"
                 )
             # 'What's growing' trend block (winners + shared patterns)
             trends = payload.get("trends") or {}

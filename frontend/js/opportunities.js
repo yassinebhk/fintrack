@@ -191,6 +191,7 @@ function renderOpportunities(data) {
             <p style="margin:4px 0;"><strong>📈 Por qué ahora:</strong> ${op.why_now}</p>
             <p style="margin:4px 0;"><strong>⚠️ Riesgos:</strong> ${op.risks}</p>
             <p style="margin:4px 0;"><strong>🎯 Encaje en tu cartera:</strong> ${op.fit}</p>
+            ${op.extended ? `<div style="margin:8px 0; background:#a855f718; border:1px solid #a855f755; border-radius:8px; padding:8px 12px; font-size:13px;">${op.extended_note || '🫧 Extendido: alto riesgo de reversión.'}</div>` : ''}
             ${assetLinks(op)}
             ${op.ticker_or_isin ? `<button onclick="openDeepAnalysis('${(op.ticker_or_isin+'').replace(/'/g,"&#39;")}','${(op.name+'').replace(/'/g,"&#39;")}')" style="margin:8px 0 4px; background:#6366f1; color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer;">🔬 Análisis profesional del activo</button>` : ''}
             ${renderBreakdown(op)}
@@ -227,7 +228,19 @@ function renderOpportunities(data) {
             ${(t.patterns && t.patterns.length) ? `<div style="margin-top:12px;"><strong style="font-size:13px;">🔁 Patrones comunes:</strong><ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${t.patterns.map(p => `<li>${p}</li>`).join('')}</ul></div>` : ''}
         </div>` : '';
 
+    const fr = data.froth || {};
+    const eu = fr.euphoria_level;
+    const euColor = eu === 'alta' ? '#a855f7' : eu === 'media' ? '#f59e0b' : '#10b981';
+    const frothBanner = (eu && (eu !== 'baja' || fr.concentration_warning)) ? `
+        <div style="margin-bottom:12px; padding:10px 14px; border-radius:8px; background:${euColor}14; border:1px solid ${euColor}44; font-size:13px;">
+            🫧 <strong>Termómetro de euforia:</strong> <span style="color:${euColor}; text-transform:uppercase; font-weight:600;">${eu}</span>
+            · ${fr.market_overbought_pct}% del mercado sobrecomprado (RSI&gt;70)
+            ${fr.concentration_warning ? `<br>${fr.concentration_warning}` : ''}
+            ${(fr.extended_ideas && fr.extended_ideas.length) ? `<br>🫧 Ideas extendidas (parabólicas): <strong>${fr.extended_ideas.join(', ')}</strong> — cuidado con perseguir el pico.` : ''}
+        </div>` : '';
+
     content.innerHTML = `
+        ${frothBanner}
         ${regimeBanner}
         ${data.market_summary ? `<div class="integrations-banner-inner" style="margin-bottom:16px;"><div class="integrations-banner-icon">🧠</div><div class="integrations-banner-body"><strong>Resumen de mercado</strong><p style="margin:6px 0 0;">${data.market_summary}</p></div></div>` : ''}
         ${trendsCard}

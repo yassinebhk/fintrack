@@ -260,6 +260,10 @@ class OpportunityService:
         # the ensemble score breakdown of the matching instrument.
         await self._enrich_opportunities(opportunities, news_items, {t["ticker"]: t for t in themes})
 
+        # 🫧 Froth guard: flag overheated ideas + thematic concentration + market euphoria,
+        # so a momentum engine doesn't quietly push the user into a bubble top.
+        froth = self._froth_guard(themes, opportunities)
+
         # Surface the top of each objective ranking to the UI (the universe is large).
         scored = [t for t in themes if t.get("factors")]
         top_mom = sorted(scored, key=lambda x: x.get("momentum_score", 0), reverse=True)[:12]
@@ -280,6 +284,7 @@ class OpportunityService:
             "trends": trends,
             "market_summary": market_summary,
             "opportunities": opportunities,
+            "froth": froth,
             "analyst_error": analyst_error,  # diagnostic: why the LLM analyst fell back
             "disclaimer": content.get("disclaimer", ""),
         }
@@ -294,6 +299,73 @@ class OpportunityService:
         except Exception as exc:
             logger.warning("scorecard snapshot failed: {}", exc)
         return payload
+
+    def _froth_guard(self, themes: list[dict], opportunities: list[dict]) -> dict:
+        """Anti-bubble guard. Detects (1) market euphoria (% of the universe
+        overbought), (2) per-idea overheating (RSI extreme + far above its 200d
+        trend = parabolic), and (3) thematic concentration of the recommendations.
+        Pure data — flags risk, never hides ideas."""
+        scored = [t for t in themes if t.get("factors")]
+        # --- 1) Market euphoria thermometer ---
+        rsis = [(t.get("signals") or {}).get("rsi") for t in scored]
+        rsis = [r for r in rsis if r is not None]
+        overbought_pct = round(sum(1 for r in rsis if r >= 70) / len(rsis) * 100, 1) if rsis else 0.0
+        if overbought_pct >= 45:
+            euphoria = "alta"
+        elif overbought_pct >= 25:
+            euphoria = "media"
+        else:
+            euphoria = "baja"
+
+        # --- 2) Per-idea overheating flags ---
+        by_ticker = {t.get("ticker"): t for t in scored}
+        extended_ideas = []
+        for op in opportunities:
+            tk = (op.get("ticker_or_isin") or "").upper()
+            t = by_ticker.get(tk)
+            if not t:
+                continue
+            f = t.get("factors") or {}
+            rsi = (t.get("signals") or {}).get("rsi")
+            dist = f.get("dist_sma200")  # fraction above its 200d trend
+            extended = (rsi is not None and rsi >= 78) and (dist is not None and dist >= 0.40)
+            op["extended"] = bool(extended)
+            if extended:
+                op["extended_note"] = (
+                    f"🫧 Extendido: RSI {rsi:.0f} y {dist*100:.0f}% por encima de su tendencia de 200 sesiones "
+                    "(parabólico). Alto riesgo de reversión brusca — no persigas el pico."
+                )
+                extended_ideas.append(tk)
+
+        # --- 3) Thematic concentration of the recommendations ---
+        from collections import Counter
+        cats = Counter((op.get("kind") or "") + "|" + (by_ticker.get((op.get("ticker_or_isin") or "").upper(), {}).get("category") or "")
+                       for op in opportunities)
+        # Simpler: count by the matched instrument's category.
+        cat_counts = Counter()
+        for op in opportunities:
+            t = by_ticker.get((op.get("ticker_or_isin") or "").upper())
+            if t and t.get("category"):
+                cat_counts[t["category"]] += 1
+        concentration_warning = ""
+        if opportunities and cat_counts:
+            top_cat, top_n = cat_counts.most_common(1)[0]
+            if top_n >= max(3, len(opportunities) * 0.6):
+                concentration_warning = (
+                    f"⚠️ {top_n} de {len(opportunities)} ideas son de '{top_cat}'. Si ese tema corrige, "
+                    "te afectaría en bloque — valora diversificar entre temas."
+                )
+
+        return {
+            "market_overbought_pct": overbought_pct,
+            "euphoria_level": euphoria,
+            "extended_ideas": extended_ideas,
+            "concentration_warning": concentration_warning,
+            "note": (
+                "El froth guard avisa de sobrecalentamiento; no oculta ideas. En euforia alta, "
+                "extrema la cautela con el momentum y revisa tu exposición."
+            ),
+        }
 
     def _template_opportunities(self, themes: list[dict]) -> list[dict]:
         """Build opportunities straight from the quant ranking when no LLM is
