@@ -133,6 +133,10 @@ class TelegramBotHandler:
             await self._send_position_review()
             return
 
+        if low in ("/planes", "planes", "mis planes", "como van mis planes", "cómo van mis planes"):
+            await self._send_plans()
+            return
+
         if low in ("/oportunidades", "oportunidades", "ideas", "recomendaciones", "que compro", "qué compro"):
             await self._send_opportunities()
             return
@@ -420,6 +424,32 @@ class TelegramBotHandler:
             await self.notifier.send_text(f"Fallo al analizar {ticker}; reintenta en un momento.")
         finally:
             thinking.cancel()
+
+    async def _send_plans(self) -> None:
+        """How each registered investment plan is performing since inception."""
+        await self.notifier.send_chat_action("typing")
+        try:
+            from app.services.plans import evaluate_plans
+            d = await evaluate_plans()
+            plans = d.get("plans") or []
+            if not plans:
+                await self.notifier.send_text("No tienes planes registrados todavía.")
+                return
+            for p in plans:
+                avg = p.get("avg_change_pct")
+                avg_s = f"{avg:+.2f}%" if avg is not None else "—"
+                lines = [f"📋 <b>Plan: {html_escape(p['name'])}</b> ({html_escape(p['horizon'])}) · {p.get('days_elapsed',0)}d",
+                         f"<b>Media del plan: {avg_s}</b>"]
+                for h in p.get("holdings", []):
+                    chg = h.get("change_pct")
+                    cs = f"{chg:+.2f}%" if chg is not None else "—"
+                    lines.append(f"• {html_escape(h.get('label') or h['ticker'])} ({h['ticker']}): {cs} "
+                                 f"<i>(entró {h.get('entry_price')}{h.get('currency') or ''})</i>")
+                await self.notifier.send_html("\n".join(lines))
+            await self.notifier.send_html(f"<i>{html_escape(d.get('disclaimer',''))}</i>{PAGE_LINK}")
+        except Exception as exc:
+            logger.error("telegram plans failed: {}", exc)
+            await self.notifier.send_text("No pude cargar tus planes ahora mismo.")
 
     async def _send_position_review(self) -> None:
         """Objective keep/trim/rotate review per holding (anti-disposition-effect)."""
