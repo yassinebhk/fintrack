@@ -15,6 +15,7 @@ from app.api import (
     health,
     imports,
     news,
+    notify,
     opportunities,
     polymarket,
     portfolio,
@@ -37,6 +38,7 @@ def build_api_router() -> APIRouter:
     router.include_router(assets.router)
     router.include_router(fx.router)
     router.include_router(news.router)
+    router.include_router(notify.router)
     router.include_router(ai.router)
     router.include_router(imports.router)
     router.include_router(brokers.router)
