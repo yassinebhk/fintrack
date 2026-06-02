@@ -644,15 +644,35 @@ class TelegramBotHandler:
         return has_kw and has_amount
 
     async def _send_quick_summary(self) -> None:
+        from app.services.report_prefs import get_excluded
+
         p = await self.portfolio_service.calculate_portfolio()
+        excluded = await get_excluded()
+        positions = [pos for pos in p["positions"] if (pos.get("ticker") or "").upper() not in excluded]
+
+        # Recompute the report's headline stats from the SHOWN positions only, so
+        # excluded dust doesn't distort them. Convert each position to base currency
+        # via its own fx ratio (market_value_base / market_value).
+        def _to_base(pos: dict, field: str) -> float:
+            mv = pos.get("market_value") or 0
+            fx = (pos["market_value_base"] / mv) if mv else 1.0
+            return (pos.get(field) or 0) * fx
+
+        total_value = sum(pos.get("market_value_base", 0) for pos in positions)
+        total_cost = sum(_to_base(pos, "cost_basis") for pos in positions)
+        daily_change = sum(_to_base(pos, "day_change") for pos in positions)
+        total_pl = total_value - total_cost
+        total_pl_pct = (total_pl / total_cost * 100) if total_cost > 0 else 0.0
+        daily_pct = (daily_change / (total_value - daily_change) * 100) if (total_value - daily_change) > 0 else 0.0
+
         lines = [
-            f"💼 <b>Tu cartera</b>: {p['total_value']:.2f} {p['base_currency']}",
-            f"P/L total: {p['total_gain_loss']:+.2f} € ({p['total_gain_loss_pct']:+.2f}%)",
-            f"Hoy: {p['daily_change']:+.2f} € ({p['daily_change_pct']:+.2f}%)",
+            f"💼 <b>Tu cartera</b>: {total_value:.2f} {p['base_currency']}",
+            f"P/L total: {total_pl:+.2f} € ({total_pl_pct:+.2f}%)",
+            f"Hoy: {daily_change:+.2f} € ({daily_pct:+.2f}%)",
             "",
             "<b>Posiciones:</b>",
         ]
-        for pos in p["positions"][:12]:
+        for pos in positions[:12]:
             name = friendly_name(pos["ticker"], pos.get("name"))
             day = pos.get("day_change_pct", 0) or 0
             mark = "🟢" if day >= 0 else "🔴"
@@ -660,6 +680,8 @@ class TelegramBotHandler:
                 f"• {html_escape(name)}: {pos['market_value_base']:.2f} € "
                 f"· hoy {mark}{day:+.1f}% · P/L {pos['gain_loss_pct']:+.1f}%"
             )
+        if excluded:
+            lines.append(f"<i>(excluidas de las estadísticas: {', '.join(sorted(excluded))})</i>")
         lines.append(PAGE_LINK)
         await self.notifier.send_html("\n".join(lines))
 

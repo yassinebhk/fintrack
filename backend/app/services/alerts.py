@@ -48,6 +48,9 @@ class AlertsEngine:
         created: list[dict] = []
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
+        from app.services.report_prefs import get_excluded
+        excluded = await get_excluded()
+
         # Rule 1: whole-portfolio aggressive move (BOTH directions)
         daily_pct = portfolio.get("daily_change_pct", 0) or 0
         if daily_pct <= PORTFOLIO_MOVE_DOWN_PCT or daily_pct >= PORTFOLIO_MOVE_UP_PCT:
@@ -71,6 +74,8 @@ class AlertsEngine:
         # Rule 2: individual holding aggressive intraday move (BOTH directions)
         held_tickers: set[str] = set()
         for pos in portfolio.get("positions", []):
+            if (pos.get("ticker") or "").upper() in excluded:
+                continue  # dust position the user chose to hide from reports/alerts
             held_tickers.add(pos.get("ticker"))
             created.append(await self._eval_move(
                 ticker=pos.get("ticker"),

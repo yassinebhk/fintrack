@@ -23,6 +23,7 @@ from app.api import (
     position_review,
     positions,
     scorecard,
+    settings,
     telegram,
     transactions,
 )
@@ -51,5 +52,6 @@ def build_api_router() -> APIRouter:
     router.include_router(opportunities.router)
     router.include_router(plans.router)
     router.include_router(scorecard.router)
+    router.include_router(settings.router)
     router.include_router(telegram.router)
     return router
