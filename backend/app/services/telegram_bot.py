@@ -654,9 +654,11 @@ class TelegramBotHandler:
         ]
         for pos in p["positions"][:12]:
             name = friendly_name(pos["ticker"], pos.get("name"))
+            day = pos.get("day_change_pct", 0) or 0
+            mark = "🟢" if day >= 0 else "🔴"
             lines.append(
                 f"• {html_escape(name)}: {pos['market_value_base']:.2f} € "
-                f"({pos['gain_loss_pct']:+.1f}%)"
+                f"· hoy {mark}{day:+.1f}% · P/L {pos['gain_loss_pct']:+.1f}%"
             )
         lines.append(PAGE_LINK)
         await self.notifier.send_html("\n".join(lines))
