@@ -71,6 +71,34 @@ async def register_plan(name: str, horizon: str, holdings: list[dict], note: str
     return {"registered": name, "holdings": snap}
 
 
+async def add_holding(name: str, ticker: str, label: str = "") -> dict:
+    """Append ONE holding to an existing plan, snapshotting only its entry today.
+    Preserves the other holdings' original entry prices. Creates the plan if missing."""
+    ticker = (ticker or "").strip()
+    if not ticker:
+        return {"error": "ticker vacío"}
+    scanner = MarketScanner()
+    today = datetime.now(timezone.utc)
+    price, cur = await _last_close(scanner, ticker)
+    entry = {"ticker": ticker, "label": label or ticker,
+             "entry_price": round(price, 4) if price else None,
+             "currency": cur, "entry_date": today.date().isoformat()}
+    data = await _load()
+    for p in data.get("plans", []):
+        if p.get("name") == name:
+            if any((h.get("ticker") or "").upper() == ticker.upper() for h in p.get("holdings", [])):
+                return {"updated": name, "ticker": ticker, "note": "ya estaba en el plan"}
+            p.setdefault("holdings", []).append(entry)
+            await _save(data)
+            return {"added": ticker, "to": name, "entry": entry}
+    # plan inexistente → crearlo con este único holding
+    data.setdefault("plans", []).append({"name": name, "horizon": "corto-medio (meses)",
+                                         "note": "", "created_at": today.isoformat(),
+                                         "holdings": [entry]})
+    await _save(data)
+    return {"created_plan": name, "added": ticker, "entry": entry}
+
+
 async def evaluate_plans() -> dict:
     """Current performance of each plan vs entry (per holding + equal-weight plan avg)."""
     scanner = MarketScanner()

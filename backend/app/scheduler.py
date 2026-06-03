@@ -6,8 +6,12 @@ Each phase adds its own job:
 - Fase 2.4: Alerts loop every 5 min
 """
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from loguru import logger
 
@@ -92,6 +96,32 @@ async def _alerts_job() -> None:
         logger.error("scheduled alerts evaluation failed: {}", exc)
 
 
+async def _ipo_spacex_reminder() -> None:
+    """One-off heads-up around the SpaceX IPO (12-Jun-2026): how the user's space
+    ETF (JEDI) is moving, plus a 'sell the news' caution. Fires on 11 and 12 Jun."""
+    try:
+        from app.services.discovery.market_scanner import MarketScanner
+        from app.services.notifications.telegram import TelegramNotifier
+        scanner = MarketScanner()
+        price = await scanner.yahoo.get_price("JEDI.DE")
+        line = ""
+        if price:
+            chg = price.get("change_percent", 0) or 0
+            line = (f"\nTu <b>Espacio (JEDI)</b>: {price.get('price'):.2f} "
+                    f"{price.get('currency','')} ({chg:+.2f}% hoy).")
+        html = (
+            "🚀 <b>IPO de SpaceX (SPCX) inminente</b> — debut Nasdaq ~12 jun.\n"
+            f"{line}\n\n"
+            "Recuerda: JEDI <b>no</b> contiene SpaceX (era privada). Un mega-IPO puede "
+            "<i>aspirar</i> capital del resto del sector y suele haber <b>'buy the rumor, "
+            "sell the news'</b>. Vigila el movimiento; no persigas el día del estreno."
+        )
+        await TelegramNotifier().send_html(html)
+        logger.info("spacex ipo reminder sent")
+    except Exception as exc:
+        logger.error("spacex ipo reminder failed: {}", exc)
+
+
 def get_scheduler() -> AsyncIOScheduler:
     global _scheduler
     if _scheduler is None:
@@ -164,6 +194,24 @@ def setup_jobs() -> None:
             coalesce=True,
         )
         logger.info("scheduled: alerts_loop every 5 min")
+
+        # One-off SpaceX-IPO heads-up (11 & 12 Jun 2026, 09:00). Only schedule
+        # future dates so a restart after the event doesn't re-fire them.
+        tz = ZoneInfo(settings.timezone)
+        now = datetime.now(tz=tz)
+        for day in ("2026-06-11", "2026-06-12"):
+            run_dt = datetime.fromisoformat(f"{day}T09:00:00").replace(tzinfo=tz)
+            if run_dt <= now:
+                continue
+            sched.add_job(
+                _ipo_spacex_reminder,
+                trigger=DateTrigger(run_date=run_dt, timezone=settings.timezone),
+                id=f"ipo_spacex_{day}",
+                name=f"SpaceX IPO heads-up {day}",
+                replace_existing=True,
+                misfire_grace_time=3600,
+            )
+        logger.info("scheduled: SpaceX IPO heads-up 11-12 Jun")
 
 
 def start_scheduler() -> None:
