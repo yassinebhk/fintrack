@@ -75,7 +75,32 @@ class YahooFinanceService:
                     return None
                 meta = result[0].get("meta", {})
                 current = float(meta.get("regularMarketPrice") or 0)
-                prev = float(meta.get("chartPreviousClose") or current)
+                # Harden previous_close: Yahoo's meta.chartPreviousClose occasionally
+                # returns a corrupt value (seen ~12% off for JEDI), which produced
+                # spurious day-change %s and risked false "asset cae/sube X%" alerts.
+                # The daily close series is the ground truth, so derive prev from it
+                # and only fall back to the meta field when the series is unavailable.
+                try:
+                    closes = [c for c in (result[0].get("indicators", {})
+                              .get("quote", [{}])[0].get("close") or []) if c is not None]
+                except Exception:
+                    closes = []
+                prev = 0.0
+                if closes:
+                    # If the last daily bar is today's (≈ current), the previous close
+                    # is the bar before it; otherwise the last bar IS the prior close.
+                    if len(closes) >= 2 and current > 0 and abs(current / closes[-1] - 1) < 0.01:
+                        prev = float(closes[-2])
+                    else:
+                        prev = float(closes[-1])
+                meta_prev = float(meta.get("chartPreviousClose") or 0)
+                if prev <= 0:
+                    prev = meta_prev or current
+                elif meta_prev > 0 and abs(meta_prev / prev - 1) > 0.08:
+                    logger.warning("yahoo {}: chartPreviousClose={:.4f} disagrees with series close={:.4f}; using series",
+                                   ticker, meta_prev, prev)
+                if not current:
+                    current = prev
                 return {
                     "ticker": ticker,
                     "price": current,

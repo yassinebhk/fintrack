@@ -197,6 +197,13 @@ class AlertsEngine:
         if not ticker:
             return None
         crypto = _is_crypto(asset_type, ticker)
+        # Backstop against residual data glitches (e.g. a corrupt previous_close):
+        # a single-day move beyond these magnitudes is almost always bad data, not a
+        # real move, so we refuse to alert on it rather than send a false positive.
+        glitch_ceiling = 45.0 if crypto else 28.0
+        if abs(pct) >= glitch_ceiling:
+            logger.warning("alerts: skipping implausible {} move {:+.1f}% (likely data glitch, not alerting)", ticker, pct)
+            return None
         warn = CRYPTO_MOVE_WARN_PCT if crypto else EQUITY_MOVE_WARN_PCT
         crit = CRYPTO_MOVE_CRIT_PCT if crypto else EQUITY_MOVE_CRIT_PCT
         if abs(pct) < warn:
