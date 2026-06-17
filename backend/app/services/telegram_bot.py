@@ -665,23 +665,31 @@ class TelegramBotHandler:
         total_pl_pct = (total_pl / total_cost * 100) if total_cost > 0 else 0.0
         daily_pct = (daily_change / (total_value - daily_change) * 100) if (total_value - daily_change) > 0 else 0.0
 
+        cur = p["base_currency"]
+        trend = "📈" if daily_change >= 0 else "📉"
+
+        def _short(pos: dict) -> str:
+            nm = (friendly_name(pos["ticker"], pos.get("name")) or pos["ticker"]).replace("&", "y")
+            return nm[:11]
+
+        # Monospace table aligns cleanly on Telegram; sorted so today's winners are on top.
+        rows = sorted(positions[:12], key=lambda x: (x.get("day_change_pct") or 0), reverse=True)
+        table = [f"{'':<11}{'HOY':>7}{'P/L':>8}"]
+        for pos in rows:
+            d = f"{(pos.get('day_change_pct') or 0):+.1f}%"
+            pl = f"{(pos.get('gain_loss_pct') or 0):+.1f}%"
+            table.append(f"{_short(pos):<11}{d:>7}{pl:>8}")
+        table_block = "<pre>" + html_escape("\n".join(table)) + "</pre>"
+
         lines = [
-            f"💼 <b>Tu cartera</b>: {total_value:.2f} {p['base_currency']}",
-            f"P/L total: {total_pl:+.2f} € ({total_pl_pct:+.2f}%)",
-            f"Hoy: {daily_change:+.2f} € ({daily_pct:+.2f}%)",
+            f"💼 <b>Tu cartera</b> · {total_value:.2f} {cur}",
+            f"{trend} Hoy: {daily_change:+.2f} {cur} ({daily_pct:+.2f}%)",
+            f"💰 P/L total: {total_pl:+.2f} {cur} ({total_pl_pct:+.2f}%)",
             "",
-            "<b>Posiciones:</b>",
+            table_block,
         ]
-        for pos in positions[:12]:
-            name = friendly_name(pos["ticker"], pos.get("name"))
-            day = pos.get("day_change_pct", 0) or 0
-            mark = "🟢" if day >= 0 else "🔴"
-            lines.append(
-                f"• {html_escape(name)}: {pos['market_value_base']:.2f} € "
-                f"· hoy {mark}{day:+.1f}% · P/L {pos['gain_loss_pct']:+.1f}%"
-            )
         if excluded:
-            lines.append(f"<i>(excluidas de las estadísticas: {', '.join(sorted(excluded))})</i>")
+            lines.append(f"<i>excl. del cálculo: {', '.join(sorted(excluded))}</i>")
         lines.append(PAGE_LINK)
         await self.notifier.send_html("\n".join(lines))
 

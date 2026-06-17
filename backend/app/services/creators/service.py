@@ -201,43 +201,54 @@ class CreatorsService:
     # ---------- LLM summary ----------
     async def _summarize(self, creator: dict, video_title: str, context_text: str,
                           source: str = "transcript") -> dict | None:
-        source_label = "transcript completo" if source == "transcript" else "DESCRIPCIÓN del vídeo (no el transcript)"
+        thin = source == "description"
+        source_label = ("transcript completo" if source == "transcript"
+                        else "artículo completo" if source == "article"
+                        else "DESCRIPCIÓN del vídeo (texto promocional, NO el transcript)")
         system = (
-            "Eres analista financiero. Resumes el contenido de un vídeo de un divulgador con "
-            "neutralidad y rigor para que el lector pueda usarlo como insumo de mercado, NO como recomendación.\n"
-            "REGLAS ANTI-ALUCINACIÓN:\n"
-            "- Usa SOLO lo que aparezca en el texto que te paso. No inventes cifras ni hechos.\n"
-            f"- Te paso un {source_label}; si es solo la descripción, di al final 'Resumen basado en la descripción del vídeo, no en el transcript completo'.\n"
-            "- Tono: profesional, español, conciso.\n"
-            "- Marca claramente que es OPINIÓN del autor, no consejo de inversión.\n"
-            "- Si hay claims fuertes (predicciones, niveles concretos), reporta como 'según el autor…'."
+            "Eres un analista financiero senior. Resumes el contenido de un divulgador para que un inversor "
+            "lo use como INSUMO de mercado (no como recomendación), con rigor, foco accionable y CERO relleno.\n"
+            "REGLAS:\n"
+            "- Usa SOLO lo que aparezca en el texto. No inventes tickers, cifras, niveles ni hechos.\n"
+            "- Si el texto es pobre (una descripción/promo sin sustancia), NO rellenes con generalidades vacías: "
+            "extrae únicamente lo concreto que haya (tickers, cifras, afirmaciones) y sé breve; más vale corto y útil.\n"
+            "- Atribuye las afirmaciones al autor ('según el autor…') y deja claro que es su OPINIÓN.\n"
+            "- Español, profesional, concreto. Prioriza lo ACCIONABLE sobre lo descriptivo."
         )
         user = (
             f"Divulgador: {creator['name']} ({creator['lang']}) · enfoque: {creator['focus']}\n"
-            f"Título del vídeo: {video_title}\n"
+            f"Título: {video_title}\n"
             f"Fuente: {source_label}\n\n"
             f"Contenido:\n{context_text}\n\n"
-            "Devuelve estrictamente este formato Markdown:\n"
-            "## Tesis principal\n"
-            "(1-2 frases)\n\n"
-            "## Puntos clave\n"
-            "- (3-5 bullets, en español, con la palabra ‘según el autor’ cuando proceda)\n\n"
-            "## Activos / sectores mencionados\n"
-            "- (lista corta; vacío si no menciona)\n\n"
-            "## Tono general del autor\n"
-            "(alcista / bajista / neutral, y por qué en una frase)\n\n"
-            "## Aviso\n"
-            "Es opinión del divulgador, no recomendación de inversión."
+            "Devuelve EXACTAMENTE este Markdown. Omite una sección SOLO si no hay nada real que poner "
+            "(no la rellenes con paja):\n"
+            "## 📌 Tesis\n"
+            "(1-2 frases concretas con el argumento central, sin relleno)\n\n"
+            "## 🎯 Ideas accionables\n"
+            "- Por cada activo/ticker mencionado: NOMBRE — postura del autor (alcista/bajista/neutral) — "
+            "razón en 1 frase — nivel/precio/objetivo/plazo si lo menciona.\n"
+            "- Si no cita activos concretos, da la idea operativa principal (qué haría y por qué, según el autor).\n\n"
+            "## 🚀 Catalizadores\n"
+            "- (eventos/datos que validarían o romperían la tesis; con fecha/plazo si se menciona)\n\n"
+            "## ⚠️ Riesgos / contraargumentos\n"
+            "- (qué puede salir mal o qué matiza el propio autor)\n\n"
+            "## 👁️ Qué vigilar\n"
+            "- (1-3 señales concretas a seguir las próximas semanas)\n\n"
+            "## 🗣️ Tono del autor\n"
+            "(alcista / bajista / neutral + por qué en una frase)"
         )
         try:
             client = get_llm_client()
             resp = await client.generate(
                 [LLMMessage(role="system", content=system), LLMMessage(role="user", content=user)],
-                max_tokens=900, temperature=0.3,
+                max_tokens=1500, temperature=0.3,
             )
             md = (resp.text or "").strip()
             if not md:
                 return None
+            if thin:
+                md += ("\n\n_⚠️ Resumen basado solo en la descripción del vídeo (YouTube bloquea el transcript "
+                       "desde el servidor) — limitado. Abre el vídeo para el detalle._")
             return {"summary_markdown": md, "model": resp.model}
         except Exception as exc:
             logger.warning("creators: LLM summary failed: {}", exc)
@@ -259,9 +270,10 @@ class CreatorsService:
             # Telegram supports a small HTML subset; strip anything risky.
             body = re.sub(r"</?(?!b|i|u|s|a|code|pre)[a-z]+[^>]*>", "", body)
             head = (
-                f"🎙️ <b>{html_escape(creator['name'])}</b> ({creator['lang'].upper()})\n"
+                f"🎙️ <b>{html_escape(creator['name'])}</b> · {creator['lang'].upper()}\n"
                 f"<i>{html_escape(creator['focus'])}</i>\n"
-                f"📺 <a href=\"{entry['url']}\">{html_escape(entry['title'])}</a>\n\n"
+                f"▶️ <a href=\"{entry['url']}\">{html_escape(entry['title'])}</a>\n"
+                f"━━━━━━━━━━━━━━\n"
             )
             msg = (head + body)[:3800]
             await n.send_html(msg)
