@@ -85,6 +85,15 @@ async def lab_run(secret: str = "", digest: bool = True) -> dict:
     return {"status": "accepted"}
 
 
+@router.post("/lab/reset")
+async def lab_reset(secret: str = "") -> dict:
+    """Wipe the paper ledger (use after a model fix invalidates old bets)."""
+    if not _SECRET or secret != _SECRET:
+        raise HTTPException(status_code=401, detail="invalid secret")
+    from app.services.polymarket import lab
+    return await lab.reset_ledger()
+
+
 @router.post("/lab/digest")
 async def lab_digest(secret: str = "") -> dict:
     """Send the current self-explanatory Lab digest to Telegram (background)."""

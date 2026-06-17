@@ -13,12 +13,21 @@ from __future__ import annotations
 import math
 import re
 
-_ABOVE = re.compile(r"\b(above|over|exceed|reach|hit|greater|more than|at least|≥|>=|por encima|m[aá]s de)\b", re.I)
-_BELOW = re.compile(r"\b(below|under|less than|drop to|fall to|≤|<=|por debajo|menos de)\b", re.I)
+_ABOVE = re.compile(r"\b(above|over|exceed|greater|more than|at least|≥|>=|por encima|m[aá]s de)\b", re.I)
+_BELOW = re.compile(r"\b(below|under|less than|≤|<=|por debajo|menos de)\b", re.I)
+# Barrier/touch markets ("reach/hit/dip to $T") resolve on ANY touch over the period,
+# not on the terminal price — our terminal lognormal can't price them, so we exclude them.
+_BARRIER = re.compile(r"\b(reach|hit|touch|dip to|fall to|drop to|surpass|new (all[- ]?time )?high|all[- ]?time high|\bath\b)\b", re.I)
+
+
+def is_terminal_threshold(question: str) -> bool:
+    """True only for clean terminal 'be above/below $T on|by <date>' markets."""
+    q = question or ""
+    return bool((_ABOVE.search(q) or _BELOW.search(q)) and not _BARRIER.search(q))
 
 
 def detect_direction(question: str) -> str:
-    """'above' (default for 'reach/hit $T') or 'below'."""
+    """'above' or 'below' for terminal threshold markets."""
     q = question or ""
     if _BELOW.search(q) and not _ABOVE.search(q):
         return "below"

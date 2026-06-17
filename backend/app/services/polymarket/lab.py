@@ -26,7 +26,7 @@ from loguru import logger
 
 from app.services.polymarket.binance import BinanceSpotClient
 from app.services.polymarket.client import PolymarketClient
-from app.services.polymarket.model import detect_direction, model_probability
+from app.services.polymarket.model import detect_direction, is_terminal_threshold, model_probability
 from app.services.polymarket.scanner import PolymarketScanner
 
 _KEY = "polymarket_paper_ledger"
@@ -38,6 +38,9 @@ KELLY_FRACTION = 0.25        # quarter-Kelly (conservative)
 MAX_STAKE_FRAC = 0.10        # never risk >10% of bankroll on one bet
 MIN_VOLUME_24H = 2000.0      # only liquid-enough markets
 FEE_HAIRCUT = 0.02           # 2% per trade, applied in the report (conservative)
+MIN_DAYS = 2                 # skip near-expiry markets (model degenerates at t→0)
+MAX_EDGE = 0.35              # an edge bigger than this on a LIQUID market = our parse
+                             # is wrong (the market isn't), so we refuse it
 
 # --- pre-registered success bar ---
 MIN_RESOLVED = 50
@@ -65,6 +68,12 @@ async def _save(payload: dict) -> None:
                             set_={"payload": payload, "updated_at": datetime.now(timezone.utc)})
     async with session_scope() as s:
         await s.execute(stmt)
+
+
+async def reset_ledger() -> dict:
+    """Wipe the paper ledger (e.g. after a model fix invalidated old bets)."""
+    await _save({"bets": []})
+    return {"reset": True}
 
 
 def _years_until(end_date: str) -> float | None:
@@ -97,10 +106,17 @@ async def find_edges(limit: int = 40) -> list[dict]:
         question = m.get("question") or ""
         if not (symbol and spot and target and implied is not None and end_date):
             continue
+        # Only price clean terminal "be above/below $T on|by <date>" markets; exclude
+        # barrier/touch markets ("reach/hit/dip to $T") our terminal model can't handle.
+        if not is_terminal_threshold(question):
+            continue
         if (m.get("volume_24h") or 0) < MIN_VOLUME_24H:
             continue
         years = _years_until(end_date)
-        if not years:
+        if not years or years < MIN_DAYS / 365.25:
+            continue
+        # Near-resolved markets carry no real edge and high mis-parse risk → skip.
+        if implied <= 0.05 or implied >= 0.95:
             continue
         if symbol not in vol_cache:
             from app.services.polymarket.deribit import dvol_annualized
@@ -117,8 +133,17 @@ async def find_edges(limit: int = 40) -> list[dict]:
         model_p = model_probability(spot, target, vol, years, direction)
         if model_p is None:
             continue
+        # Coherence: if our reading grossly contradicts a liquid market (e.g. strike
+        # clearly below spot for an "above" market, yet implied is low), WE are likely
+        # misreading the market — distrust ourselves, not the market. Skip.
+        if direction == "above":
+            if (target <= spot * 0.97 and implied < 0.5) or (target >= spot * 1.03 and implied > 0.5):
+                continue
+        else:
+            if (target >= spot * 1.03 and implied < 0.5) or (target <= spot * 0.97 and implied > 0.5):
+                continue
         edge = model_p - implied
-        if abs(edge) < MIN_EDGE:
+        if abs(edge) < MIN_EDGE or abs(edge) > MAX_EDGE:
             continue
         side = "YES" if edge > 0 else "NO"
         entry = implied if side == "YES" else (1.0 - implied)
