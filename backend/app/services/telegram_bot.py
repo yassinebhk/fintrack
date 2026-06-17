@@ -645,71 +645,12 @@ class TelegramBotHandler:
 
     async def _send_quick_summary(self) -> None:
         from app.services.report_prefs import get_excluded
+        from app.services.portfolio_report import build_summary_html
 
         p = await self.portfolio_service.calculate_portfolio()
         excluded = await get_excluded()
-        positions = [pos for pos in p["positions"] if (pos.get("ticker") or "").upper() not in excluded]
-
-        # Recompute the report's headline stats from the SHOWN positions only, so
-        # excluded dust doesn't distort them. Convert each position to base currency
-        # via its own fx ratio (market_value_base / market_value).
-        def _to_base(pos: dict, field: str) -> float:
-            mv = pos.get("market_value") or 0
-            fx = (pos["market_value_base"] / mv) if mv else 1.0
-            return (pos.get(field) or 0) * fx
-
-        total_value = sum(pos.get("market_value_base", 0) for pos in positions)
-        total_cost = sum(_to_base(pos, "cost_basis") for pos in positions)
-        daily_change = sum(_to_base(pos, "day_change") for pos in positions)
-        total_pl = total_value - total_cost
-        total_pl_pct = (total_pl / total_cost * 100) if total_cost > 0 else 0.0
-        daily_pct = (daily_change / (total_value - daily_change) * 100) if (total_value - daily_change) > 0 else 0.0
-
-        cur = p["base_currency"]
-        trend = "📈" if daily_change >= 0 else "📉"
-
-        def _short(pos: dict) -> str:
-            nm = (friendly_name(pos["ticker"], pos.get("name")) or pos["ticker"]).replace("&", "y")
-            return nm[:11]
-
-        # Prefer a pretty image card; fall back to the text table if it fails.
-        try:
-            from app.services.charts import portfolio_today_chart
-            crows = sorted(positions[:12], key=lambda x: (x.get("day_change_pct") or 0), reverse=True)
-            clabels = [f"{_short(x)} {(x.get('day_change_pct') or 0):+.1f}%" for x in crows]
-            cvals = [round((x.get("day_change_pct") or 0), 2) for x in crows]
-            tl = [f"Cartera {total_value:.0f} {cur}",
-                  f"Hoy {daily_change:+.0f} {cur} ({daily_pct:+.1f}%)  -  P/L {total_pl_pct:+.1f}%"]
-            cap = (f"💼 <b>Tu cartera</b> · {total_value:.2f} {cur}\n"
-                   f"{trend} Hoy: {daily_change:+.2f} {cur} ({daily_pct:+.2f}%)\n"
-                   f"💰 P/L total: {total_pl:+.2f} {cur} ({total_pl_pct:+.2f}%)")
-            if excluded:
-                cap += f"\n<i>excl.: {', '.join(sorted(excluded))}</i>"
-            if await self.notifier.send_photo(portfolio_today_chart(tl, clabels, cvals), caption=cap[:1024]):
-                return
-        except Exception:
-            pass
-
-        # Monospace table aligns cleanly on Telegram; sorted so today's winners are on top.
-        rows = sorted(positions[:12], key=lambda x: (x.get("day_change_pct") or 0), reverse=True)
-        table = [f"{'':<11}{'HOY':>7}{'P/L':>8}"]
-        for pos in rows:
-            d = f"{(pos.get('day_change_pct') or 0):+.1f}%"
-            pl = f"{(pos.get('gain_loss_pct') or 0):+.1f}%"
-            table.append(f"{_short(pos):<11}{d:>7}{pl:>8}")
-        table_block = "<pre>" + html_escape("\n".join(table)) + "</pre>"
-
-        lines = [
-            f"💼 <b>Tu cartera</b> · {total_value:.2f} {cur}",
-            f"{trend} Hoy: {daily_change:+.2f} {cur} ({daily_pct:+.2f}%)",
-            f"💰 P/L total: {total_pl:+.2f} {cur} ({total_pl_pct:+.2f}%)",
-            "",
-            table_block,
-        ]
-        if excluded:
-            lines.append(f"<i>excl. del cálculo: {', '.join(sorted(excluded))}</i>")
-        lines.append(PAGE_LINK)
-        await self.notifier.send_html("\n".join(lines))
+        html = build_summary_html(p, excluded) + "\n" + PAGE_LINK
+        await self.notifier.send_html(html)
 
     async def _try_contribution(self, text: str) -> bool:
         """Parse and execute a contribution. Returns True if handled."""
