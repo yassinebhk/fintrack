@@ -17,10 +17,13 @@ class PolymarketClient:
         *,
         closed: bool = False,
         limit: int = 50,
+        offset: int = 0,
         tag: str | None = None,
     ) -> list[dict]:
-        """Fetch active markets. Optionally filter by a tag like 'crypto'."""
-        params: dict = {"closed": str(closed).lower(), "limit": limit, "order": "volume24hr", "ascending": "false"}
+        """Fetch active markets. Gamma caps each call at 100, so callers paginate
+        via `offset`. Optionally filter by a tag like 'crypto'."""
+        params: dict = {"closed": str(closed).lower(), "limit": limit, "offset": offset,
+                        "order": "volume24hr", "ascending": "false"}
         if tag:
             params["tag_id"] = tag
         try:
@@ -55,31 +58,40 @@ class PolymarketClient:
         norm["umaResolutionStatus"] = m.get("umaResolutionStatus")
         return norm
 
-    async def search_crypto_markets(self, limit: int = 30) -> list[dict]:
+    async def search_crypto_markets(self, limit: int = 30, pages: int = 6) -> list[dict]:
         """Pull active markets and keep the ones genuinely about crypto prices.
 
-        Uses word-boundary matching so e.g. 'Ethan' doesn't match 'eth', and
-        requires a price-related token ($, k, price, hit, reach, above, below)
-        to avoid sports/politics noise.
+        Crypto price markets aren't in the top-100 by volume, and Gamma caps each
+        call at 100, so we PAGINATE (offset) across several pages. Word-boundary
+        matching avoids 'Ethan'→'eth'; a price token ($/k/price/hit/above/…) filters
+        out sports/politics noise.
         """
         import re
 
-        markets = await self.get_markets(closed=False, limit=200)
         crypto_re = re.compile(
-            r"\b(bitcoin|btc|ethereum|eth|solana|sol|dogecoin|doge|crypto)\b",
+            r"\b(bitcoin|btc|ethereum|eth|solana|sol|dogecoin|doge)\b",
             re.IGNORECASE,
         )
         price_signal_re = re.compile(
             r"(\$|\bprice\b|\bhit\b|\breach\b|\babove\b|\bbelow\b|\bk\b|all[- ]time high|\bath\b)",
             re.IGNORECASE,
         )
-        result = []
-        for m in markets:
-            question = m.get("question") or m.get("title") or ""
-            if crypto_re.search(question) and price_signal_re.search(question):
-                result.append(self._normalize_market(m))
-            if len(result) >= limit:
+        result: list[dict] = []
+        seen: set = set()
+        for p in range(pages):
+            batch = await self.get_markets(closed=False, limit=100, offset=p * 100)
+            if not batch:
                 break
+            for m in batch:
+                question = m.get("question") or m.get("title") or ""
+                mid = m.get("id")
+                if mid in seen:
+                    continue
+                if crypto_re.search(question) and price_signal_re.search(question):
+                    seen.add(mid)
+                    result.append(self._normalize_market(m))
+                    if len(result) >= limit:
+                        return result
         return result
 
     def _normalize_market(self, m: dict) -> dict:
