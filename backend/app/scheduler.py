@@ -111,6 +111,30 @@ async def _polymarket_lab_job() -> None:
         logger.error("polymarket lab job failed: {}", exc)
 
 
+async def _systematic_rebalance_job() -> None:
+    """Weekly: rebalance the systematic paper portfolio, mark it, send the digest."""
+    try:
+        from app.services.systematic import paper
+        from app.services.systematic.digest import telegram_digest
+        from app.services.notifications.telegram import TelegramNotifier
+        await paper.rebalance()
+        await paper.mark()
+        await TelegramNotifier().send_html(await telegram_digest())
+        logger.info("systematic: weekly rebalance + digest done")
+    except Exception as exc:
+        logger.error("systematic rebalance job failed: {}", exc)
+
+
+async def _systematic_mark_job() -> None:
+    """Daily: mark the systematic paper portfolio to market (build the NAV curve)."""
+    try:
+        from app.services.systematic import paper
+        res = await paper.mark()
+        logger.info("systematic daily mark: {}", res)
+    except Exception as exc:
+        logger.error("systematic mark job failed: {}", exc)
+
+
 async def _ipo_spacex_reminder() -> None:
     """One-off heads-up around the SpaceX IPO (12-Jun-2026): how the user's space
     ETF (JEDI) is moving, plus a 'sell the news' caution. Fires on 11 and 12 Jun."""
@@ -239,6 +263,23 @@ def setup_jobs() -> None:
         coalesce=True,
     )
     logger.info("scheduled: polymarket_lab @ 07:15 {}", settings.timezone)
+
+    # Systematic paper portfolio (multi-asset) — additive, no broker/LLM needed.
+    sched.add_job(
+        _systematic_rebalance_job,
+        trigger=CronTrigger(day_of_week="mon", hour=7, minute=30, timezone=settings.timezone),
+        id="systematic_rebalance",
+        name="Systematic paper portfolio weekly rebalance + digest",
+        replace_existing=True, max_instances=1, coalesce=True,
+    )
+    sched.add_job(
+        _systematic_mark_job,
+        trigger=CronTrigger(hour=22, minute=30, timezone=settings.timezone),
+        id="systematic_mark",
+        name="Systematic paper portfolio daily NAV mark",
+        replace_existing=True, max_instances=1, coalesce=True,
+    )
+    logger.info("scheduled: systematic rebalance (Mon 07:30) + daily mark (22:30) {}", settings.timezone)
 
 
 def start_scheduler() -> None:
