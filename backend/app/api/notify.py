@@ -27,20 +27,29 @@ async def send(payload: NotifyIn, secret: str = "") -> dict:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.post("/portfolio-card")
-async def portfolio_card(secret: str = "") -> dict:
-    """Send the portfolio to Telegram as a clean monospace table (headline + grid)."""
-    if not _SECRET or secret != _SECRET:
-        raise HTTPException(status_code=401, detail="invalid secret")
+async def _send_portfolio_table() -> None:
     from app.services.notifications.telegram import TelegramNotifier
     from app.services.portfolio import PortfolioService
     from app.services.portfolio_report import build_summary_html
     from app.services.report_prefs import get_excluded
+    try:
+        p = await PortfolioService().calculate_portfolio()
+        excluded = await get_excluded()
+        await TelegramNotifier().send_html(build_summary_html(p, excluded))
+    except Exception:
+        logger.exception("portfolio-card send failed")
 
-    p = await PortfolioService().calculate_portfolio()
-    excluded = await get_excluded()
-    ok = await TelegramNotifier().send_html(build_summary_html(p, excluded))
-    return {"sent": bool(ok)}
+
+@router.post("/portfolio-card")
+async def portfolio_card(secret: str = "") -> dict:
+    """Send the portfolio to Telegram as a clean monospace table (headline + grid).
+    Runs in the background so the heavy live-price recompute never hits the gateway
+    timeout (Render free tier)."""
+    if not _SECRET or secret != _SECRET:
+        raise HTTPException(status_code=401, detail="invalid secret")
+    import asyncio
+    asyncio.create_task(_send_portfolio_table())
+    return {"status": "accepted"}
 
 
 class ChartReq(BaseModel):
