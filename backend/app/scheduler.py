@@ -96,6 +96,17 @@ async def _alerts_job() -> None:
         logger.error("scheduled alerts evaluation failed: {}", exc)
 
 
+async def _polymarket_lab_job() -> None:
+    """Daily: log fresh model-vs-market paper bets + resolve matured ones. No real money."""
+    try:
+        from app.services.polymarket import lab
+        logged = await lab.log_paper_bets()
+        resolved = await lab.evaluate()
+        logger.info("polymarket lab: {} new bets, {} resolved", logged.get("new_bets"), resolved.get("resolved_now"))
+    except Exception as exc:
+        logger.error("polymarket lab job failed: {}", exc)
+
+
 async def _ipo_spacex_reminder() -> None:
     """One-off heads-up around the SpaceX IPO (12-Jun-2026): how the user's space
     ETF (JEDI) is moving, plus a 'sell the news' caution. Fires on 11 and 12 Jun."""
@@ -212,6 +223,18 @@ def setup_jobs() -> None:
                 misfire_grace_time=3600,
             )
         logger.info("scheduled: SpaceX IPO heads-up 11-12 Jun")
+
+    # Polymarket paper-trading lab — needs no LLM/broker, so it runs unconditionally.
+    sched.add_job(
+        _polymarket_lab_job,
+        trigger=CronTrigger(hour=7, minute=15, timezone=settings.timezone),
+        id="polymarket_lab",
+        name="Polymarket paper-trading lab (log edges + resolve) daily",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    logger.info("scheduled: polymarket_lab @ 07:15 {}", settings.timezone)
 
 
 def start_scheduler() -> None:

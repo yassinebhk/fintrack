@@ -35,6 +35,26 @@ class PolymarketClient:
             data = data.get("data", [])
         return data or []
 
+    async def get_market_by_id(self, market_id: str) -> dict | None:
+        """Fetch a single market by id (used to check resolution of a paper bet).
+        Returns the normalized market plus raw `closed`/resolution fields."""
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.get(f"{GAMMA_URL}/markets/{market_id}")
+                resp.raise_for_status()
+                m = resp.json()
+        except Exception as exc:
+            logger.warning("polymarket market {} fetch failed: {}", market_id, exc)
+            return None
+        if isinstance(m, list):
+            m = m[0] if m else None
+        if not m:
+            return None
+        norm = self._normalize_market(m)
+        norm["closed"] = bool(m.get("closed"))
+        norm["umaResolutionStatus"] = m.get("umaResolutionStatus")
+        return norm
+
     async def search_crypto_markets(self, limit: int = 30) -> list[dict]:
         """Pull active markets and keep the ones genuinely about crypto prices.
 
