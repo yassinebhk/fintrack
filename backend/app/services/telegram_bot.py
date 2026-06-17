@@ -672,6 +672,24 @@ class TelegramBotHandler:
             nm = (friendly_name(pos["ticker"], pos.get("name")) or pos["ticker"]).replace("&", "y")
             return nm[:11]
 
+        # Prefer a pretty image card; fall back to the text table if it fails.
+        try:
+            from app.services.charts import portfolio_today_chart
+            crows = sorted(positions[:12], key=lambda x: (x.get("day_change_pct") or 0), reverse=True)
+            clabels = [f"{_short(x)} {(x.get('day_change_pct') or 0):+.1f}%" for x in crows]
+            cvals = [round((x.get("day_change_pct") or 0), 2) for x in crows]
+            tl = [f"Cartera {total_value:.0f} {cur}",
+                  f"Hoy {daily_change:+.0f} {cur} ({daily_pct:+.1f}%)  -  P/L {total_pl_pct:+.1f}%"]
+            cap = (f"💼 <b>Tu cartera</b> · {total_value:.2f} {cur}\n"
+                   f"{trend} Hoy: {daily_change:+.2f} {cur} ({daily_pct:+.2f}%)\n"
+                   f"💰 P/L total: {total_pl:+.2f} {cur} ({total_pl_pct:+.2f}%)")
+            if excluded:
+                cap += f"\n<i>excl.: {', '.join(sorted(excluded))}</i>"
+            if await self.notifier.send_photo(portfolio_today_chart(tl, clabels, cvals), caption=cap[:1024]):
+                return
+        except Exception:
+            pass
+
         # Monospace table aligns cleanly on Telegram; sorted so today's winners are on top.
         rows = sorted(positions[:12], key=lambda x: (x.get("day_change_pct") or 0), reverse=True)
         table = [f"{'':<11}{'HOY':>7}{'P/L':>8}"]

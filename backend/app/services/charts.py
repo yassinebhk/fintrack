@@ -134,6 +134,33 @@ def bar_chart(title: str, labels: list[str], values: list[float], color: str = "
     return _chart_url(config, width=width, height=height)
 
 
+def portfolio_today_chart(title_lines: list[str], labels: list[str], values: list[float],
+                          width: int = 620, height: int | None = None) -> str:
+    """Horizontal bar card of today's % move per holding (green up / red down).
+    `title_lines` is shown as a multi-line title (total, today, P/L)."""
+    colors = ["#10b981" if (v or 0) >= 0 else "#ef4444" for v in values]
+    height = height or max(240, 40 * len(labels) + 110)
+    config = {
+        "type": "bar",
+        "data": {"labels": labels, "datasets": [{
+            "data": values, "backgroundColor": colors, "borderWidth": 0,
+        }]},
+        "options": {
+            "indexAxis": "y",
+            "plugins": {
+                "title": {"display": True, "text": title_lines, "color": "#f8fafc", "font": {"size": 15}},
+                "legend": {"display": False},
+            },
+            "scales": {
+                "x": {"ticks": {"color": "#94a3b8"}, "grid": {"color": "rgba(255,255,255,0.06)"},
+                      "title": {"display": True, "text": "% hoy", "color": "#64748b"}},
+                "y": {"ticks": {"color": "#e2e8f0"}, "grid": {"display": False}},
+            },
+        },
+    }
+    return _chart_url(config, width=width, height=height)
+
+
 def doughnut_chart(title: str, labels: list[str], values: list[float]) -> str:
     colors = ["#00d4aa", "#6366f1", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6", "#ef4444", "#3b82f6"]
     config = {
