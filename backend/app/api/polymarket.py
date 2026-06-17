@@ -62,12 +62,42 @@ async def lab_ledger(limit: int = Query(default=50, ge=1, le=500)) -> dict:
     return {"total": len(bets), "bets": bets[-limit:][::-1]}
 
 
+async def _lab_run_and_digest(send_digest: bool) -> None:
+    from app.services.polymarket import lab
+    try:
+        logged = await lab.log_paper_bets()
+        resolved = await lab.evaluate()
+        if send_digest or (logged.get("new_bets") or 0) > 0 or (resolved.get("resolved_now") or 0) > 0:
+            from app.services.notifications.telegram import TelegramNotifier
+            await TelegramNotifier().send_html(await lab.telegram_digest())
+    except Exception:
+        logger.exception("lab run/digest failed")
+
+
 @router.post("/lab/run")
-async def lab_run(secret: str = "") -> dict:
-    """Log new paper bets for fresh edges + resolve matured ones. Cron + manual."""
+async def lab_run(secret: str = "", digest: bool = True) -> dict:
+    """Log new paper bets + resolve matured ones (+ send digest). Runs in background to
+    dodge the Render gateway timeout on the heavy scan."""
     if not _SECRET or secret != _SECRET:
         raise HTTPException(status_code=401, detail="invalid secret")
-    from app.services.polymarket import lab
-    logged = await lab.log_paper_bets()
-    resolved = await lab.evaluate()
-    return {"logged": logged, "resolved": resolved}
+    import asyncio
+    asyncio.create_task(_lab_run_and_digest(send_digest=digest))
+    return {"status": "accepted"}
+
+
+@router.post("/lab/digest")
+async def lab_digest(secret: str = "") -> dict:
+    """Send the current self-explanatory Lab digest to Telegram (background)."""
+    if not _SECRET or secret != _SECRET:
+        raise HTTPException(status_code=401, detail="invalid secret")
+    import asyncio
+
+    async def _send():
+        from app.services.polymarket import lab
+        from app.services.notifications.telegram import TelegramNotifier
+        try:
+            await TelegramNotifier().send_html(await lab.telegram_digest())
+        except Exception:
+            logger.exception("lab digest send failed")
+    asyncio.create_task(_send())
+    return {"status": "accepted"}

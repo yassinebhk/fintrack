@@ -103,12 +103,18 @@ async def find_edges(limit: int = 40) -> list[dict]:
         if not years:
             continue
         if symbol not in vol_cache:
-            v = await binance.realized_vol_annualized(symbol)
+            from app.services.polymarket.deribit import dvol_annualized
+            v, src = await dvol_annualized(symbol), "DVOL-implícita"   # forward-looking (BTC/ETH)
+            if not v:
+                v, src = await binance.realized_vol_yang_zhang(symbol), "Yang-Zhang"  # efficient OHLC
+            if not v:
+                v, src = await binance.realized_vol_annualized(symbol), "close-to-close"
             if not v:
                 continue
-            vol_cache[symbol] = v
+            vol_cache[symbol] = (v, src)
+        vol, vol_src = vol_cache[symbol]
         direction = detect_direction(question)
-        model_p = model_probability(spot, target, vol_cache[symbol], years, direction)
+        model_p = model_probability(spot, target, vol, years, direction)
         if model_p is None:
             continue
         edge = model_p - implied
@@ -131,7 +137,7 @@ async def find_edges(limit: int = 40) -> list[dict]:
             "end_date": end_date, "side": side, "entry_price": round(entry, 4),
             "model_prob_yes": round(model_p, 4), "implied_prob_yes": round(implied, 4),
             "edge": round(edge, 4), "win_prob": round(win_p, 4),
-            "vol_annual": round(vol_cache[symbol], 4), "years": round(years, 4), "stake": stake,
+            "vol_annual": round(vol, 4), "vol_source": vol_src, "years": round(years, 4), "stake": stake,
         })
     return out
 
@@ -225,6 +231,65 @@ async def report() -> dict:
     }
     summary["criteria"] = _criteria_block(summary)
     return summary
+
+
+def _short_label(b: dict) -> str:
+    sym = (b.get("symbol") or "").replace("USDT", "")
+    tgt = b.get("target") or 0
+    tgt_s = f"{tgt/1000:.0f}k" if tgt >= 1000 else (f"{tgt:.0f}" if tgt >= 1 else f"{tgt:.3f}")
+    arrow = "≥" if b.get("direction") == "above" else "≤"
+    return f"{sym}{arrow}{tgt_s}"[:13]
+
+
+async def telegram_digest() -> str:
+    """Self-explanatory, clean HTML digest for Telegram. Defines every term inline."""
+    from app.services.notifications.telegram import html_escape
+    rep = await report()
+    data = await _load()
+    open_bets = [b for b in data.get("bets", []) if b.get("status") == "open"]
+
+    lines = [
+        "🧪 <b>Lab Polymarket</b> · paper-trading (sin dinero real)",
+        "<i>Apuesto en PAPEL cuando mi modelo de probabilidad discrepa del precio del "
+        "mercado. Meta: probar si acierto MÁS que el mercado antes de arriesgar 1€.</i>",
+        "━━━━━━━━━━━━━━",
+    ]
+
+    n = rep.get("resolved", 0)
+    lines.append(f"📊 <b>Resultados</b> — apuestas cerradas: <b>{n}</b>")
+    if n == 0:
+        lines.append("<i>Aún sin mercados resueltos (tardan semanas en cerrar). "
+                     "Que no haya resultados todavía es lo correcto, no un fallo.</i>")
+    else:
+        beat = (rep.get("model_brier") is not None and rep.get("market_brier") is not None
+                and rep["model_brier"] < rep["market_brier"])
+        lines += [
+            f"• Aciertos: <b>{rep['wins']}/{n}</b> ({rep['hit_rate_pct']}%)",
+            f"• Rentabilidad neta: <b>{rep['mean_net_roi_per_bet_pct']:+}%</b> por apuesta "
+            f"(IC95 desde {rep['net_roi_ci95_low_pct']:+}%)",
+            f"• P&amp;L acumulado: <b>{rep['total_pnl']:+} </b>(papel)",
+            f"• ¿Mi modelo predice mejor que el mercado? <b>{'SÍ ✅' if beat else 'NO ❌'}</b> "
+            f"<i>(error Brier {rep['model_brier']} vs {rep['market_brier']}; menor = mejor)</i>",
+        ]
+
+    if open_bets:
+        rows = sorted(open_bets, key=lambda b: abs(b.get("edge") or 0), reverse=True)[:6]
+        tbl = [f"{'MERCADO':<13}{'MODELO':>7}{'MERC.':>7}{'VOY':>5}"]
+        for b in rows:
+            mp = f"{(b.get('model_prob_yes') or 0)*100:.0f}%"
+            ip = f"{(b.get('implied_prob_yes') or 0)*100:.0f}%"
+            tbl.append(f"{_short_label(b):<13}{mp:>7}{ip:>7}{b.get('side',''):>5}")
+        lines += ["", f"🎯 <b>Apuestas abiertas: {len(open_bets)}</b> "
+                  "<i>(modelo = mi prob.; merc. = prob. del mercado; voy = a qué lado apuesto)</i>",
+                  "<pre>" + html_escape("\n".join(tbl)) + "</pre>"]
+
+    crit = rep.get("criteria", {})
+    ready = crit.get("passed")
+    lines += ["", f"🚦 <b>¿Listo para dinero real?</b> {'SÍ ✅' if ready else 'NO ❌'}"]
+    if not ready:
+        lines.append(f"<i>Faltan datos. Bar: ≥{MIN_RESOLVED} cerradas, batir al mercado, y "
+                     "rentabilidad neta positiva con significancia. Hasta entonces, solo papel.</i>")
+    return "\n".join(lines)
 
 
 def _criteria_block(s: dict | None) -> dict:

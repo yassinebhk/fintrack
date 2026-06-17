@@ -97,12 +97,16 @@ async def _alerts_job() -> None:
 
 
 async def _polymarket_lab_job() -> None:
-    """Daily: log fresh model-vs-market paper bets + resolve matured ones. No real money."""
+    """Daily: log fresh model-vs-market paper bets + resolve matured ones. No real money.
+    Sends the Telegram digest ONLY when something changed (avoids '0 resolved' spam)."""
     try:
         from app.services.polymarket import lab
         logged = await lab.log_paper_bets()
         resolved = await lab.evaluate()
-        logger.info("polymarket lab: {} new bets, {} resolved", logged.get("new_bets"), resolved.get("resolved_now"))
+        if (logged.get("new_bets") or 0) > 0 or (resolved.get("resolved_now") or 0) > 0:
+            from app.services.notifications.telegram import TelegramNotifier
+            await TelegramNotifier().send_html(await lab.telegram_digest())
+        logger.info("polymarket lab: {} new, {} resolved", logged.get("new_bets"), resolved.get("resolved_now"))
     except Exception as exc:
         logger.error("polymarket lab job failed: {}", exc)
 
