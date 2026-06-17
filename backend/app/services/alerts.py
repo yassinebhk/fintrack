@@ -111,6 +111,9 @@ class AlertsEngine:
                 source="watchlist",
             ))
 
+        # Rule 2c: trailing-stop sell signals (track peak, alert on drop from it)
+        await self._check_trailing_stops(portfolio, created)
+
         # Rule 3: drawdown from peak
         kpis = portfolio.get("kpis", {})
         max_dd = kpis.get("max_drawdown", 0)
@@ -175,6 +178,70 @@ class AlertsEngine:
             from app.services.discovery.market_scanner import MarketScanner
             AlertsEngine._scanner_singleton = MarketScanner()
         return AlertsEngine._scanner_singleton
+
+    async def _check_trailing_stops(self, portfolio: dict, created: list) -> None:
+        """Track each watched ticker's running peak; fire a CRITICAL sell signal when
+        price drops `trailing_pct` below that peak. Needs no price history → works for
+        brand-new listings (IPOs) where RSI/Sharpe/vol are meaningless."""
+        try:
+            from app.services import trailing_stops as ts
+            stops = await ts.get_all()
+        except Exception as exc:
+            logger.debug("trailing stops load failed: {}", exc)
+            return
+        if not stops:
+            return
+        pos_price: dict[str, tuple] = {}
+        for p in portfolio.get("positions", []):
+            t = (p.get("ticker") or "").upper()
+            if p.get("current_price"):
+                pos_price[t] = (p["current_price"], p.get("currency") or "")
+        changed = False
+        for stop in stops:
+            if not stop.get("active"):
+                continue
+            tk = (stop.get("ticker") or "").upper()
+            price = None
+            cur = stop.get("currency") or ""
+            if tk in pos_price:
+                price, cur = pos_price[tk][0], (pos_price[tk][1] or cur)
+            else:
+                try:
+                    pr = await self._scanner().yahoo.get_price(tk)
+                    if pr:
+                        price, cur = pr.get("price"), (pr.get("currency") or cur)
+                except Exception as exc:
+                    logger.debug("trailing stop price {} failed: {}", tk, exc)
+            if not price or price <= 0:
+                continue
+            peak = float(stop.get("peak") or 0)
+            if price > peak:
+                stop["peak"] = price
+                peak = price
+                changed = True
+            pct = float(stop.get("trailing_pct") or 12)
+            if peak > 0 and price <= peak * (1 - pct / 100.0):
+                drop = (price - peak) / peak * 100
+                label = stop.get("label") or tk
+                res = await self._maybe_create(
+                    kind="trailing_stop", severity="critical",
+                    title=f"🔻 Señal de venta: {tk} {drop:.1f}% desde máximo",
+                    body=(f"{label}: precio {price:.2f} {cur}, ha caído {drop:.1f}% desde su máximo de "
+                          f"{peak:.2f} {cur} (stop dinámico {pct:.0f}%). El movimiento se ha girado — "
+                          f"valora vender. (Análisis, no recomendación.)"),
+                    payload={"ticker": tk, "price": price, "peak": peak,
+                             "trailing_pct": pct, "drop_from_peak_pct": round(drop, 2)},
+                    dedupe_key=f"trailing_stop:{tk}",
+                )
+                if res:
+                    created.append(res)
+                stop["active"] = False  # fire once, then disarm (re-arm to reactivate)
+                changed = True
+        if changed:
+            try:
+                await ts.update_peaks_and_save(stops)
+            except Exception as exc:
+                logger.debug("trailing stops save failed: {}", exc)
 
     async def _watchlist_extra(self, held: set[str]) -> dict[str, str]:
         """Plan/watchlist tickers not already in the portfolio. Returns {ticker: label}."""

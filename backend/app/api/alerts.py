@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +13,28 @@ from app.services.alerts import AlertsEngine
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 _engine = AlertsEngine()
+
+
+class TrailingStopIn(BaseModel):
+    ticker: str = Field(min_length=1)
+    trailing_pct: float = Field(gt=0, le=90)
+    label: str = ""
+    peak: float | None = None
+    currency: str = ""
+
+
+@router.get("/trailing-stops")
+async def list_trailing_stops() -> dict:
+    from app.services import trailing_stops as ts
+    return {"stops": await ts.get_all()}
+
+
+@router.post("/trailing-stop")
+async def set_trailing_stop(payload: TrailingStopIn) -> dict:
+    from app.services import trailing_stops as ts
+    stop = await ts.set_stop(payload.ticker, payload.trailing_pct,
+                             payload.label, payload.peak, payload.currency)
+    return {"message": "trailing stop armado", "stop": stop}
 
 
 @router.get("")
