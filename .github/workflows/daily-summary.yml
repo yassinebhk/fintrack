@@ -1,0 +1,32 @@
+name: daily-summary
+
+# Sends + pins the daily portfolio summary to Telegram. Runs from GitHub's servers,
+# so it fires reliably even when Render's free tier has put the backend to sleep
+# (internal APScheduler jobs don't keep a free dyno awake).
+#
+# Required GitHub Secrets (same as the other workers):
+#   FINTRACK_API_URL        — e.g. https://fintrack-front.onrender.com/api
+#   FINTRACK_INGEST_SECRET  — same value as CREATORS_INGEST_SECRET in Render env
+
+on:
+  schedule:
+    - cron: "5 6 * * *"    # 06:05 UTC ≈ 08:05 Europe/Madrid
+  workflow_dispatch: {}
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wake backend then trigger pinned daily summary
+        env:
+          API_URL: ${{ secrets.FINTRACK_API_URL }}
+          SECRET: ${{ secrets.FINTRACK_INGEST_SECRET }}
+        run: |
+          # Wake the dyno first (Render free tier may be asleep), then trigger.
+          curl -s -o /dev/null --max-time 120 "${API_URL%/}/health" || true
+          sleep 5
+          code=$(curl -s -o /tmp/out.json -w "%{http_code}" --max-time 60 \
+            -X POST "${API_URL%/}/notify/daily-summary?secret=${SECRET}")
+          echo "HTTP $code"; cat /tmp/out.json || true
+          test "$code" = "200"
