@@ -42,12 +42,12 @@ async def _kraken_sync_job() -> None:
 
 
 async def _briefing_job() -> None:
-    # 1) Daily portfolio snapshot summary (live values per position, like checking each app)
+    # 1) Daily portfolio snapshot summary — sent AND pinned (unpins yesterday's).
     try:
-        from app.services.telegram_bot import TelegramBotHandler
+        from app.services.portfolio_report import send_daily_summary_pinned
 
-        await TelegramBotHandler()._send_quick_summary()
-        logger.info("daily portfolio summary sent")
+        res = await send_daily_summary_pinned()
+        logger.info("daily portfolio summary sent (pinned={})", res.get("pinned"))
     except Exception as exc:
         logger.error("daily portfolio summary failed: {}", exc)
 

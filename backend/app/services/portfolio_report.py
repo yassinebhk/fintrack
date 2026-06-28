@@ -6,6 +6,54 @@ doesn't distort them (per-position fx via market_value_base / market_value)."""
 
 from __future__ import annotations
 
+_PIN_KEY = "pinned_daily_summary"
+
+
+async def _get_pinned_id() -> int | None:
+    try:
+        from sqlalchemy import select
+        from app.db import session_scope
+        from app.models import JsonCache
+        async with session_scope() as s:
+            row = (await s.execute(select(JsonCache).where(JsonCache.key == _PIN_KEY))).scalar_one_or_none()
+        return (row.payload or {}).get("message_id") if row and row.payload else None
+    except Exception:
+        return None
+
+
+async def _set_pinned_id(message_id: int) -> None:
+    from datetime import datetime, timezone
+    from app.db import session_scope, upsert_insert
+    from app.models import JsonCache
+    payload = {"message_id": message_id}
+    stmt = upsert_insert()(JsonCache).values(key=_PIN_KEY, payload=payload, updated_at=datetime.now(timezone.utc)) \
+        .on_conflict_do_update(index_elements=["key"], set_={"payload": payload, "updated_at": datetime.now(timezone.utc)})
+    async with session_scope() as s:
+        await s.execute(stmt)
+
+
+async def send_daily_summary_pinned() -> dict:
+    """Build the portfolio table, send it, unpin yesterday's, pin today's. Used by
+    the scheduler and the daily GitHub-Actions cron (reliable even if Render slept)."""
+    from app.services.notifications.telegram import TelegramNotifier
+    from app.services.portfolio import PortfolioService
+    from app.services.report_prefs import get_excluded
+    p = await PortfolioService().calculate_portfolio()
+    excluded = await get_excluded()
+    html = build_summary_html(p, excluded) + "\n📌 <i>Resumen diario</i>"
+    n = TelegramNotifier()
+    mid = await n.send_html_return_id(html)
+    if not mid:
+        await n.send_html(html)  # fallback: at least deliver, unpinned
+        return {"sent": True, "pinned": False}
+    prev = await _get_pinned_id()
+    if prev and prev != mid:
+        await n.unpin_message(prev)
+    pinned = await n.pin_message(mid)
+    await _set_pinned_id(mid)
+    return {"sent": True, "pinned": pinned, "message_id": mid}
+
+
 _NICE = {
     "IE00B4ND3602": "Oro", "IE00BYX5NX33": "MSCI World", "LYX0F.DE": "Nasdaq100",
     "VVSM.DE": "Semis", "QDVF.DE": "Energia", "NUKL.DE": "Uranio", "BTEC.L": "Biotech",

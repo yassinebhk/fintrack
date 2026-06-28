@@ -90,6 +90,52 @@ class TelegramNotifier:
         plain = plain.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
         return await self.send_text(plain)
 
+    async def send_html_return_id(self, html: str) -> int | None:
+        """Like send_html but returns Telegram's message_id (needed to pin)."""
+        if not self.enabled:
+            return None
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.post(
+                    self.BASE_URL.format(token=self.token, method="sendMessage"),
+                    json={"chat_id": self.chat_id, "text": html[:TG_MAX_LEN],
+                          "parse_mode": "HTML", "disable_web_page_preview": True},
+                )
+                if resp.status_code >= 400:
+                    logger.warning("telegram send(id) failed ({}): {}", resp.status_code, resp.text[:200])
+                    return None
+                return (resp.json().get("result") or {}).get("message_id")
+        except Exception as exc:
+            logger.error("telegram send_html_return_id failed: {}", exc)
+            return None
+
+    async def pin_message(self, message_id: int, silent: bool = True) -> bool:
+        if not self.enabled or not message_id:
+            return False
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                r = await client.post(
+                    self.BASE_URL.format(token=self.token, method="pinChatMessage"),
+                    json={"chat_id": self.chat_id, "message_id": message_id, "disable_notification": silent},
+                )
+            return r.status_code < 400
+        except Exception as exc:
+            logger.warning("telegram pin failed: {}", exc)
+            return False
+
+    async def unpin_message(self, message_id: int) -> bool:
+        if not self.enabled or not message_id:
+            return False
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                await client.post(
+                    self.BASE_URL.format(token=self.token, method="unpinChatMessage"),
+                    json={"chat_id": self.chat_id, "message_id": message_id},
+                )
+            return True
+        except Exception:
+            return False
+
     async def send_photo(self, photo_url: str, caption: str = "") -> bool:
         """Send a photo by URL (e.g. a QuickChart image). caption supports HTML."""
         if not self.enabled:

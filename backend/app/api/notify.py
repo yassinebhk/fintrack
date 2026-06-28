@@ -27,6 +27,25 @@ async def send(payload: NotifyIn, secret: str = "") -> dict:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.post("/daily-summary")
+async def daily_summary(secret: str = "") -> dict:
+    """Send + PIN the daily portfolio table (unpins yesterday's). Triggered by a
+    GitHub-Actions cron so it's reliable even when Render's free tier has slept.
+    Runs in the background to dodge the gateway timeout on the live-price recompute."""
+    if not _SECRET or secret != _SECRET:
+        raise HTTPException(status_code=401, detail="invalid secret")
+    import asyncio
+
+    async def _job():
+        from app.services.portfolio_report import send_daily_summary_pinned
+        try:
+            await send_daily_summary_pinned()
+        except Exception:
+            logger.exception("daily-summary pinned send failed")
+    asyncio.create_task(_job())
+    return {"status": "accepted"}
+
+
 async def _send_portfolio_table() -> None:
     from app.services.notifications.telegram import TelegramNotifier
     from app.services.portfolio import PortfolioService
