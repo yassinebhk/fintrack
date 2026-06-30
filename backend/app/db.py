@@ -21,16 +21,14 @@ _settings = get_settings()
 
 # Managed Postgres / CockroachDB over asyncpg needs TLS, and CockroachDB also
 # requires asyncpg's prepared-statement cache disabled (it errors otherwise).
-# Encrypt without cert verification → no CA file to ship to Render; channel is
-# still encrypted. (SQLite local dev path keeps connect_args empty.)
+# FULL TLS verification against system CAs (CockroachDB Cloud uses a publicly
+# trusted cert → verified) — equivalent to sslmode=verify-full, no CA file to ship.
+# (SQLite local dev path keeps connect_args empty.)
 _connect_args: dict = {}
 if "asyncpg" in _settings.async_database_url:
     import ssl as _ssl
 
-    _ctx = _ssl.create_default_context()
-    _ctx.check_hostname = False
-    _ctx.verify_mode = _ssl.CERT_NONE
-    _connect_args = {"ssl": _ctx, "statement_cache_size": 0}
+    _connect_args = {"ssl": _ssl.create_default_context(), "statement_cache_size": 0}
 
 engine = create_async_engine(
     _settings.async_database_url,
