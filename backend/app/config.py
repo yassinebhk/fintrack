@@ -73,11 +73,16 @@ class Settings(BaseSettings):
         SQLAlchemy async needs `postgresql+asyncpg://...`.
         """
         url = self.database_url
-        if url.startswith("postgres://"):
-            url = "postgresql+asyncpg://" + url[len("postgres://"):]
-        elif url.startswith("postgresql://"):
-            url = "postgresql+asyncpg://" + url[len("postgresql://"):]
-        # Strip sslmode query param that asyncpg doesn't accept as-is
+        # CockroachDB needs SQLAlchemy's cockroachdb dialect (the plain postgresql
+        # asyncpg dialect breaks on its JSON type: "unknown type: pg_catalog.json").
+        is_crdb = "cockroachlabs.cloud" in url or url.startswith("cockroachdb")
+        driver = "cockroachdb+asyncpg" if is_crdb else "postgresql+asyncpg"
+        for prefix in ("postgresql://", "postgres://", "cockroachdb://"):
+            if url.startswith(prefix):
+                url = f"{driver}://" + url[len(prefix):]
+                break
+        # Strip sslmode query param that asyncpg doesn't accept as-is (SSL is set
+        # via connect_args in db.py).
         if "?sslmode=" in url:
             url = url.split("?sslmode=")[0]
         return url
