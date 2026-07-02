@@ -10,7 +10,13 @@ name: daily-summary
 
 on:
   schedule:
-    - cron: "5 6 * * *"    # 06:05 UTC ≈ 08:05 Europe/Madrid
+    # Several morning times as REDUNDANCY: GitHub Actions frequently delays or skips
+    # scheduled runs. The endpoint is idempotent per day (only the first successful
+    # send delivers; the rest skip), so firing multiple times never spams.
+    - cron: "5 6 * * *"    # ≈ 08:05 Europe/Madrid
+    - cron: "35 6 * * *"   # ≈ 08:35
+    - cron: "20 7 * * *"   # ≈ 09:20
+    - cron: "10 8 * * *"   # ≈ 10:10
   workflow_dispatch: {}
 
 jobs:

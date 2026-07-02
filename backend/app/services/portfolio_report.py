@@ -9,35 +9,43 @@ from __future__ import annotations
 _PIN_KEY = "pinned_daily_summary"
 
 
-async def _get_pinned_id() -> int | None:
+async def _load_pin() -> dict:
     try:
         from sqlalchemy import select
         from app.db import session_scope
         from app.models import JsonCache
         async with session_scope() as s:
             row = (await s.execute(select(JsonCache).where(JsonCache.key == _PIN_KEY))).scalar_one_or_none()
-        return (row.payload or {}).get("message_id") if row and row.payload else None
+        return (row.payload or {}) if row and row.payload else {}
     except Exception:
-        return None
+        return {}
 
 
-async def _set_pinned_id(message_id: int) -> None:
+async def _save_pin(message_id: int, date: str) -> None:
     from datetime import datetime, timezone
     from app.db import session_scope, upsert_insert
     from app.models import JsonCache
-    payload = {"message_id": message_id}
+    payload = {"message_id": message_id, "date": date}
     stmt = upsert_insert()(JsonCache).values(key=_PIN_KEY, payload=payload, updated_at=datetime.now(timezone.utc)) \
         .on_conflict_do_update(index_elements=["key"], set_={"payload": payload, "updated_at": datetime.now(timezone.utc)})
     async with session_scope() as s:
         await s.execute(stmt)
 
 
-async def send_daily_summary_pinned() -> dict:
-    """Build the portfolio table, send it, unpin yesterday's, pin today's. Used by
-    the scheduler and the daily GitHub-Actions cron (reliable even if Render slept)."""
+async def send_daily_summary_pinned(force: bool = False) -> dict:
+    """Build the portfolio table, send it, unpin yesterday's, pin today's.
+    Idempotent per day: if already sent today it skips (unless force=True), so several
+    morning cron times can fire as redundancy without spamming the user."""
+    from datetime import datetime, timezone
     from app.services.notifications.telegram import TelegramNotifier
     from app.services.portfolio import PortfolioService
     from app.services.report_prefs import get_excluded
+
+    today = datetime.now(timezone.utc).date().isoformat()
+    prev = await _load_pin()
+    if not force and prev.get("date") == today:
+        return {"skipped": "ya enviado hoy", "date": today}
+
     p = await PortfolioService().calculate_portfolio()
     excluded = await get_excluded()
     html = build_summary_html(p, excluded) + "\n📌 <i>Resumen diario</i>"
@@ -46,11 +54,11 @@ async def send_daily_summary_pinned() -> dict:
     if not mid:
         await n.send_html(html)  # fallback: at least deliver, unpinned
         return {"sent": True, "pinned": False}
-    prev = await _get_pinned_id()
-    if prev and prev != mid:
-        await n.unpin_message(prev)
+    prev_id = prev.get("message_id")
+    if prev_id and prev_id != mid:
+        await n.unpin_message(prev_id)
     pinned = await n.pin_message(mid)
-    await _set_pinned_id(mid)
+    await _save_pin(mid, today)
     return {"sent": True, "pinned": pinned, "message_id": mid}
 
 

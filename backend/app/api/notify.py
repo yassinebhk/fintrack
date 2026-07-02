@@ -28,10 +28,11 @@ async def send(payload: NotifyIn, secret: str = "") -> dict:
 
 
 @router.post("/daily-summary")
-async def daily_summary(secret: str = "") -> dict:
+async def daily_summary(secret: str = "", force: bool = False) -> dict:
     """Send + PIN the daily portfolio table (unpins yesterday's). Triggered by a
     GitHub-Actions cron so it's reliable even when Render's free tier has slept.
-    Runs in the background to dodge the gateway timeout on the live-price recompute."""
+    Idempotent per day (skips if already sent today) unless force=true — so several
+    morning cron times act as redundancy without spamming. Runs in the background."""
     if not _SECRET or secret != _SECRET:
         raise HTTPException(status_code=401, detail="invalid secret")
     import asyncio
@@ -39,7 +40,7 @@ async def daily_summary(secret: str = "") -> dict:
     async def _job():
         from app.services.portfolio_report import send_daily_summary_pinned
         try:
-            await send_daily_summary_pinned()
+            await send_daily_summary_pinned(force=force)
         except Exception:
             logger.exception("daily-summary pinned send failed")
     asyncio.create_task(_job())
