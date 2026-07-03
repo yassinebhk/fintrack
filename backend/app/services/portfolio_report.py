@@ -95,16 +95,17 @@ def build_summary_html(p: dict, excluded: set[str]) -> str:
     daily_pct = (daily / (total - daily) * 100) if (total - daily) > 0 else 0.0
     trend = "📈" if daily >= 0 else "📉"
 
-    rows = sorted(positions, key=lambda x: (x.get("day_change_pct") or 0), reverse=True)[:14]
-    W = 31
-    body = [f"{'ACTIVO':<10}{'HOY':>7}{'P/L':>8}{'€':>6}", "─" * W]
+    # PUESTO = lo invertido (coste) · AHORA = valor actual · P/L% = ganancia/pérdida.
+    rows = sorted(positions, key=lambda x: (x.get("market_value_base") or 0), reverse=True)[:14]
+    W = 30
+    body = [f"{'ACTIVO':<10}{'PUESTO':>7}{'AHORA':>7}{'P/L':>6}", "─" * W]
     for x in rows:
-        d = f"{(x.get('day_change_pct') or 0):+.1f}%"
-        pls = f"{(x.get('gain_loss_pct') or 0):+.1f}%"
-        val = f"{(x.get('market_value_base') or 0):.0f}€"
-        body.append(f"{_short(x):<10}{d:>7}{pls:>8}{val:>6}")
+        put = f"{_to_base(x, 'cost_basis'):.0f}€"
+        now = f"{(x.get('market_value_base') or 0):.0f}€"
+        pls = f"{(x.get('gain_loss_pct') or 0):+.0f}%"
+        body.append(f"{_short(x)[:10]:<10}{put:>7}{now:>7}{pls:>6}")
     body.append("─" * W)
-    body.append(f"{'TOTAL':<10}{f'{daily_pct:+.1f}%':>7}{f'{pl_pct:+.1f}%':>8}{f'{total:.0f}€':>6}")
+    body.append(f"{'TOTAL':<10}{f'{cost:.0f}€':>7}{f'{total:.0f}€':>7}{f'{pl_pct:+.0f}%':>6}")
 
     from app.services.notifications.telegram import html_escape
     head = (f"💼 <b>Tu cartera</b> · {total:.2f} {cur}\n"
