@@ -109,7 +109,8 @@ def build_summary_html(p: dict, excluded: set[str]) -> str:
 
     from app.services.notifications.telegram import html_escape
     head = (f"💼 <b>Tu cartera</b> · {total:.2f} {cur}\n"
-            f"{trend} Hoy {daily:+.2f} {cur} ({daily_pct:+.2f}%) · 💰 P/L {pl_pct:+.2f}%")
+            f"{trend} Hoy {daily:+.2f} {cur} ({daily_pct:+.2f}%)\n"
+            f"💰 P/L {pl:+.2f} {cur} ({pl_pct:+.2f}%)")
     msg = head + "\n<pre>" + html_escape("\n".join(body)) + "</pre>"
     if excluded:
         msg += f"\n<i>excl.: {', '.join(sorted(excluded))}</i>"
