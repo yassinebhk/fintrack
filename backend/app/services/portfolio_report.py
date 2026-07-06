@@ -63,7 +63,7 @@ async def send_daily_summary_pinned(force: bool = False) -> dict:
 
 
 _NICE = {
-    "IE00B4ND3602": "Oro", "IE00BYX5NX33": "MSCI World", "LYX0F.DE": "Nasdaq100",
+    "IE00B4ND3602": "Oro", "IE00BYX5NX33": "World", "LYX0F.DE": "Nasdaq",
     "VVSM.DE": "Semis", "QDVF.DE": "Energia", "NUKL.DE": "Uranio", "BTEC.L": "Biotech",
     "COPX.L": "Cobre", "JEDI.DE": "Espacio", "PLTR": "Palantir", "SPCX": "SpaceX",
     "BTC": "Bitcoin", "ETH": "Ethereum", "SOL": "Solana", "DOGE": "Doge", "PEPE": "Pepe",
@@ -95,17 +95,20 @@ def build_summary_html(p: dict, excluded: set[str]) -> str:
     daily_pct = (daily / (total - daily) * 100) if (total - daily) > 0 else 0.0
     trend = "📈" if daily >= 0 else "📉"
 
-    # PUESTO = lo invertido (coste) · AHORA = valor actual · P/L% = ganancia/pérdida.
+    # PUESTO = invertido · AHORA = valor actual · P/L€ = ganancia en euros · P/L% = en %.
     rows = sorted(positions, key=lambda x: (x.get("market_value_base") or 0), reverse=True)[:14]
-    W = 30
-    body = [f"{'ACTIVO':<10}{'PUESTO':>7}{'AHORA':>7}{'P/L':>6}", "─" * W]
+    W = 32
+    body = [f"{'ACTIVO':<8}{'PUESTO':>6}{'AHORA':>6}{'P/L€':>6}{'P/L%':>6}", "─" * W]
     for x in rows:
-        put = f"{_to_base(x, 'cost_basis'):.0f}€"
-        now = f"{(x.get('market_value_base') or 0):.0f}€"
-        pls = f"{(x.get('gain_loss_pct') or 0):+.0f}%"
-        body.append(f"{_short(x)[:10]:<10}{put:>7}{now:>7}{pls:>6}")
+        pv = _to_base(x, "cost_basis")
+        nv = x.get("market_value_base") or 0
+        put = f"{pv:.0f}€"
+        now = f"{nv:.0f}€"
+        ple = f"{nv - pv:+.0f}€"
+        plp = f"{(x.get('gain_loss_pct') or 0):+.0f}%"
+        body.append(f"{_short(x)[:8]:<8}{put:>6}{now:>6}{ple:>6}{plp:>6}")
     body.append("─" * W)
-    body.append(f"{'TOTAL':<10}{f'{cost:.0f}€':>7}{f'{total:.0f}€':>7}{f'{pl_pct:+.0f}%':>6}")
+    body.append(f"{'TOTAL':<8}{f'{cost:.0f}€':>6}{f'{total:.0f}€':>6}{f'{pl:+.0f}€':>6}{f'{pl_pct:+.0f}%':>6}")
 
     from app.services.notifications.telegram import html_escape
     head = (f"💼 <b>Tu cartera</b> · {total:.2f} {cur}\n"
