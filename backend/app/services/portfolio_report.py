@@ -95,26 +95,35 @@ def build_summary_html(p: dict, excluded: set[str]) -> str:
     daily_pct = (daily / (total - daily) * 100) if (total - daily) > 0 else 0.0
     trend = "📈" if daily >= 0 else "📉"
 
-    # PUESTO = invertido · AHORA = valor actual · P/L€ = ganancia en euros · P/L% = en %.
     rows = sorted(positions, key=lambda x: (x.get("market_value_base") or 0), reverse=True)[:14]
-    W = 32
-    body = [f"{'ACTIVO':<8}{'PUESTO':>6}{'AHORA':>6}{'P/L€':>6}{'P/L%':>6}", "─" * W]
+
+    # Table 1 — HOY (variación del día por activo, € y %).
+    Wd = 26
+    hoy = [f"{'HOY':<10}{'€':>8}{'%':>8}", "─" * Wd]
+    for x in rows:
+        de = _to_base(x, "day_change")
+        dp = x.get("day_change_pct") or 0
+        hoy.append(f"{_short(x)[:10]:<10}{f'{de:+.0f}€':>8}{f'{dp:+.1f}%':>8}")
+    hoy.append("─" * Wd)
+    hoy.append(f"{'TOTAL':<10}{f'{daily:+.0f}€':>8}{f'{daily_pct:+.1f}%':>8}")
+
+    # Table 2 — ACUMULADO (desde la compra): PUESTO → AHORA → P/L€ → P/L%.
+    Wa = 32
+    acum = [f"{'ACUMUL':<8}{'PUESTO':>6}{'AHORA':>6}{'P/L€':>6}{'P/L%':>6}", "─" * Wa]
     for x in rows:
         pv = _to_base(x, "cost_basis")
         nv = x.get("market_value_base") or 0
-        put = f"{pv:.0f}€"
-        now = f"{nv:.0f}€"
-        ple = f"{nv - pv:+.0f}€"
-        plp = f"{(x.get('gain_loss_pct') or 0):+.0f}%"
-        body.append(f"{_short(x)[:8]:<8}{put:>6}{now:>6}{ple:>6}{plp:>6}")
-    body.append("─" * W)
-    body.append(f"{'TOTAL':<8}{f'{cost:.0f}€':>6}{f'{total:.0f}€':>6}{f'{pl:+.0f}€':>6}{f'{pl_pct:+.0f}%':>6}")
+        acum.append(f"{_short(x)[:8]:<8}{f'{pv:.0f}€':>6}{f'{nv:.0f}€':>6}{f'{nv - pv:+.0f}€':>6}{f'{(x.get('gain_loss_pct') or 0):+.0f}%':>6}")
+    acum.append("─" * Wa)
+    acum.append(f"{'TOTAL':<8}{f'{cost:.0f}€':>6}{f'{total:.0f}€':>6}{f'{pl:+.0f}€':>6}{f'{pl_pct:+.0f}%':>6}")
 
     from app.services.notifications.telegram import html_escape
     head = (f"💼 <b>Tu cartera</b> · {total:.2f} {cur}\n"
             f"{trend} Hoy {daily:+.2f} {cur} ({daily_pct:+.2f}%)\n"
             f"💰 P/L {pl:+.2f} {cur} ({pl_pct:+.2f}%)")
-    msg = head + "\n<pre>" + html_escape("\n".join(body)) + "</pre>"
+    msg = (head
+           + "\n📈 <b>HOY</b> (variación del día)\n<pre>" + html_escape("\n".join(hoy)) + "</pre>"
+           + "\n💰 <b>ACUMULADO</b> (desde la compra)\n<pre>" + html_escape("\n".join(acum)) + "</pre>")
     if excluded:
         msg += f"\n<i>excl.: {', '.join(sorted(excluded))}</i>"
     return msg
