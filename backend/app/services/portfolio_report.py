@@ -46,9 +46,12 @@ async def send_daily_summary_pinned(force: bool = False) -> dict:
     if not force and prev.get("date") == today:
         return {"skipped": "ya enviado hoy", "date": today}
 
+    from app.services import allocation
+
     p = await PortfolioService().calculate_portfolio()
     excluded = await get_excluded()
-    html = build_summary_html(p, excluded) + "\n📌 <i>Resumen diario</i>"
+    targets = await allocation.get_targets()
+    html = build_summary_html(p, excluded, targets) + "\n📌 <i>Resumen diario</i>"
     n = TelegramNotifier()
     mid = await n.send_html_return_id(html)
     if not mid:
@@ -76,7 +79,7 @@ def _short(pos: dict) -> str:
     return nm.replace("&", "y")[:10]
 
 
-def build_summary_html(p: dict, excluded: set[str]) -> str:
+def build_summary_html(p: dict, excluded: set[str], targets: dict | None = None) -> str:
     positions = [x for x in p.get("positions", []) if (x.get("ticker") or "").upper() not in excluded]
     if not positions:
         return "💼 <b>Tu cartera</b>: sin posiciones para mostrar."
@@ -124,6 +127,16 @@ def build_summary_html(p: dict, excluded: set[str]) -> str:
     msg = (head
            + "\n📈 <b>HOY</b> (variación del día)\n<pre>" + html_escape("\n".join(hoy)) + "</pre>"
            + "\n💰 <b>ACUMULADO</b> (desde la compra)\n<pre>" + html_escape("\n".join(acum)) + "</pre>")
+
+    # Table 3 — REPARTO (objetivo vs real por bloque) — computed over ALL positions.
+    if targets:
+        from app.services.allocation import format_reparto
+        rep_lines, hint = format_reparto(p.get("positions", []), targets)
+        if rep_lines:
+            msg += "\n⚖️ <b>REPARTO</b> (objetivo vs real)\n<pre>" + html_escape("\n".join(rep_lines)) + "</pre>"
+            tail = "Ajusta con aportaciones nuevas, no vendiendo."
+            msg += f"\n<i>{html_escape(hint + '. ' + tail if hint else tail)}</i>"
+
     if excluded:
         msg += f"\n<i>excl.: {', '.join(sorted(excluded))}</i>"
     return msg

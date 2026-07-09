@@ -52,10 +52,12 @@ async def _send_portfolio_table() -> None:
     from app.services.portfolio import PortfolioService
     from app.services.portfolio_report import build_summary_html
     from app.services.report_prefs import get_excluded
+    from app.services import allocation
     try:
         p = await PortfolioService().calculate_portfolio()
         excluded = await get_excluded()
-        await TelegramNotifier().send_html(build_summary_html(p, excluded))
+        targets = await allocation.get_targets()
+        await TelegramNotifier().send_html(build_summary_html(p, excluded, targets))
     except Exception:
         logger.exception("portfolio-card send failed")
 
