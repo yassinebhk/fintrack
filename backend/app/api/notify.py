@@ -53,11 +53,18 @@ async def _send_portfolio_table() -> None:
     from app.services.portfolio_report import build_summary_html
     from app.services.report_prefs import get_excluded
     from app.services import allocation
+    from app.services.portfolio_report import _asset_trends
     try:
-        p = await PortfolioService().calculate_portfolio()
+        svc = PortfolioService()
+        p = await svc.calculate_portfolio()
         excluded = await get_excluded()
         targets = await allocation.get_targets()
-        await TelegramNotifier().send_html(build_summary_html(p, excluded, targets))
+        shown = sorted(
+            (x for x in p.get("positions", []) if (x.get("ticker") or "").upper() not in excluded),
+            key=lambda x: x.get("market_value_base") or 0, reverse=True,
+        )[:14]
+        trends = await _asset_trends(svc, shown)
+        await TelegramNotifier().send_html(build_summary_html(p, excluded, targets, trends))
     except Exception:
         logger.exception("portfolio-card send failed")
 

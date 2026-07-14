@@ -6,7 +6,35 @@ doesn't distort them (per-position fx via market_value_base / market_value)."""
 
 from __future__ import annotations
 
+from loguru import logger
+
 _PIN_KEY = "pinned_daily_summary"
+
+
+async def _asset_trends(svc, positions: list[dict]) -> dict:
+    """Market PRICE momentum per asset: {TICKER: {'m1': pct|None, 'm3': pct|None}}.
+
+    This is the asset's own trend (1m≈21 sesiones, 3m≈63), NOT the user's P/L.
+    Reuses the portfolio's Yahoo service so ISIN→symbol mapping is applied; crypto
+    falls back to the -EUR pair. Failures are skipped (the row just shows '–')."""
+    out: dict[str, dict] = {}
+    for x in positions:
+        t = (x.get("ticker") or "")
+        if not t:
+            continue
+        tu = t.upper()
+        try:
+            hist = await svc.yahoo.get_history(t, period="3mo")
+            if (not hist or len(hist) < 25) and x.get("type") == "crypto":
+                hist = await svc.yahoo.get_history(f"{tu}-EUR", period="3mo")
+            closes = [h.get("close") for h in (hist or []) if h.get("close")]
+            if len(closes) >= 25:
+                m1 = (closes[-1] / closes[-22] - 1) * 100 if len(closes) > 22 else None
+                m3 = (closes[-1] / closes[0] - 1) * 100
+                out[tu] = {"m1": m1, "m3": m3}
+        except Exception as exc:
+            logger.debug("trend fetch failed for {}: {}", t, exc)
+    return out
 
 
 async def _load_pin() -> dict:
@@ -48,10 +76,16 @@ async def send_daily_summary_pinned(force: bool = False) -> dict:
 
     from app.services import allocation
 
-    p = await PortfolioService().calculate_portfolio()
+    svc = PortfolioService()
+    p = await svc.calculate_portfolio()
     excluded = await get_excluded()
     targets = await allocation.get_targets()
-    html = build_summary_html(p, excluded, targets) + "\n📌 <i>Resumen diario</i>"
+    shown = sorted(
+        (x for x in p.get("positions", []) if (x.get("ticker") or "").upper() not in excluded),
+        key=lambda x: x.get("market_value_base") or 0, reverse=True,
+    )[:14]
+    trends = await _asset_trends(svc, shown)
+    html = build_summary_html(p, excluded, targets, trends) + "\n📌 <i>Resumen diario</i>"
     n = TelegramNotifier()
     mid = await n.send_html_return_id(html)
     if not mid:
@@ -79,7 +113,8 @@ def _short(pos: dict) -> str:
     return nm.replace("&", "y")[:10]
 
 
-def build_summary_html(p: dict, excluded: set[str], targets: dict | None = None) -> str:
+def build_summary_html(p: dict, excluded: set[str], targets: dict | None = None,
+                       trends: dict | None = None) -> str:
     positions = [x for x in p.get("positions", []) if (x.get("ticker") or "").upper() not in excluded]
     if not positions:
         return "💼 <b>Tu cartera</b>: sin posiciones para mostrar."
@@ -128,7 +163,30 @@ def build_summary_html(p: dict, excluded: set[str], targets: dict | None = None)
            + "\n📈 <b>HOY</b> (variación del día)\n<pre>" + html_escape("\n".join(hoy)) + "</pre>"
            + "\n💰 <b>ACUMULADO</b> (desde la compra)\n<pre>" + html_escape("\n".join(acum)) + "</pre>")
 
-    # Table 3 — REPARTO (objetivo vs real por bloque) — computed over ALL positions.
+    # Table 3 — TENDENCIA (momentum del PRECIO del activo, NO tu P/L). Aclara la
+    # confusión típica: "mi oro va -1%" (tu P/L) vs "el oro cae -13% en 3m" (mercado).
+    if trends:
+        Wt = 24
+        tend = [f"{'ACTIVO':<10}{'1m':>7}{'3m':>7}", "─" * Wt]
+        any_row = False
+        for x in rows:
+            tr = trends.get((x.get("ticker") or "").upper())
+            if not tr:
+                continue
+            m1, m3 = tr.get("m1"), tr.get("m3")
+            s1 = f"{m1:+.1f}%" if m1 is not None else "–"
+            s3 = f"{m3:+.1f}%" if m3 is not None else "–"
+            tend.append(f"{_short(x)[:10]:<10}{s1:>7}{s3:>7}")
+            any_row = True
+        if any_row:
+            msg_tend = "\n📉 <b>TENDENCIA</b> (precio del activo, no tu P/L)\n<pre>" + html_escape("\n".join(tend)) + "</pre>"
+        else:
+            msg_tend = ""
+    else:
+        msg_tend = ""
+    msg += msg_tend
+
+    # Table 4 — REPARTO (objetivo vs real por bloque) — computed over ALL positions.
     if targets:
         from app.services.allocation import format_reparto
         rep_lines, hint = format_reparto(p.get("positions", []), targets)
