@@ -106,19 +106,19 @@ def build_summary_html(p: dict, excluded: set[str], targets: dict | None = None)
     for x in rows:
         de = _to_base(x, "day_change")
         dp = x.get("day_change_pct") or 0
-        hoy.append(f"{_short(x)[:10]:<10}{f'{de:+.0f}€':>8}{f'{dp:+.1f}%':>8}")
+        hoy.append(f"{_short(x)[:10]:<10}{f'{de:+.2f}€':>8}{f'{dp:+.1f}%':>8}")
     hoy.append("─" * Wd)
-    hoy.append(f"{'TOTAL':<10}{f'{daily:+.0f}€':>8}{f'{daily_pct:+.1f}%':>8}")
+    hoy.append(f"{'TOTAL':<10}{f'{daily:+.2f}€':>8}{f'{daily_pct:+.1f}%':>8}")
 
     # Table 2 — ACUMULADO (desde la compra): PUESTO → AHORA → P/L€ → P/L%.
-    Wa = 32
-    acum = [f"{'ACUMUL':<8}{'PUESTO':>6}{'AHORA':>6}{'P/L€':>6}{'P/L%':>6}", "─" * Wa]
+    Wa = 33
+    acum = [f"{'ACUMUL':<8}{'PUESTO':>6}{'AHORA':>6}{'P/L€':>7}{'P/L%':>6}", "─" * Wa]
     for x in rows:
         pv = _to_base(x, "cost_basis")
         nv = x.get("market_value_base") or 0
-        acum.append(f"{_short(x)[:8]:<8}{f'{pv:.0f}€':>6}{f'{nv:.0f}€':>6}{f'{nv - pv:+.0f}€':>6}{f'{(x.get('gain_loss_pct') or 0):+.0f}%':>6}")
+        acum.append(f"{_short(x)[:8]:<8}{f'{pv:.0f}€':>6}{f'{nv:.0f}€':>6}{f'{nv - pv:+.1f}€':>7}{f'{(x.get('gain_loss_pct') or 0):+.0f}%':>6}")
     acum.append("─" * Wa)
-    acum.append(f"{'TOTAL':<8}{f'{cost:.0f}€':>6}{f'{total:.0f}€':>6}{f'{pl:+.0f}€':>6}{f'{pl_pct:+.0f}%':>6}")
+    acum.append(f"{'TOTAL':<8}{f'{cost:.0f}€':>6}{f'{total:.0f}€':>6}{f'{pl:+.1f}€':>7}{f'{pl_pct:+.0f}%':>6}")
 
     from app.services.notifications.telegram import html_escape
     head = (f"💼 <b>Tu cartera</b> · {total:.2f} {cur}\n"
