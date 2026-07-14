@@ -41,8 +41,10 @@ _BLOCK_BY_TICKER = {
     "BTEC.L": "tematico", "PLTR": "tematico", "SPCX": "tematico",
     "NUKL.DE": "tematico", "JEDI.DE": "tematico",
     "BTC": "cripto", "ETH": "cripto", "SOL": "cripto", "DOGE": "cripto", "PEPE": "cripto",
-    # stability sleeve (mapped so it's classified correctly once added)
+    "USPY.DE": "tematico",  # ciberseguridad
+    # stability sleeve — cash-like money market + investment-grade bonds
     "XEON.DE": "estabilidad", "PR1R.DE": "estabilidad", "ERNE.DE": "estabilidad",
+    "IEAA.L": "estabilidad",  # iShares Core € Corp Bond (IG)
 }
 _CRYPTO_HINT = {"BTC", "ETH", "SOL", "DOGE", "PEPE", "ADA", "XRP", "BNB", "AVAX", "LTC", "DOT", "LINK", "TRX"}
 
