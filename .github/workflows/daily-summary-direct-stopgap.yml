@@ -1,0 +1,41 @@
+name: daily-summary-direct-stopgap
+
+# TEMPORARY: Render's free web service is suspended (hit the 750h/month quota,
+# 2026-07-25) until its next billing period (~2026-08-01). While it's down,
+# daily-summary.yml is a no-op (it hits the Render URL, which 503s). This
+# workflow talks straight to the DB from a GitHub-hosted runner instead, no
+# Render involved. DELETE THIS FILE once Render is confirmed back up and
+# daily-summary.yml is sending on its own again — this is a stopgap, not a
+# permanent second path.
+#
+# Required GitHub Secrets:
+#   NEON_DATABASE_URL   — the Neon Postgres connection string (async driver
+#                         normalization happens in app/config.py)
+#   TELEGRAM_BOT_TOKEN
+#   TELEGRAM_CHAT_ID
+
+on:
+  schedule:
+    - cron: "10 6 * * *"   # ≈ 08:10 Europe/Madrid
+    - cron: "10 7 * * *"   # ≈ 09:10 Europe/Madrid
+  workflow_dispatch: {}
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements.txt
+      - name: Send + pin daily summary directly against Neon
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m app.scripts.send_daily_summary_direct
