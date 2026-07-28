@@ -81,10 +81,16 @@ class Settings(BaseSettings):
             if url.startswith(prefix):
                 url = f"{driver}://" + url[len(prefix):]
                 break
-        # Strip sslmode query param that asyncpg doesn't accept as-is (SSL is set
-        # via connect_args in db.py).
-        if "?sslmode=" in url:
-            url = url.split("?sslmode=")[0]
+        # Strip query params libpq/asyncpg-cli understand but the asyncpg DBAPI
+        # connect() doesn't accept as kwargs (SSL is set via connect_args in
+        # db.py instead). Neon's copy-paste connection string orders
+        # channel_binding before sslmode, so a plain "?sslmode=" split misses it.
+        if "?" in url:
+            base, _, query = url.partition("?")
+            from urllib.parse import parse_qsl, urlencode
+
+            kept = [(k, v) for k, v in parse_qsl(query) if k not in {"sslmode", "channel_binding"}]
+            url = base + (f"?{urlencode(kept)}" if kept else "")
         return url
 
     @property
