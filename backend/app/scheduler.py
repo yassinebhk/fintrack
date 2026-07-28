@@ -6,7 +6,7 @@ Each phase adds its own job:
 - Fase 2.4: Alerts loop every 5 min
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -130,6 +130,56 @@ async def _alerts_job() -> None:
             logger.info("alerts: {} new ({} delivered)", len(created), sum(1 for c in created if c.get("delivered_telegram")))
     except Exception as exc:
         logger.error("scheduled alerts evaluation failed: {}", exc)
+
+
+async def _monthly_fidelity_contribution_job() -> None:
+    """Day 27 of every month: register the user's recurring 100EUR contribution
+    to Fidelity MSCI World (IE00BYX5NX33 @ MyInvestor) — same math as
+    POST /api/positions/movement (action=aportar): shares bought at that day's
+    live price, weighted-average cost updated, buy transaction recorded."""
+    ticker, broker, eur_amount = "IE00BYX5NX33", "MyInvestor", 100.0
+    try:
+        from app.repositories import PositionRepository, TransactionRepository
+        from app.services.market import YahooFinanceService
+        from app.services.notifications.telegram import TelegramNotifier
+
+        async with session_scope() as session:
+            repo = PositionRepository(session)
+            existing = await repo.get(ticker, broker)
+            if existing is None:
+                logger.error("monthly contribution: position {} @ {} not found", ticker, broker)
+                return
+
+            price_info = await YahooFinanceService().get_price(ticker)
+            price = price_info.get("price") if price_info else None
+            if not price or price <= 0:
+                logger.error("monthly contribution: no price for {}", ticker)
+                return
+
+            shares_added = eur_amount / price
+            old_cost = existing.quantity * existing.avg_price
+            existing.quantity += shares_added
+            existing.avg_price = (old_cost + eur_amount) / existing.quantity
+            new_qty, new_avg = existing.quantity, existing.avg_price
+
+            await TransactionRepository(session).add(
+                type="buy", ticker=ticker, quantity=shares_added, price=price,
+                currency="EUR", broker=broker, executed_at=datetime.now(timezone.utc),
+                notes=f"Aportación mensual {eur_amount:.2f}€ (recurrente día 27, automática)",
+            )
+            await session.flush()
+
+        logger.info(
+            "monthly contribution: +{:.2f}€ -> {} shares={:.6f} qty={:.6f} avg={:.4f}",
+            eur_amount, ticker, shares_added, new_qty, new_avg,
+        )
+        await TelegramNotifier().send_html(
+            f"💰 <b>Aportación mensual registrada</b>\n"
+            f"Fidelity MSCI World: +{eur_amount:.0f}€ @ {price:.4f}€ "
+            f"({shares_added:.4f} part.)\nTotal: {new_qty:.4f} part. · coste medio {new_avg:.4f}€"
+        )
+    except Exception as exc:
+        logger.error("monthly contribution job failed: {}", exc)
 
 
 async def _polymarket_lab_job() -> None:
@@ -300,6 +350,16 @@ def setup_jobs() -> None:
                 misfire_grace_time=3600,
             )
         logger.info("scheduled: SpaceX IPO heads-up 11-12 Jun")
+
+    # Recurring monthly contribution — needs no LLM/broker, runs unconditionally.
+    sched.add_job(
+        _monthly_fidelity_contribution_job,
+        trigger=CronTrigger(day=27, hour=9, minute=0, timezone=settings.timezone),
+        id="monthly_fidelity_contribution",
+        name="Monthly 100EUR contribution to Fidelity MSCI World (day 27)",
+        replace_existing=True, max_instances=1, coalesce=True,
+    )
+    logger.info("scheduled: monthly_fidelity_contribution @ day 27 09:00 {}", settings.timezone)
 
     # Polymarket paper-trading lab — needs no LLM/broker, so it runs unconditionally.
     sched.add_job(
