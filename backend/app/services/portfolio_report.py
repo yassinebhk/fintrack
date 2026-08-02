@@ -69,7 +69,14 @@ async def send_daily_summary_pinned(force: bool = False) -> dict:
     from app.services.portfolio import PortfolioService
     from app.services.report_prefs import get_excluded
 
-    today = datetime.now(timezone.utc).date().isoformat()
+    now = datetime.now(timezone.utc)
+    today = now.date().isoformat()
+    if not force and now.weekday() >= 5:
+        # Sat/Sun: exchanges are closed, so Yahoo just keeps serving Friday's
+        # already-realized session change — sending it back labeled "HOY" is
+        # misleading, not a fresh weekend move (crypto excepted, but it's a
+        # small enough slice of the portfolio not to warrant its own send).
+        return {"skipped": "fin de semana (mercados cerrados)", "date": today}
     prev = await _load_pin()
     if not force and prev.get("date") == today:
         return {"skipped": "ya enviado hoy", "date": today}
