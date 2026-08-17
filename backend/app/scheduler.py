@@ -76,6 +76,61 @@ async def _scorecard_job() -> None:
         logger.error("scorecard eval failed: {}", exc)
 
 
+_POSITION_NEWS_TICKERS = ["BTC", "PLTR", "SPCX"]
+_POSITION_NEWS_KEY = "position_news_seen_urls"
+
+
+async def _position_news_job() -> None:
+    """Every few hours: check RSS news for the user's 'story-driven' individual
+    positions (BTC/PLTR/SPCX — the ones that move on single headlines, unlike
+    the diversified ETFs) and Telegram-alert only genuinely NEW articles.
+    Not a trading signal (the market has already moved by the time any RSS
+    feed carries the story) — purely so the user isn't blindsided."""
+    try:
+        from sqlalchemy import select
+        from app.db import session_scope, upsert_insert
+        from app.models import JsonCache
+        from app.services.news import NewsService
+        from app.services.notifications.telegram import TelegramNotifier
+
+        async with session_scope() as s:
+            row = (await s.execute(select(JsonCache).where(JsonCache.key == _POSITION_NEWS_KEY))).scalar_one_or_none()
+        seen: set[str] = set((row.payload or {}).get("urls", [])) if row and row.payload else set()
+
+        svc = NewsService()
+        new_items = []
+        for ticker in _POSITION_NEWS_TICKERS:
+            for item in await svc.get_news_for_asset(ticker, limit=5):
+                if item.get("url") and item["url"] not in seen:
+                    new_items.append((ticker, item))
+
+        if not new_items:
+            logger.debug("position news: nothing new")
+            return
+
+        emoji = {"bullish": "🟢", "bearish": "🔴", "neutral": "⚪"}
+        lines = ["📰 <b>Noticias sobre tus posiciones</b>"]
+        for ticker, item in new_items:
+            em = emoji.get(item.get("impact", "neutral"), "⚪")
+            title = (item.get("title") or "")[:140]
+            url, src = item.get("url", ""), item.get("source", "")
+            lines.append(f"{em} <b>{ticker}</b>: <a href=\"{url}\">{title}</a> <i>({src})</i>" if url
+                         else f"{em} <b>{ticker}</b>: {title} <i>({src})</i>")
+        lines.append("\n<i>Contexto, no señal de compra — el precio ya se movió antes de que esto se publicara.</i>")
+        await TelegramNotifier().send_html("\n".join(lines))
+
+        seen.update(item["url"] for _, item in new_items)
+        payload = {"urls": list(seen)[-200:]}
+        from datetime import datetime, timezone
+        stmt = upsert_insert()(JsonCache).values(key=_POSITION_NEWS_KEY, payload=payload, updated_at=datetime.now(timezone.utc)) \
+            .on_conflict_do_update(index_elements=["key"], set_={"payload": payload, "updated_at": datetime.now(timezone.utc)})
+        async with session_scope() as s:
+            await s.execute(stmt)
+        logger.info("position news: {} new item(s) alerted", len(new_items))
+    except Exception as exc:
+        logger.error("position news job failed: {}", exc)
+
+
 async def _creators_job() -> None:
     """Check curated YouTube finance channels for new videos every few hours."""
     try:
@@ -360,6 +415,16 @@ def setup_jobs() -> None:
         replace_existing=True, max_instances=1, coalesce=True,
     )
     logger.info("scheduled: monthly_fidelity_contribution @ day 27 09:00 {}", settings.timezone)
+
+    # Position news watch (BTC/PLTR/SPCX) — needs no LLM/broker, runs unconditionally.
+    sched.add_job(
+        _position_news_job,
+        trigger=IntervalTrigger(hours=3),
+        id="position_news",
+        name="Watch news for BTC/PLTR/SPCX, alert only on new items",
+        replace_existing=True, max_instances=1, coalesce=True,
+    )
+    logger.info("scheduled: position_news every 3h")
 
     # Polymarket paper-trading lab — needs no LLM/broker, so it runs unconditionally.
     sched.add_job(

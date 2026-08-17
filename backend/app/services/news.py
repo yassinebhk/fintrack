@@ -56,6 +56,8 @@ ASSET_PATTERNS = {
     "QQQ": r"\b(nasdaq|qqq)\b",
     "GOLD": r"\b(gold|oro)\b",
     "OIL": r"\b(oil|petróleo|petroleum|crude)\b",
+    "PLTR": r"\b(palantir|pltr)\b",
+    "SPCX": r"\b(spacex|space x)\b",
 }
 
 
