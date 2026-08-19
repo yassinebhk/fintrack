@@ -169,7 +169,32 @@ class AlertsEngine:
                 )
             )
 
-        return [c for c in created if c is not None]
+        return await self._deliver_batch([c for c in created if c is not None])
+
+    async def _deliver_batch(self, alerts: list[dict]) -> list[dict]:
+        """Send every alert created in this evaluate() run as ONE Telegram
+        message instead of one push per rule (a volatile day could otherwise
+        trigger 4-5 separate notifications within minutes of each other)."""
+        if not alerts:
+            return alerts
+        from app.services.notifications.telegram import html_escape as esc
+        severity_emoji = {"info": "ℹ️", "warning": "⚠️", "critical": "🚨"}
+        blocks = []
+        for a in alerts:
+            em = severity_emoji.get(a["severity"], "🔔")
+            blocks.append(f"{em} <b>{esc(a['title'])}</b>\n{esc(a['body'])}")
+        header = "🔔 <b>Alertas</b>" if len(alerts) > 1 else ""
+        html = "\n\n".join([header] + blocks) if header else blocks[0]
+        delivered = await self.telegram.send_html(html)
+        if delivered:
+            ids = [a["id"] for a in alerts]
+            async with session_scope() as session:
+                rows = (await session.execute(select(Alert).where(Alert.id.in_(ids)))).scalars().all()
+                for row in rows:
+                    row.delivered_telegram = True
+        for a in alerts:
+            a["delivered_telegram"] = delivered
+        return alerts
 
     # ---- helpers -----------------------------------------------------------
 
@@ -331,25 +356,13 @@ class AlertsEngine:
             await session.flush()
             alert_id = alert.id
 
-        # Notify with rich HTML
-        from app.services.notifications.telegram import html_escape as esc
-        severity_emoji = {"info": "ℹ️", "warning": "⚠️", "critical": "🚨"}.get(severity, "🔔")
-        html = (
-            f"{severity_emoji} <b>{esc(title)}</b>\n"
-            f"<i>{esc(severity.upper())}</i>\n\n"
-            f"{esc(body)}"
-        )
-        delivered = await self.telegram.send_html(html)
-        if delivered:
-            async with session_scope() as session:
-                row = await session.get(Alert, alert_id)
-                if row:
-                    row.delivered_telegram = True
-
+        # Telegram send happens once, batched, at the end of evaluate() — not
+        # here — so a volatile day with several rules firing produces ONE
+        # digest message instead of one push per rule.
         return {
             "id": alert_id,
             "kind": kind,
             "severity": severity,
             "title": title,
-            "delivered_telegram": delivered,
+            "body": body,
         }

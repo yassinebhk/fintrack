@@ -419,12 +419,12 @@ def setup_jobs() -> None:
     # Position news watch (BTC/PLTR/SPCX) — needs no LLM/broker, runs unconditionally.
     sched.add_job(
         _position_news_job,
-        trigger=IntervalTrigger(hours=3),
+        trigger=IntervalTrigger(hours=6),
         id="position_news",
         name="Watch news for BTC/PLTR/SPCX, alert only on new items",
         replace_existing=True, max_instances=1, coalesce=True,
     )
-    logger.info("scheduled: position_news every 3h")
+    logger.info("scheduled: position_news every 6h")
 
     # Polymarket paper-trading lab — needs no LLM/broker, so it runs unconditionally.
     sched.add_job(
