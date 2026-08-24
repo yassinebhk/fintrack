@@ -35,44 +35,44 @@ let currentPeriod = 30;
 let sortColumn = 'market_value';
 let sortDirection = 'desc';
 
-// Diccionario de nombres descriptivos para activos
-const ASSET_NAMES = {
-    // Cryptos
-    'BTC': 'Bitcoin',
-    'ETH': 'Ethereum',
-    'SOL': 'Solana',
-    'DOGE': 'Dogecoin',
-    'PEPE': 'Pepe',
-    'XRP': 'Ripple',
-    'ADA': 'Cardano',
-    
-    // ETFs Trade Republic (Oro)
-    'SGLD.L': 'Oro Físico (WisdomTree)',
-    
-    // ETFs Trade Republic (MSCI World)
-    'LYX0F.DE': 'MSCI World (Amundi)',
-    
-    // Fondos MyInvestor
-    'IE00BYX5NX33': 'Vanguard S&P 500',
-    'IE00B4ND3602': 'iShares MSCI World',
-    
-    // Acciones populares
-    'AAPL': 'Apple',
-    'MSFT': 'Microsoft',
-    'GOOGL': 'Google',
-    'NVDA': 'Nvidia',
-    'TSLA': 'Tesla',
+// Single source of truth for asset display names/icons/colors — verified 2026-08
+// against the real Trade Republic / MyInvestor / Kraken records. Every other
+// script (asset-analysis.js, portfolio-manager.js, transactions.js, backtest.js)
+// reads this same object; do not declare a second copy anywhere, and do not
+// "correct" an entry without re-checking a real CSV/broker export first
+// (LYX0F.DE and IE00BYX5NX33 were swapped here for months, and this dict used
+// to also mislabel the Gold ETC, IE00B4ND3602, as "iShares MSCI World").
+// `short` is for tight spaces (correlation matrix headers, chart legends)
+// where "Fidelity MSCI World P-Acc" would overflow — keep it recognizable
+// at a glance, matching how the user talks about these positions.
+const ASSET_DISPLAY_NAMES = {
+    'BTC': { name: 'Bitcoin', short: 'Bitcoin', icon: '₿', color: '#f7931a' },
+    'ETH': { name: 'Ethereum', short: 'Ethereum', icon: 'Ξ', color: '#627eea' },
+    'SOL': { name: 'Solana', short: 'Solana', icon: '◎', color: '#00ffa3' },
+    'DOGE': { name: 'Dogecoin', short: 'Dogecoin', icon: '🐕', color: '#c3a634' },
+    'PEPE': { name: 'Pepe', short: 'Pepe', icon: '🐸', color: '#4caf50' },
+    'IE00BYX5NX33': { name: 'Fidelity MSCI World P-Acc', short: 'MSCI World', icon: '🌍', color: '#2196f3' },
+    'IE00B4ND3602': { name: 'iShares Physical Gold ETC', short: 'Oro', icon: '🥇', color: '#ffd700' },
+    'LYX0F.DE': { name: 'Amundi Nasdaq-100', short: 'Nasdaq-100', icon: '📈', color: '#1976d2' },
+    'VVSM.DE': { name: 'VanEck Semiconductor', short: 'Semiconductores', icon: '💾', color: '#9c27b0' },
+    'QDVF.DE': { name: 'iShares S&P500 Energy', short: 'S&P Energía', icon: '⚡', color: '#ff9800' },
+    'NUKL.DE': { name: 'VanEck Uranium & Nuclear', short: 'Uranio/Nuclear', icon: '☢️', color: '#8bc34a' },
+    'BTEC.L': { name: 'iShares Nasdaq Biotech', short: 'Biotech', icon: '🧬', color: '#00bcd4' },
+    'COPX.L': { name: 'Global X Copper Miners', short: 'Cobre', icon: '🔶', color: '#b87333' },
+    'JEDI.DE': { name: 'VanEck Space Innovators', short: 'Espacio', icon: '🚀', color: '#673ab7' },
+    'PLTR': { name: 'Palantir Technologies', short: 'Palantir', icon: '🔮', color: '#000000' },
+    'SPCX': { name: 'SpaceX', short: 'SpaceX', icon: '🛰️', color: '#005288' },
+    'USPY.DE': { name: 'L&G Cyber Security', short: 'Ciberseguridad', icon: '🔐', color: '#607d8b' },
+    'IEAA.L': { name: 'iShares Core € Corp Bond', short: 'Bonos Corp.', icon: '🏦', color: '#795548' },
 };
 
 function getAssetName(ticker) {
-    return ASSET_NAMES[ticker?.toUpperCase()] || null;
+    return ASSET_DISPLAY_NAMES[ticker?.toUpperCase()]?.name || null;
 }
 
 function getTickerIcon(ticker, type) {
-    const icons = {
-        'BTC': '₿', 'ETH': 'Ξ', 'SOL': '◎', 'DOGE': '🐕', 'PEPE': '🐸',
-    };
-    if (icons[ticker?.toUpperCase()]) return icons[ticker.toUpperCase()];
+    const info = ASSET_DISPLAY_NAMES[ticker?.toUpperCase()];
+    if (info) return info.icon;
     if (type === 'crypto') return '🪙';
     if (type === 'etf') return '📊';
     if (type === 'fund') return '📈';
@@ -262,7 +262,8 @@ function updateQuickStats(data) {
     
     const bestEl = document.getElementById('bestPerformer');
     if (bestEl && bestPerformer) {
-        bestEl.innerHTML = `<span style="color: var(--positive)">${bestPerformer.ticker}</span> ${formatPercent(bestPerformer.gain_loss_pct)}`;
+        const bestName = getAssetName(bestPerformer.ticker) || bestPerformer.name || bestPerformer.ticker;
+        bestEl.innerHTML = `<span style="color: var(--positive)">${bestName}</span> ${formatPercent(bestPerformer.gain_loss_pct)}`;
     }
     
     // Worst performer
@@ -272,7 +273,8 @@ function updateQuickStats(data) {
     
     const worstEl = document.getElementById('worstPerformer');
     if (worstEl && worstPerformer) {
-        worstEl.innerHTML = `<span style="color: var(--negative)">${worstPerformer.ticker}</span> ${formatPercent(worstPerformer.gain_loss_pct)}`;
+        const worstName = getAssetName(worstPerformer.ticker) || worstPerformer.name || worstPerformer.ticker;
+        worstEl.innerHTML = `<span style="color: var(--negative)">${worstName}</span> ${formatPercent(worstPerformer.gain_loss_pct)}`;
     }
 }
 

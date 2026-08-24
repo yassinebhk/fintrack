@@ -152,7 +152,7 @@ function renderManagerPositions(positions) {
 
     tbody.innerHTML = positions.map(pos => {
         const assetName = getAssetName(pos.ticker);
-        const showName = assetName !== pos.ticker; // Solo mostrar nombre si es diferente al ticker
+        const showName = Boolean(assetName); // Solo mostrar nombre si tenemos uno real
         
         return `
         <tr>
@@ -181,28 +181,8 @@ function renderManagerPositions(positions) {
     `}).join('');
 }
 
-function getTickerIcon(ticker, type) {
-    const icons = {
-        'BTC': '₿',
-        'ETH': 'Ξ',
-        'SOL': '◎',
-        'DOGE': '🐕',
-        'PEPE': '🐸',
-        'XRP': '✕',
-    };
-    
-    if (icons[ticker.toUpperCase()]) {
-        return icons[ticker.toUpperCase()];
-    }
-    
-    // Iconos por tipo
-    if (type === 'crypto') return '🪙';
-    if (type === 'etf') return '📊';
-    if (type === 'fund') return '📈';
-    if (type === 'stock') return '📉';
-    
-    return ticker.substring(0, 2).toUpperCase();
-}
+// getTickerIcon lives in app.js (loaded before this file) — single source
+// of truth shared by every page. Do not redeclare it here.
 
 function getTypeName(type) {
     const names = {

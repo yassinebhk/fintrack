@@ -8,29 +8,8 @@ let assetChart = null;
 let currentAssetPeriod = '3mo';
 let currentAssetData = null;
 
-// Asset name mapping — verified 2026-08 against the real Trade Republic /
-// MyInvestor transaction history (do not "correct" without re-checking a CSV
-// export; LYX0F.DE and IE00BYX5NX33 were previously swapped here for months).
-const ASSET_DISPLAY_NAMES = {
-    'BTC': { name: 'Bitcoin', icon: '₿', color: '#f7931a' },
-    'ETH': { name: 'Ethereum', icon: 'Ξ', color: '#627eea' },
-    'SOL': { name: 'Solana', icon: '◎', color: '#00ffa3' },
-    'DOGE': { name: 'Dogecoin', icon: '🐕', color: '#c3a634' },
-    'PEPE': { name: 'Pepe', icon: '🐸', color: '#4caf50' },
-    'IE00BYX5NX33': { name: 'Fidelity MSCI World P-Acc', icon: '🌍', color: '#2196f3' },
-    'IE00B4ND3602': { name: 'iShares Physical Gold ETC', icon: '🥇', color: '#ffd700' },
-    'LYX0F.DE': { name: 'Amundi Nasdaq-100', icon: '📈', color: '#1976d2' },
-    'VVSM.DE': { name: 'VanEck Semiconductor', icon: '💾', color: '#9c27b0' },
-    'QDVF.DE': { name: 'iShares S&P500 Energy', icon: '⚡', color: '#ff9800' },
-    'NUKL.DE': { name: 'VanEck Uranium & Nuclear', icon: '☢️', color: '#8bc34a' },
-    'BTEC.L': { name: 'iShares Nasdaq Biotech', icon: '🧬', color: '#00bcd4' },
-    'COPX.L': { name: 'Global X Copper Miners', icon: '🔶', color: '#b87333' },
-    'JEDI.DE': { name: 'VanEck Space Innovators', icon: '🚀', color: '#673ab7' },
-    'PLTR': { name: 'Palantir Technologies', icon: '🔮', color: '#000000' },
-    'SPCX': { name: 'SpaceX', icon: '🛰️', color: '#005288' },
-    'USPY.DE': { name: 'L&G Cyber Security', icon: '🔐', color: '#607d8b' },
-    'IEAA.L': { name: 'iShares Core € Corp Bond', icon: '🏦', color: '#795548' },
-};
+// ASSET_DISPLAY_NAMES lives in app.js (loaded before this file) — single
+// source of truth shared by every page. Do not redeclare it here.
 
 /**
  * Initialize asset analysis when page loads
@@ -685,16 +664,22 @@ function renderCorrelationMatrix(correlation) {
     const colorFor = (v) => v >= 0
         ? `rgba(0, 212, 170, ${Math.min(Math.abs(v), 1) * 0.6})`
         : `rgba(239, 68, 68, ${Math.min(Math.abs(v), 1) * 0.6})`;
+    // Raw ISINs/tickers (IE00BYX5NX33, LYX0F.DE...) mean nothing at a glance —
+    // always show the human name here, ticker only as a hover tooltip.
+    const label = (t) => {
+        const info = ASSET_DISPLAY_NAMES[t?.toUpperCase()];
+        return info ? `${info.icon} ${info.short || info.name}` : t;
+    };
 
     let html = '<div style="overflow-x:auto"><table class="correlation-table"><thead><tr><th></th>';
-    for (let j = 0; j < N; j++) html += `<th>${tickers[j]}</th>`;
+    for (let j = 0; j < N; j++) html += `<th title="${tickers[j]}">${label(tickers[j])}</th>`;
     html += '</tr></thead><tbody>';
     for (let i = 0; i < N; i++) {
-        html += `<tr><th>${tickers[i]}</th>`;
+        html += `<tr><th title="${tickers[i]}">${label(tickers[i])}</th>`;
         for (let j = 0; j < N; j++) {
             const v = matrix[i]?.[j];
-            const label = v != null ? v.toFixed(2) : '-';
-            html += `<td style="background:${v != null ? colorFor(v) : 'transparent'}" title="${tickers[i]} vs ${tickers[j]}">${label}</td>`;
+            const cell = v != null ? v.toFixed(2) : '-';
+            html += `<td style="background:${v != null ? colorFor(v) : 'transparent'}" title="${label(tickers[i])} vs ${label(tickers[j])}">${cell}</td>`;
         }
         html += '</tr>';
     }

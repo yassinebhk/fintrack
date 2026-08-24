@@ -219,7 +219,7 @@ function renderBtResults(data) {
         <tr>
             <td>${t.date}</td>
             <td><span class="type-badge ${t.action}">${t.action}</span></td>
-            <td><code>${t.ticker}</code></td>
+            <td><code>${t.ticker}</code>${getAssetName(t.ticker) ? ` <span class="text-muted" style="font-size:12px;">${getAssetName(t.ticker)}</span>` : ''}</td>
             <td class="text-right mono">${Number(t.amount_eur).toLocaleString('es-ES', { maximumFractionDigits: 2 })}</td>
             <td class="text-right mono">${Number(t.price).toLocaleString('es-ES', { maximumFractionDigits: 4 })}</td>
             <td class="text-right mono">${Number(t.shares).toLocaleString('es-ES', { maximumFractionDigits: 8 })}</td>

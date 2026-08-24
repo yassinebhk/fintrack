@@ -48,10 +48,11 @@ function renderTransactions() {
         const total = (t.quantity || 0) * (t.price || 0);
         const cur = t.currency || 'EUR';
         const title = t.notes ? ` title="${(t.notes + '').replace(/"/g, '&quot;')}"` : '';
+        const assetName = getAssetName(t.ticker);
         return `<tr${title}>
             <td>${date}</td>
             <td>${typeLabel[t.type] || t.type}</td>
-            <td>${t.ticker}</td>
+            <td><span style="font-family: var(--font-mono); font-weight: 600;">${t.ticker}</span>${assetName ? `<br><span class="text-muted" style="font-size:12px;">${assetName}</span>` : ''}</td>
             <td class="text-right mono">${fmt(t.quantity, 6)}</td>
             <td class="text-right mono">${fmt(t.price)} ${cur}</td>
             <td class="text-right mono">${fmt(total)} ${cur}</td>
