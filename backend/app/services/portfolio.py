@@ -6,7 +6,7 @@ Public API preserved for legacy callers:
 - `get_portfolio_history(days)` returns a list[{date, value}].
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import numpy as np
 import pandas as pd
@@ -251,6 +251,8 @@ class PortfolioService:
             "volatility": 0.0,
             "sharpe_ratio": 0.0,
             "days_tracked": len(snaps),
+            "positive_days_pct": 0.0,
+            "ytd_return": 0.0,
         }
         if len(snaps) < 2:
             return kpis
@@ -265,7 +267,15 @@ class PortfolioService:
             if len(vals) < 2:
                 return kpis
 
-        returns = np.diff(vals) / vals[:-1]
+        raw_returns = np.diff(vals) / vals[:-1]
+        # A deposit/withdrawal shows up as a same-day value jump that isn't a
+        # market move — an early top-up can look like a +80% "return" and
+        # wreck every stat below. Treat anything beyond this threshold as a
+        # cash flow, not performance, and exclude it from the return series.
+        FLOW_THRESHOLD = 0.20
+        is_flow = np.abs(raw_returns) > FLOW_THRESHOLD
+        returns = raw_returns[~is_flow]
+
         if len(returns) > 0:
             kpis["best_day"] = round(float(np.max(returns)) * 100, 2)
             kpis["worst_day"] = round(float(np.min(returns)) * 100, 2)
@@ -274,10 +284,22 @@ class PortfolioService:
             excess = returns - risk_free
             if np.std(excess) > 0:
                 kpis["sharpe_ratio"] = round(float(np.mean(excess) / np.std(excess) * np.sqrt(252)), 2)
+            kpis["positive_days_pct"] = round(float(np.mean(returns > 0)) * 100, 1)
+
+        # CAGR / YTD: compound the flow-excluded daily returns instead of the
+        # raw start/end value ratio, so new contributions aren't counted as gains.
+        clean_returns = np.where(is_flow, 0.0, raw_returns)
+        cum = np.concatenate([[1.0], np.cumprod(1 + clean_returns)])
+
+        year_start = date(dates[-1].year, 1, 1)
+        ytd_idx = [i for i, d in enumerate(dates) if d >= year_start]
+        if len(ytd_idx) >= 2:
+            i0, i1 = ytd_idx[0], ytd_idx[-1]
+            kpis["ytd_return"] = round((float(cum[i1]) / float(cum[i0]) - 1) * 100, 2)
 
         years = (dates[-1] - dates[0]).days / 365.25
-        if years > 0 and vals[0] > 0:
-            kpis["cagr"] = round((pow(vals[-1] / vals[0], 1 / years) - 1) * 100, 2)
+        if years > 0 and cum[0] > 0:
+            kpis["cagr"] = round((pow(float(cum[-1]) / float(cum[0]), 1 / years) - 1) * 100, 2)
 
         peak = vals[0]
         max_dd = 0.0
@@ -313,6 +335,85 @@ class PortfolioService:
             return None
         period = "1y" if days >= 365 else f"{days}d"
         return await self.yahoo.get_history(ticker, period=period)
+
+    async def risk_analysis(self) -> dict:
+        """Real (not hardcoded) risk distribution by realized annualized volatility,
+        and a pairwise return-correlation matrix, over both held positions."""
+        cache = getattr(self, "_risk_cache", None)
+        if cache and cache["expiry"] > datetime.now(timezone.utc):
+            return cache["data"]
+
+        portfolio = await self.calculate_portfolio()
+        positions = portfolio.get("positions", [])
+        empty = {"risk_distribution": {"low": 0.0, "medium": 0.0, "high": 0.0},
+                 "risk_by_ticker": {}, "correlation": {"tickers": [], "matrix": []}}
+        if not positions:
+            return empty
+
+        import asyncio
+
+        async def _hist(pos: dict) -> tuple[str, list[dict]]:
+            ticker = pos["ticker"]
+            try:
+                # Yahoo directly for crypto too (not CoinGecko): firing 5+ concurrent
+                # CoinGecko calls trips its free-tier rate limit instantly, and its
+                # own retry-after-60s logic then makes this endpoint take minutes.
+                if pos.get("type") == "crypto":
+                    hist = await self.yahoo.get_history(f"{ticker.upper()}-EUR", period="3mo")
+                else:
+                    hist = await self.yahoo.get_history(ticker, period="3mo")
+                return ticker, hist or []
+            except Exception as exc:
+                logger.debug("risk_analysis history fetch failed for {}: {}", ticker, exc)
+                return ticker, []
+
+        results = await asyncio.gather(*[_hist(p) for p in positions])
+        closes: dict[str, dict[str, float]] = {}
+        for ticker, hist in results:
+            series = {h["date"]: (h.get("close") or h.get("price")) for h in hist if h.get("close") or h.get("price")}
+            if len(series) >= 15:
+                closes[ticker] = series
+
+        weight_map = {p["ticker"]: p.get("weight") or 0.0 for p in positions}
+        risk_weights = {"low": 0.0, "medium": 0.0, "high": 0.0}
+        risk_by_ticker: dict[str, float] = {}
+        for ticker, series in closes.items():
+            vals = np.array([v for _, v in sorted(series.items())], dtype=float)
+            if len(vals) < 10:
+                continue
+            rets = np.diff(vals) / vals[:-1]
+            ann_vol = float(np.std(rets) * np.sqrt(252) * 100)
+            risk_by_ticker[ticker] = round(ann_vol, 1)
+            bucket = "low" if ann_vol < 20 else "medium" if ann_vol < 50 else "high"
+            risk_weights[bucket] += weight_map.get(ticker, 0.0)
+
+        total_w = sum(risk_weights.values())
+        risk_distribution = (
+            {k: round(v / total_w * 100, 1) for k, v in risk_weights.items()} if total_w > 0
+            else {"low": 0.0, "medium": 0.0, "high": 0.0}
+        )
+
+        tickers = list(closes.keys())
+        matrix: list[list[float]] = []
+        if len(tickers) >= 2:
+            common = set(closes[tickers[0]])
+            for t in tickers[1:]:
+                common &= set(closes[t])
+            common_dates = sorted(common)
+            if len(common_dates) >= 10:
+                series_matrix = np.array([[closes[t][d] for d in common_dates] for t in tickers])
+                rets_matrix = np.diff(series_matrix, axis=1) / series_matrix[:, :-1]
+                with np.errstate(invalid="ignore"):
+                    corr = np.corrcoef(rets_matrix)
+                matrix = [[round(float(x), 2) if np.isfinite(x) else 0.0 for x in row] for row in corr]
+
+        data = {
+            "risk_distribution": risk_distribution,
+            "risk_by_ticker": risk_by_ticker,
+            "correlation": {"tickers": tickers, "matrix": matrix},
+        }
+        self._risk_cache = {"data": data, "expiry": datetime.now(timezone.utc) + timedelta(hours=1)}
+        return data
 
     def _empty_portfolio(self) -> dict:
         return {

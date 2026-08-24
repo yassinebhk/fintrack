@@ -35,6 +35,14 @@ async def get_portfolio_summary() -> dict:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/portfolio/risk-analysis")
+async def get_risk_analysis() -> dict:
+    try:
+        return await _service.risk_analysis()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.get("/portfolio/history")
 async def get_portfolio_history(days: int = Query(default=365, ge=1, le=3650)) -> dict:
     history = await _service.get_portfolio_history(days)

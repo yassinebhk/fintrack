@@ -8,16 +8,28 @@ let assetChart = null;
 let currentAssetPeriod = '3mo';
 let currentAssetData = null;
 
-// Asset name mapping
+// Asset name mapping — verified 2026-08 against the real Trade Republic /
+// MyInvestor transaction history (do not "correct" without re-checking a CSV
+// export; LYX0F.DE and IE00BYX5NX33 were previously swapped here for months).
 const ASSET_DISPLAY_NAMES = {
     'BTC': { name: 'Bitcoin', icon: '₿', color: '#f7931a' },
     'ETH': { name: 'Ethereum', icon: 'Ξ', color: '#627eea' },
     'SOL': { name: 'Solana', icon: '◎', color: '#00ffa3' },
     'DOGE': { name: 'Dogecoin', icon: '🐕', color: '#c3a634' },
     'PEPE': { name: 'Pepe', icon: '🐸', color: '#4caf50' },
-    'SGLD.L': { name: 'Oro Físico (WisdomTree)', icon: '🥇', color: '#ffd700' },
-    'LYX0F.DE': { name: 'MSCI World (Amundi)', icon: '🌍', color: '#2196f3' },
-    'IE00BYX5NX33': { name: 'Vanguard S&P 500', icon: '🇺🇸', color: '#1976d2' },
+    'IE00BYX5NX33': { name: 'Fidelity MSCI World P-Acc', icon: '🌍', color: '#2196f3' },
+    'IE00B4ND3602': { name: 'iShares Physical Gold ETC', icon: '🥇', color: '#ffd700' },
+    'LYX0F.DE': { name: 'Amundi Nasdaq-100', icon: '📈', color: '#1976d2' },
+    'VVSM.DE': { name: 'VanEck Semiconductor', icon: '💾', color: '#9c27b0' },
+    'QDVF.DE': { name: 'iShares S&P500 Energy', icon: '⚡', color: '#ff9800' },
+    'NUKL.DE': { name: 'VanEck Uranium & Nuclear', icon: '☢️', color: '#8bc34a' },
+    'BTEC.L': { name: 'iShares Nasdaq Biotech', icon: '🧬', color: '#00bcd4' },
+    'COPX.L': { name: 'Global X Copper Miners', icon: '🔶', color: '#b87333' },
+    'JEDI.DE': { name: 'VanEck Space Innovators', icon: '🚀', color: '#673ab7' },
+    'PLTR': { name: 'Palantir Technologies', icon: '🔮', color: '#000000' },
+    'SPCX': { name: 'SpaceX', icon: '🛰️', color: '#005288' },
+    'USPY.DE': { name: 'L&G Cyber Security', icon: '🔐', color: '#607d8b' },
+    'IEAA.L': { name: 'iShares Core € Corp Bond', icon: '🏦', color: '#795548' },
 };
 
 /**
@@ -28,6 +40,8 @@ function initAssetAnalysis() {
     setupPeriodButtons();
     setupChartTypeToggle();
     loadAssetQuickCards();
+    loadBenchmarkChart();
+    loadRiskAndCorrelation();
 }
 
 /**
@@ -576,6 +590,116 @@ function formatDateLocal(dateStr) {
         month: 'short',
         year: 'numeric'
     });
+}
+
+/**
+ * "Rendimiento vs Benchmark" — your portfolio's daily value history vs the
+ * S&P 500 over the same window, both indexed to 0% at the common start date.
+ */
+let benchmarkChartInstance = null;
+async function loadBenchmarkChart() {
+    const canvas = document.getElementById('benchmarkChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    try {
+        const [histResp, spyResp] = await Promise.all([
+            fetch(`${ASSET_API}/portfolio/history?days=90`),
+            fetch(`${ASSET_API}/asset/SPY/history?period=3mo&asset_type=stock`),
+        ]);
+        const hist = await histResp.json();
+        const spy = await spyResp.json();
+        const portfolioSeries = hist.history || [];
+        const spyByDate = {};
+        (spy.history || []).forEach(h => { spyByDate[h.date] = h.close; });
+        const aligned = portfolioSeries.filter(p => spyByDate[p.date] !== undefined);
+        if (aligned.length < 2) return;
+
+        const baseP = aligned[0].value;
+        const baseS = spyByDate[aligned[0].date];
+        const labels = aligned.map(p => p.date);
+        const portfolioPct = aligned.map(p => (p.value / baseP - 1) * 100);
+        const spyPct = aligned.map(p => (spyByDate[p.date] / baseS - 1) * 100);
+
+        if (benchmarkChartInstance) benchmarkChartInstance.destroy();
+        benchmarkChartInstance = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    { label: 'Tu cartera', data: portfolioPct, borderColor: '#00d4aa', backgroundColor: 'transparent', tension: 0.2, pointRadius: 0, borderWidth: 2 },
+                    { label: 'S&P 500', data: spyPct, borderColor: '#94a3b8', backgroundColor: 'transparent', tension: 0.2, pointRadius: 0, borderWidth: 2, borderDash: [4, 4] },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: true, labels: { color: '#94a3b8', boxWidth: 12 } } },
+                scales: {
+                    x: { display: false },
+                    y: { ticks: { color: '#94a3b8', callback: v => `${v.toFixed(0)}%` }, grid: { color: 'rgba(148,163,184,0.1)' } },
+                },
+            },
+        });
+    } catch (err) {
+        console.error('benchmark chart failed:', err);
+    }
+}
+
+/**
+ * "Distribución de Riesgo" (real annualized volatility, weighted by position
+ * size — not the hardcoded 30/45/25 this used to show) + "Correlación de
+ * Activos" — both come from the same /portfolio/risk-analysis call.
+ */
+async function loadRiskAndCorrelation() {
+    try {
+        const resp = await fetch(`${ASSET_API}/portfolio/risk-analysis`);
+        const data = await resp.json();
+        renderRiskDistribution(data.risk_distribution || {});
+        renderCorrelationMatrix(data.correlation || {});
+    } catch (err) {
+        console.error('risk/correlation load failed:', err);
+    }
+}
+
+function renderRiskDistribution(dist) {
+    const map = { low: 'riskLow', medium: 'riskMedium', high: 'riskHigh' };
+    for (const [key, elId] of Object.entries(map)) {
+        const pct = dist[key] || 0;
+        const pctEl = document.getElementById(elId);
+        if (!pctEl) continue;
+        pctEl.textContent = `${pct.toFixed(1)}%`;
+        const fillEl = pctEl.closest('.risk-item')?.querySelector('.risk-fill');
+        if (fillEl) fillEl.style.width = `${pct}%`;
+    }
+}
+
+function renderCorrelationMatrix(correlation) {
+    const container = document.getElementById('correlationMatrix');
+    if (!container) return;
+    const tickers = correlation.tickers || [];
+    const matrix = correlation.matrix || [];
+    if (!tickers.length || !matrix.length) {
+        container.innerHTML = '<p class="text-muted">Aún no hay suficiente histórico para calcular correlaciones.</p>';
+        return;
+    }
+    const N = Math.min(8, tickers.length); // top holdings only — an 18x18 grid doesn't fit a small card
+    const colorFor = (v) => v >= 0
+        ? `rgba(0, 212, 170, ${Math.min(Math.abs(v), 1) * 0.6})`
+        : `rgba(239, 68, 68, ${Math.min(Math.abs(v), 1) * 0.6})`;
+
+    let html = '<div style="overflow-x:auto"><table class="correlation-table"><thead><tr><th></th>';
+    for (let j = 0; j < N; j++) html += `<th>${tickers[j]}</th>`;
+    html += '</tr></thead><tbody>';
+    for (let i = 0; i < N; i++) {
+        html += `<tr><th>${tickers[i]}</th>`;
+        for (let j = 0; j < N; j++) {
+            const v = matrix[i]?.[j];
+            const label = v != null ? v.toFixed(2) : '-';
+            html += `<td style="background:${v != null ? colorFor(v) : 'transparent'}" title="${tickers[i]} vs ${tickers[j]}">${label}</td>`;
+        }
+        html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
 }
 
 // Initialize when DOM is ready

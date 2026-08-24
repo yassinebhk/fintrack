@@ -239,6 +239,17 @@ function updateKPIs(kpis) {
     if (worstDayEl) {
         worstDayEl.textContent = kpis.worst_day ? formatPercent(kpis.worst_day) : '-0.00%';
     }
+
+    const positiveDaysEl = document.getElementById('positiveDays');
+    if (positiveDaysEl) {
+        positiveDaysEl.textContent = kpis.positive_days_pct != null ? `${formatNumber(kpis.positive_days_pct, 1)}%` : '0%';
+    }
+
+    const ytdEl = document.getElementById('ytdReturn');
+    if (ytdEl) {
+        ytdEl.textContent = kpis.ytd_return != null ? formatPercent(kpis.ytd_return) : '0.00%';
+        ytdEl.className = `stat-value ${kpis.ytd_return >= 0 ? 'positive' : 'negative'}`;
+    }
 }
 
 function updateQuickStats(data) {
