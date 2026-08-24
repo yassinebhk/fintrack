@@ -189,7 +189,7 @@ class CoinGeckoService:
                 resp.raise_for_status()
                 data = resp.json()
             prices = data.get("prices", [])
-            result = [
+            rows = [
                 {
                     "date": datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d"),
                     "close": float(price),
@@ -197,6 +197,15 @@ class CoinGeckoService:
                 }
                 for ts, price in prices
             ]
+            # CoinGecko's last point is often an intraday "now" snapshot on top of
+            # the daily point for the same day — same date string twice breaks
+            # chart libraries that require strictly ascending/unique timestamps.
+            # Keep the last (most recent) value per date; order is preserved
+            # since duplicates are contiguous and dict keeps first-seen position.
+            deduped: dict[str, dict] = {}
+            for row in rows:
+                deduped[row["date"]] = row
+            result = list(deduped.values())
             if result:
                 self._cache[cache_key] = result
                 self._expiry[cache_key] = datetime.now() + timedelta(minutes=30)
