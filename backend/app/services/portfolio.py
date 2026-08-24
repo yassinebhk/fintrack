@@ -6,6 +6,7 @@ Public API preserved for legacy callers:
 - `get_portfolio_history(days)` returns a list[{date, value}].
 """
 
+import asyncio
 from datetime import date, datetime, timedelta, timezone
 
 import numpy as np
@@ -61,17 +62,19 @@ class PortfolioService:
         if stocks_etfs:
             prices.update(await self.yahoo.get_prices(stocks_etfs))
         if cryptos:
-            crypto_prices = await self.coingecko.get_prices(cryptos, vs_currency=self.base_currency.lower())
-            prices.update(crypto_prices)
-            # Fallback: CoinGecko free tier rate-limits hard. For any crypto it didn't
-            # return, fetch the EUR pair from Yahoo (BTC-EUR, ETH-EUR, ...) so we never
-            # fall back to using avg_price as the live price (which zeroes out P/L).
-            missing = [c for c in cryptos if c not in crypto_prices]
-            for ticker in missing:
-                yp = await self._crypto_price_yahoo(ticker)
-                if yp:
-                    prices[ticker] = yp
-                    logger.info("crypto {} price via Yahoo fallback: {}", ticker, yp["price"])
+            # Yahoo first, concurrently: no rate limit, and CoinGecko's free tier
+            # 429s hard enough that get_prices()'s batch retry-sleep (up to 60s
+            # across 3 attempts) was blocking the ENTIRE portfolio load behind it.
+            # CoinGecko stays only as a fallback for whatever Yahoo has no market for.
+            yahoo_results = await asyncio.gather(*(self._crypto_price_yahoo(t) for t in cryptos))
+            yahoo_prices = {t: yp for t, yp in zip(cryptos, yahoo_results) if yp}
+            prices.update(yahoo_prices)
+            missing = [c for c in cryptos if c not in yahoo_prices]
+            if missing:
+                crypto_prices = await self.coingecko.get_prices(missing, vs_currency=self.base_currency.lower())
+                prices.update(crypto_prices)
+                for ticker, price in crypto_prices.items():
+                    logger.info("crypto {} price via CoinGecko fallback: {}", ticker, price["price"])
 
         self._prices_cache = prices
         return prices
@@ -322,17 +325,15 @@ class PortfolioService:
 
     async def get_asset_history(self, ticker: str, asset_type: str, days: int = 365) -> list[dict] | None:
         if asset_type == "crypto":
-            hist = await self.coingecko.get_history(ticker, days=days, vs_currency=self.base_currency.lower())
-            if hist:
-                return hist
-            # Fallback: CoinGecko rate-limited → Yahoo BTC-EUR / BTC-USD
+            # Yahoo first (no rate limit) — see fetch_all_prices for why CoinGecko-first
+            # is unsafe as the primary path (its 429 retry-sleep can block for a minute).
             up = ticker.upper()
             yperiod = "max" if days > 1825 else "5y" if days > 730 else "2y" if days > 365 else "1y" if days > 90 else "6mo" if days > 30 else "1mo"
             for yt in (f"{up}-EUR", f"{up}-USD"):
                 hist = await self.yahoo.get_history(yt, period=yperiod)
                 if hist:
                     return hist
-            return None
+            return await self.coingecko.get_history(ticker, days=days, vs_currency=self.base_currency.lower())
         period = "1y" if days >= 365 else f"{days}d"
         return await self.yahoo.get_history(ticker, period=period)
 
@@ -349,8 +350,6 @@ class PortfolioService:
                  "risk_by_ticker": {}, "correlation": {"tickers": [], "matrix": []}}
         if not positions:
             return empty
-
-        import asyncio
 
         async def _hist(pos: dict) -> tuple[str, list[dict]]:
             ticker = pos["ticker"]
