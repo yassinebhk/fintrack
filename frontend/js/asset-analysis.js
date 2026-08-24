@@ -40,7 +40,7 @@ async function loadAssetSelector() {
             const displayName = ASSET_DISPLAY_NAMES[pos.ticker]?.name || pos.ticker;
             const option = document.createElement('option');
             option.value = pos.ticker;
-            option.textContent = `${pos.ticker} - ${displayName}`;
+            option.textContent = `${displayName} (${pos.ticker})`;
             option.dataset.type = pos.type;
             selector.appendChild(option);
         });
@@ -400,9 +400,9 @@ async function loadAssetQuickCards() {
                 <div class="asset-quick-card" onclick="selectAsset('${pos.ticker}')" style="--accent-color: ${info.color}">
                     <div class="quick-card-header">
                         <span class="quick-card-icon">${info.icon}</span>
-                        <span class="quick-card-ticker">${pos.ticker}</span>
+                        <span class="quick-card-ticker">${info.name}</span>
                     </div>
-                    <div class="quick-card-name">${info.name}</div>
+                    <div class="quick-card-name">${pos.ticker}</div>
                     <div class="quick-card-price">${formatCurrencyLocal(pos.current_price)}</div>
                     <div class="quick-card-change ${changeClass}">
                         ${changeSign}${pos.day_change_pct.toFixed(2)}% hoy
@@ -418,6 +418,26 @@ async function loadAssetQuickCards() {
         console.error('Error loading asset cards:', error);
         grid.innerHTML = '<p class="error">Error al cargar los activos</p>';
     }
+}
+
+/**
+ * Jump to the Análisis page and load a specific asset's chart — used by the
+ * Dashboard/Gestionar Cartera position rows, so "see how this position has
+ * evolved" doesn't require manually finding it in the selector afterwards.
+ */
+function viewAssetChart(ticker) {
+    const link = document.querySelector('[data-page="analysis"]');
+    if (!link) return;
+    link.click();
+    const trySelect = (attempts = 0) => {
+        const selector = document.getElementById('assetSelector');
+        if (selector && selector.querySelector(`option[value="${ticker}"]`)) {
+            selectAsset(ticker);
+        } else if (attempts < 20) {
+            setTimeout(() => trySelect(attempts + 1), 150);
+        }
+    };
+    setTimeout(() => trySelect(), 250);
 }
 
 /**
@@ -709,6 +729,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Expose functions globally for HTML onclick handlers
 window.loadAssetChart = loadAssetChart;
 window.selectAsset = selectAsset;
+window.viewAssetChart = viewAssetChart;
 window.showBuyAdvice = showBuyAdvice;
 window.showDetailedAnalysis = showDetailedAnalysis;
 window.initAssetAnalysis = initAssetAnalysis;

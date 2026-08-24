@@ -151,17 +151,16 @@ function renderManagerPositions(positions) {
     }
 
     tbody.innerHTML = positions.map(pos => {
-        const assetName = getAssetName(pos.ticker);
-        const showName = Boolean(assetName); // Solo mostrar nombre si tenemos uno real
-        
+        const assetName = getAssetName(pos.ticker) || pos.ticker;
+
         return `
         <tr>
             <td>
-                <div class="ticker-cell">
+                <div class="ticker-cell" onclick="viewAssetChart('${pos.ticker}')" style="cursor:pointer" title="Ver evolución de ${assetName}">
                     <div class="ticker-icon">${getTickerIcon(pos.ticker, pos.type)}</div>
                     <div class="ticker-info">
-                        <span class="ticker-symbol">${pos.ticker}</span>
-                        ${showName ? `<span class="ticker-name">${assetName}</span>` : ''}
+                        <span class="ticker-symbol">${assetName}</span>
+                        <span class="ticker-name">${pos.ticker}</span>
                     </div>
                 </div>
             </td>
