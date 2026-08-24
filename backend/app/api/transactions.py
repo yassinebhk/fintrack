@@ -27,9 +27,11 @@ class TransactionIn(BaseModel):
 @router.get("")
 async def list_transactions(
     limit: int = 200,
+    ticker: str | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> list[dict]:
-    rows = await TransactionRepository(session).list_all(limit=limit)
+    repo = TransactionRepository(session)
+    rows = await repo.list_for_ticker(ticker) if ticker else await repo.list_all(limit=limit)
     return [
         {
             "id": r.id,

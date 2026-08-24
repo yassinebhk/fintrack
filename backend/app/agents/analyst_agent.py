@@ -50,6 +50,11 @@ Reglas:
    propón 6-8 oportunidades VARIADAS (distintos sectores, regiones, factores y enfoques), repartidas
    entre momentum y valor/contrarian. Aprovecha que el motor ha rankeado ~130 instrumentos: no te
    quedes en 3. Eso sí, TODAS deben venir del ranking y TODAS deben ir explicadas por completo.
+9. Se te da el HISTORIAL REAL de esta cartera de ideas (out-of-sample, autoentrenamiento). Cada línea
+   marca si ese enfoque/convicción tiene ya evidencia suficiente ("gated") o no. Si un enfoque marca
+   evidencia suficiente y negativa, baja tu convicción ahí en consecuencia y dilo explícitamente. Si
+   marca "insuficiente", IGNÓRALO POR COMPLETO — no es una señal, es ruido, no lo menciones como si
+   fuera un patrón real.
 """
 
 SCHEMA = {
@@ -112,6 +117,7 @@ class AnalystAgent(Agent):
         news_str = context.extras.get("news_str", "") or "(sin titulares)"
 
         trends_str = context.extras.get("trends_str", "") or ""
+        scorecard_str = context.extras.get("scorecard_str", "") or "(sin historial suficiente aún)"
 
         return (
             "## Datos de mercado (momentum real de sectores/temas)\n"
@@ -122,6 +128,8 @@ class AnalystAgent(Agent):
             f"{news_str}\n\n"
             "## Macro\n"
             f"{macro_str}\n\n"
+            "## Historial del motor (out-of-sample, autoentrenamiento)\n"
+            f"{scorecard_str}\n\n"
             "## Cartera actual del usuario\n"
             f"{rendered_portfolio}\n\n"
             "## Tu tarea\n"

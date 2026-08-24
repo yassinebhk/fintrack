@@ -156,7 +156,7 @@ function renderManagerPositions(positions) {
         return `
         <tr>
             <td>
-                <div class="ticker-cell" onclick="viewAssetChart('${pos.ticker}')" style="cursor:pointer" title="Ver evolución de ${assetName}">
+                <div class="ticker-cell" onclick="showAssetDetail('${pos.ticker}')" style="cursor:pointer" title="Ver detalle de ${assetName}">
                     <div class="ticker-icon">${getTickerIcon(pos.ticker, pos.type)}</div>
                     <div class="ticker-info">
                         <span class="ticker-symbol">${assetName}</span>

@@ -421,26 +421,6 @@ async function loadAssetQuickCards() {
 }
 
 /**
- * Jump to the Análisis page and load a specific asset's chart — used by the
- * Dashboard/Gestionar Cartera position rows, so "see how this position has
- * evolved" doesn't require manually finding it in the selector afterwards.
- */
-function viewAssetChart(ticker) {
-    const link = document.querySelector('[data-page="analysis"]');
-    if (!link) return;
-    link.click();
-    const trySelect = (attempts = 0) => {
-        const selector = document.getElementById('assetSelector');
-        if (selector && selector.querySelector(`option[value="${ticker}"]`)) {
-            selectAsset(ticker);
-        } else if (attempts < 20) {
-            setTimeout(() => trySelect(attempts + 1), 150);
-        }
-    };
-    setTimeout(() => trySelect(), 250);
-}
-
-/**
  * Select an asset from quick cards
  */
 function selectAsset(ticker) {
@@ -511,12 +491,10 @@ function showBuyAdvice() {
  * Show detailed analysis
  */
 function showDetailedAnalysis() {
-    // Navigate to AI advisor with context
-    if (currentAssetData) {
-        const ticker = currentAssetData.ticker;
-        // Could open AI advisor with pre-filled question
-        alert(`Para un análisis detallado de ${ticker}, ve a la sección "Asesor IA" y pregunta sobre este activo.`);
-    }
+    if (!currentAssetData) return;
+    const ticker = currentAssetData.ticker;
+    const name = ASSET_DISPLAY_NAMES[ticker]?.name || ticker;
+    openDeepAnalysis(ticker, name);
 }
 
 // Helper functions
@@ -729,7 +707,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // Expose functions globally for HTML onclick handlers
 window.loadAssetChart = loadAssetChart;
 window.selectAsset = selectAsset;
-window.viewAssetChart = viewAssetChart;
 window.showBuyAdvice = showBuyAdvice;
 window.showDetailedAnalysis = showDetailedAnalysis;
 window.initAssetAnalysis = initAssetAnalysis;

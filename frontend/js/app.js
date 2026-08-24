@@ -328,7 +328,7 @@ function updatePositionsTable(positions) {
         const typeName = {'crypto': 'Crypto', 'etf': 'ETF', 'fund': 'Fondo', 'stock': 'Acción'}[pos.type] || pos.type;
         
         return `
-        <tr onclick="viewAssetChart('${pos.ticker}')" style="cursor:pointer" title="Ver evolución de ${assetName}">
+        <tr onclick="showAssetDetail('${pos.ticker}')" style="cursor:pointer" title="Ver detalle de ${assetName}">
             <td>
                 <div class="ticker-cell">
                     <div class="ticker-icon">${icon}</div>

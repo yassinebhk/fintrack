@@ -15,7 +15,7 @@ from loguru import logger
 
 from app.config import get_settings
 from app.db import session_scope
-from app.repositories import PositionRepository, SnapshotRepository
+from app.repositories import PositionRepository, SnapshotRepository, TransactionRepository
 from app.services.market import CoinGeckoService, ExchangeRateService, YahooFinanceService
 
 
@@ -336,6 +336,66 @@ class PortfolioService:
             return await self.coingecko.get_history(ticker, days=days, vs_currency=self.base_currency.lower())
         period = "1y" if days >= 365 else f"{days}d"
         return await self.yahoo.get_history(ticker, period=period)
+
+    async def get_position_history(self, ticker: str, days: int = 365) -> dict:
+        """The user's OWN position over time for `ticker` — quantity held, market
+        value (quantity * price), and cumulative cost basis (money actually put in)
+        at each date. Distinct from get_asset_history(): that's the raw market
+        price; this is worth 0 before the first purchase and jumps whenever the
+        user actually buys/sells, since it's built by replaying their transactions
+        against the price history, not the price series itself."""
+        ticker_up = ticker.upper()
+        async with session_scope() as session:
+            txs = await TransactionRepository(session).list_for_ticker(ticker_up)
+        txs = sorted(txs, key=lambda t: t.executed_at)
+        if not txs:
+            return {"ticker": ticker_up, "history": [], "current_quantity": 0.0}
+
+        positions = await self.load_positions()
+        pos = positions[positions["ticker"].str.upper() == ticker_up]
+        if not pos.empty:
+            asset_type = pos.iloc[0]["type"]
+        elif ticker_up in {"BTC", "ETH", "SOL", "DOGE", "PEPE", "XRP", "ADA"}:
+            asset_type = "crypto"  # fully-exited crypto position: no row in Position anymore
+        else:
+            asset_type = "stock"
+
+        first_date = txs[0].executed_at.date()
+        span_days = max(days, (datetime.now(timezone.utc).date() - first_date).days + 1)
+        price_hist = await self.get_asset_history(ticker_up, asset_type, days=span_days) or []
+
+        # Replay buys/sells into (date, qty_delta, cost_delta) events. Dividends/fees
+        # don't change quantity or cost basis here — they only appear in the raw
+        # transaction list the frontend shows alongside this chart.
+        events: list[tuple[date, float, float]] = []
+        for t in txs:
+            d = t.executed_at.date()
+            if t.type == "buy":
+                events.append((d, float(t.quantity), float(t.quantity) * float(t.price) + float(t.fee or 0)))
+            elif t.type == "sell":
+                events.append((d, -float(t.quantity), -float(t.quantity) * float(t.price)))
+        events.sort(key=lambda e: e[0])
+
+        history = []
+        qty = cost_basis = 0.0
+        ei = 0
+        for h in sorted(price_hist, key=lambda h: h["date"]):
+            h_date = datetime.strptime(h["date"], "%Y-%m-%d").date()
+            while ei < len(events) and events[ei][0] <= h_date:
+                qty += events[ei][1]
+                cost_basis += events[ei][2]
+                ei += 1
+            if h_date < first_date:
+                continue  # nothing held yet — skip rather than show a misleading 0 before day 1
+            price = h.get("close") or h.get("price") or 0
+            history.append({
+                "date": h["date"],
+                "quantity": round(qty, 8),
+                "value": round(qty * price, 2),
+                "cost_basis": round(max(cost_basis, 0.0), 2),
+            })
+
+        return {"ticker": ticker_up, "history": history, "current_quantity": round(qty, 8)}
 
     async def risk_analysis(self) -> dict:
         """Real (not hardcoded) risk distribution by realized annualized volatility,

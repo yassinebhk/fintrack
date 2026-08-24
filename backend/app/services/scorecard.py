@@ -14,8 +14,10 @@ uses, so snapshot and evaluation are consistent.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+from statistics import median
 
 from loguru import logger
+from scipy.stats import ttest_1samp
 from sqlalchemy import select
 
 from app.db import session_scope
@@ -25,6 +27,14 @@ from app.services.discovery.market_scanner import MarketScanner
 
 _HORIZONS = {"ret_1m": 30, "ret_3m": 90, "ret_6m": 180}
 _EXCESS = {"ret_1m": "excess_1m", "ret_3m": "excess_3m", "ret_6m": "excess_6m"}
+
+# Anti-noise gate for the feedback loop (feedback_context() below): mirrors the
+# philosophy of systematic/paper.py's readiness gate (days>=56, marks>=30) but
+# adapted for a cross-sectional table (many tickers/dates) rather than one
+# sequential NAV curve — n alone isn't enough here, since 30 recommendations
+# could all come from one bad week. Both must hold before a bucket is trusted.
+MIN_N_FEEDBACK = 30
+MIN_SPAN_DAYS_FEEDBACK = 90
 
 
 def _close_on_or_before(hist: list[dict], target: date) -> float | None:
@@ -181,9 +191,101 @@ async def summary() -> dict:
         "horizons": horizons,
         "by_approach_3m": breakdown("approach"),
         "by_conviction_3m": breakdown("conviction"),
+        "feedback_gate": await feedback_context(rows),
         "note": (
             "Rendimiento de las ideas DESPUÉS de recomendarlas (out-of-sample). "
             "'alpha_vs_benchmark' = exceso sobre su índice de referencia. "
             "Necesita semanas/meses de historial para ser significativo."
         ),
     }
+
+
+def _bucket_stats(rows: list[RecommendationTrack], attr: str) -> dict:
+    """Group by `attr` (approach/conviction) at the 3-month horizon and gate each
+    group on (n >= MIN_N_FEEDBACK and date span >= MIN_SPAN_DAYS_FEEDBACK) — the
+    anti-noise threshold. Ungated groups still get a real n/span so the caller can
+    show honest progress ("12/30"), never silence."""
+    groups: dict[str, list[tuple[date, float]]] = {}
+    for r in rows:
+        if r.ret_3m is not None:
+            key = getattr(r, attr) or "—"
+            groups.setdefault(key, []).append((r.rec_date, r.ret_3m))
+
+    out: dict = {}
+    for key, pairs in groups.items():
+        vals = [v for _, v in pairs]
+        dates = [d for d, _ in pairs]
+        n = len(vals)
+        span_days = (max(dates) - min(dates)).days if n > 1 else 0
+        p_value = float(ttest_1samp(vals, 0.0).pvalue) if n >= 5 else None
+        gated = n >= MIN_N_FEEDBACK and span_days >= MIN_SPAN_DAYS_FEEDBACK
+        out[key] = {
+            "n": n,
+            "n_required": MIN_N_FEEDBACK,
+            "span_days": span_days,
+            "span_days_required": MIN_SPAN_DAYS_FEEDBACK,
+            "median": round(median(vals), 2),
+            "hit_rate_pct": round(sum(1 for v in vals if v > 0) / n * 100, 1),
+            "p_value": round(p_value, 3) if p_value is not None else None,
+            "gated": gated,
+            "significant": bool(gated and p_value is not None and p_value < 0.10),
+        }
+    return out
+
+
+_feedback_gate_seen_open: set[str] = set()
+
+
+async def feedback_context(rows: list[RecommendationTrack] | None = None) -> dict:
+    """The self-training input: real out-of-sample stats per approach/conviction,
+    gated so a small sample never gets used as if it were a real pattern. This is
+    read by opportunities.py to (a) hand the LLM real numbers to calibrate
+    'conviction' with, and (b) nudge the no-LLM template fallback — but ONLY for
+    buckets where `gated` is True. Everything else must be treated as noise."""
+    if rows is None:
+        async with session_scope() as s:
+            rows = (await s.execute(select(RecommendationTrack))).scalars().all()
+    fb = {"by_approach": _bucket_stats(rows, "approach"), "by_conviction": _bucket_stats(rows, "conviction")}
+    for group_name, buckets in fb.items():
+        for key, stats in buckets.items():
+            marker = f"{group_name}:{key}"
+            if stats["gated"] and marker not in _feedback_gate_seen_open:
+                _feedback_gate_seen_open.add(marker)
+                logger.info(
+                    "scorecard feedback: {} just crossed the anti-noise gate (n={}, span={}d) — "
+                    "the self-training loop is now live for this bucket",
+                    marker, stats["n"], stats["span_days"],
+                )
+    return fb
+
+
+def render_feedback_for_prompt(fb: dict) -> str:
+    """Render feedback_context()'s output as prompt text for AnalystAgent. Ungated
+    buckets are shown as explicitly insufficient — never silently omitted, so the
+    LLM (and anyone reading the raw prompt) sees the same honesty the UI does."""
+    lines = [
+        "Historial del motor (out-of-sample, usar SOLO para calibrar convicción, NO para elegir tickers):",
+    ]
+    labels = {"by_approach": "por enfoque", "by_conviction": "por convicción"}
+    any_gated = False
+    for group_name, buckets in fb.items():
+        if not buckets:
+            continue
+        for key, stats in sorted(buckets.items()):
+            tag = f"{key.upper()} ({labels[group_name]})"
+            if stats["gated"]:
+                any_gated = True
+                lines.append(
+                    f"- {tag}: n={stats['n']} en {stats['span_days']}d — mediana {stats['median']:+.1f}% a 3m, "
+                    f"{stats['hit_rate_pct']:.0f}% de aciertos"
+                    + (", diferencia de 0 estadísticamente significativa" if stats["significant"] else ", sin significancia estadística clara")
+                    + "."
+                )
+            else:
+                lines.append(f"- {tag}: n={stats['n']}/{stats['n_required']} — insuficiente, sin conclusión.")
+    if not any_gated:
+        lines.append(
+            f"Nota: con <{MIN_N_FEEDBACK} muestras a 3 meses o <{MIN_SPAN_DAYS_FEEDBACK} días de rango, "
+            "cualquier patrón es ruido; ignora este bloque por completo."
+        )
+    return "\n".join(lines)

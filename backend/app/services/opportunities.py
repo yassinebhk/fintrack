@@ -230,6 +230,14 @@ class OpportunityService:
         market_regime = next((t.get("market_regime") for t in themes if t.get("market_regime")), "neutral")
         market_breadth = next((t.get("market_breadth") for t in themes if t.get("market_breadth") is not None), None)
 
+        # Self-training feedback: the engine's own out-of-sample track record (gated —
+        # see scorecard.py — so a small/short sample is never used as if it were a
+        # real pattern). Feeds AnalystAgent's conviction calibration and, for gated
+        # buckets only, nudges the no-LLM template fallback below.
+        from app.services.scorecard import feedback_context, render_feedback_for_prompt
+        feedback = await feedback_context()
+        scorecard_str = render_feedback_for_prompt(feedback)
+
         # Try the LLM analyst; if EVERY provider is exhausted, degrade gracefully to a
         # data-driven template so the user still gets the ranked ideas + metrics.
         ctx = AgentContext(
@@ -239,6 +247,7 @@ class OpportunityService:
                 "trends_str": trends_str,
                 "macro": {"us": us_macro, "eu": eu_macro},
                 "news_str": news_str,
+                "scorecard_str": scorecard_str,
             },
         )
         model_used = "plantilla (sin IA)"
@@ -253,7 +262,7 @@ class OpportunityService:
         except Exception as exc:
             analyst_error = str(exc)[:500]
             logger.warning("analyst LLM unavailable ({}); using data-driven template", str(exc)[:200])
-            opportunities = self._template_opportunities(themes)
+            opportunities = self._template_opportunities(themes, feedback)
             market_summary = self._template_market_summary(market_regime, market_breadth, trends)
             content = {"disclaimer": "Generado automáticamente desde los datos (IA no disponible ahora)."}
         # Enrich each idea with a 6-month trend chart + the headlines that back it +
@@ -285,6 +294,7 @@ class OpportunityService:
             "market_summary": market_summary,
             "opportunities": opportunities,
             "froth": froth,
+            "scorecard_feedback": feedback,
             "analyst_error": analyst_error,  # diagnostic: why the LLM analyst fell back
             "disclaimer": content.get("disclaimer", ""),
         }
@@ -367,7 +377,7 @@ class OpportunityService:
             ),
         }
 
-    def _template_opportunities(self, themes: list[dict]) -> list[dict]:
+    def _template_opportunities(self, themes: list[dict], feedback: dict | None = None) -> list[dict]:
         """Build opportunities straight from the quant ranking when no LLM is
         available — same shape as the LLM output, text generated from the data.
         Keeps the core product alive (data, ranking, metrics) without any AI."""
@@ -377,8 +387,18 @@ class OpportunityService:
         top_mom = sorted(scored, key=lambda x: x.get("momentum_score", 0), reverse=True)[:3]
         top_val = sorted(scored, key=lambda x: x.get("value_score", 0), reverse=True)[:3]
 
-        def conviction(score: float) -> str:
-            return "alta" if score >= 1.0 else "media" if score >= 0.3 else "baja"
+        by_approach = (feedback or {}).get("by_approach") or {}
+
+        def conviction(score: float, approach: str) -> str:
+            base = "alta" if score >= 1.0 else "media" if score >= 0.3 else "baja"
+            # Deterministic, non-LLM nudge — only acts once this approach's real
+            # track record clears the anti-noise gate (scorecard.MIN_N_FEEDBACK /
+            # MIN_SPAN_DAYS_FEEDBACK). Until then this is a documented no-op.
+            stats = by_approach.get(approach)
+            if stats and stats.get("gated") and stats.get("median", 0) <= 0:
+                order = ["baja", "media", "alta"]
+                base = order[max(0, order.index(base) - 1)]
+            return base
 
         def signals_txt(t: dict) -> str:
             s = t.get("signals") or {}
@@ -416,7 +436,7 @@ class OpportunityService:
                 "why_now": why,
                 "risks": risks,
                 "fit": "Revisa su encaje y correlación con lo que ya tienes en cartera.",
-                "conviction": conviction(score),
+                "conviction": conviction(score, approach),
                 "supporting_news_idx": [],
             }
 

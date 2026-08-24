@@ -49,6 +49,14 @@ async def get_portfolio_history(days: int = Query(default=365, ge=1, le=3650)) -
     return {"history": history, "days": days}
 
 
+@router.get("/portfolio/position-history/{ticker}")
+async def get_position_history(ticker: str, days: int = Query(default=365, ge=1, le=3650)) -> dict:
+    try:
+        return await _service.get_position_history(ticker, days)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.get("/portfolio/kpis")
 async def get_portfolio_kpis() -> dict:
     p = await _service.calculate_portfolio()

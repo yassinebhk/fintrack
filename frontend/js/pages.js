@@ -1286,6 +1286,14 @@ function navigateFromHash() {
     const raw = decodeURIComponent((location.hash || '').replace(/^#/, '')).trim();
     if (!raw) return;
 
+    // 0) Asset detail deep link (e.g. #asset/BTC) — not a sidebar page, so it
+    // needs its own branch instead of the .nav-item lookup below.
+    if (raw.startsWith('asset/') && window.showAssetDetail) {
+        const ticker = raw.slice('asset/'.length);
+        if (ticker) window.showAssetDetail(ticker);
+        return;
+    }
+
     // 1) Direct page name (e.g. #opportunities, #docs, #backtest)
     const navByPage = document.querySelector(`.nav-item[data-page="${raw}"]`);
     if (navByPage) {

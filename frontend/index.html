@@ -568,6 +568,97 @@
                     </div>
                 </div>
 
+                <!-- Asset Detail Page — reached by clicking a position anywhere in the
+                     app (showAssetDetail()), not from the sidebar nav. Shows market
+                     price + the user's own position value over time + their
+                     contributions for that one ticker, all in one place. -->
+                <div class="page page-asset-detail" id="page-asset-detail">
+                    <section class="analysis-header">
+                        <button class="btn-secondary" onclick="document.querySelector('[data-page=dashboard]').click()" style="margin-bottom: var(--spacing-md);">← Volver</button>
+                        <h2 id="assetDetailPageTitle">📊 Detalle de Activo</h2>
+                        <p>Mercado, tu posición en el tiempo y tus aportaciones — todo en un sitio</p>
+                    </section>
+
+                    <section class="asset-analysis-section">
+                        <div class="card asset-chart-card">
+                            <div class="asset-info-panel" id="assetDetailInfoPanel">
+                                <div class="asset-main-info">
+                                    <div class="asset-icon-large" id="assetDetailIcon">📊</div>
+                                    <div class="asset-details">
+                                        <h3 id="assetDetailName">-</h3>
+                                        <span class="asset-ticker-badge" id="assetDetailTicker">-</span>
+                                    </div>
+                                    <div class="asset-price-info">
+                                        <div class="current-price" id="assetDetailPrice">-</div>
+                                        <div class="price-change" id="assetDetailChange">-</div>
+                                    </div>
+                                </div>
+                                <div class="asset-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Tu posición</span>
+                                        <span class="stat-value" id="assetDetailQty">-</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Valor actual</span>
+                                        <span class="stat-value" id="assetDetailValue">-</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Ganancia/Pérdida</span>
+                                        <span class="stat-value" id="assetDetailGainLoss">-</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">% de tu cartera</span>
+                                        <span class="stat-value" id="assetDetailWeight">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="asset-chart-container">
+                                <div id="assetDetailTvContainer" style="width: 100%; height: 400px;"></div>
+                            </div>
+
+                            <div class="asset-actions" style="display: flex;">
+                                <button class="btn-action btn-analyze" id="assetDetailDeepBtn">🔬 Análisis profesional del activo</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="analysis-metrics" style="grid-template-columns: 1fr;">
+                        <div class="card metric-card">
+                            <h4>Tu posición en el tiempo</h4>
+                            <p class="text-muted" style="font-size:12px; margin:0 0 8px;">Valor de lo que tienes invertido en este activo vs. lo que has aportado — no es lo mismo que el precio de mercado, refleja cuándo compraste.</p>
+                            <div class="chart-container">
+                                <canvas id="assetDetailPositionChart"></canvas>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="positions-section">
+                        <div class="card card-positions">
+                            <div class="card-header">
+                                <h3>Tus aportaciones</h3>
+                            </div>
+                            <div class="table-container">
+                                <table class="transactions-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Tipo</th>
+                                            <th class="text-right">Cantidad</th>
+                                            <th class="text-right">Precio</th>
+                                            <th class="text-right">Total</th>
+                                            <th>Broker</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="assetDetailTxBody">
+                                        <tr><td colspan="6" class="text-center text-muted">Cargando…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
                 <!-- Goals Page -->
                 <div class="page page-goals" id="page-goals">
                     <section class="goals-header">
@@ -1531,18 +1622,19 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="js/app.js?v=20260824c"></script>
+    <script src="js/app.js?v=20260825a"></script>
     <script src="js/calculators.js?v=20260530a"></script>
     <script src="js/news.js?v=20260530a"></script>
-    <script src="js/portfolio-manager.js?v=20260824c"></script>
+    <script src="js/portfolio-manager.js?v=20260825a"></script>
     <script src="js/ai-advisor.js?v=20260530a"></script>
-    <script src="js/asset-analysis.js?v=20260824c"></script>
+    <script src="js/asset-analysis.js?v=20260825a"></script>
     <script src="js/backtest.js?v=20260824c"></script>
     <script src="js/opportunities.js?v=20260530a"></script>
     <script src="js/asset-deep-analysis.js?v=20260530a"></script>
+    <script src="js/asset-detail.js?v=20260825a"></script>
     <script src="js/transactions.js?v=20260824c"></script>
     <script src="js/position-review.js?v=20260530a"></script>
     <script src="js/polymarket.js?v=20260530a"></script>
-    <script src="js/pages.js?v=20260530a"></script>
+    <script src="js/pages.js?v=20260825a"></script>
 </body>
 </html>
