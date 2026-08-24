@@ -34,7 +34,8 @@ async function openDeepAnalysis(ticker, name) {
     const body = m.querySelector('#deepBody');
     body.innerHTML = `<div style="text-align:center; padding:40px;"><div class="spinner"></div><p class="text-muted" style="margin-top:14px;">Analizando ${name || ticker}…<br><span style="font-size:12px;">Esto tarda ~10-30s la primera vez (escaneo profundo y noticias).</span></p></div>`;
     try {
-        const resp = await fetch(`${DEEP_API}/assets/${encodeURIComponent(ticker)}/deep-analysis`, { cache: 'no-store' });
+        const nameParam = name ? `?name=${encodeURIComponent(name)}` : '';
+        const resp = await fetch(`${DEEP_API}/assets/${encodeURIComponent(ticker)}/deep-analysis${nameParam}`, { cache: 'no-store' });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
         body.innerHTML = renderDeepAnalysis(data);

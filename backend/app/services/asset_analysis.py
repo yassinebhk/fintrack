@@ -381,9 +381,13 @@ async def _llm_summary(name: str, ticker: str, metrics: dict, breakdown: dict | 
     )
     try:
         client = get_llm_client()
+        # Gemini 2.5 Flash spends part of max_tokens on internal "thinking" before
+        # any visible text — 600 was too tight and truncated the narrative right
+        # after the opening header (see analyst_agent.py for the same fix at a
+        # larger scale).
         resp = await client.generate(
             [LLMMessage(role="system", content=system), LLMMessage(role="user", content=user)],
-            max_tokens=600, temperature=0.4,
+            max_tokens=2048, temperature=0.4,
         )
         return resp.text.strip()
     except Exception as exc:
@@ -391,8 +395,14 @@ async def _llm_summary(name: str, ticker: str, metrics: dict, breakdown: dict | 
         return ""
 
 
-async def analyze_asset(ticker: str) -> dict:
-    """Build the full deep-analysis payload for one ticker."""
+async def analyze_asset(ticker: str, name_override: str | None = None) -> dict:
+    """Build the full deep-analysis payload for one ticker.
+
+    name_override: the caller (frontend) usually already knows the real name —
+    holdings outside the ~130-instrument opportunities scan universe (e.g. a
+    MyInvestor-only fund identified by ISIN) have no match there and would
+    otherwise fall back to the raw ticker/ISIN everywhere, including in the
+    LLM narrative."""
     ticker = (ticker or "").strip()
     if not ticker:
         raise ValueError("ticker is required")
@@ -410,7 +420,7 @@ async def analyze_asset(ticker: str) -> dict:
               await get_opportunity_service()._load_from_db()) or {}
     themes = cached.get("themes") or []
     match = next((t for t in themes if (t.get("ticker") or "").upper() == ticker.upper()), {}) or {}
-    name = match.get("theme") or ticker
+    name = (name_override or "").strip() or match.get("theme") or ticker
     category = match.get("category") or ""
     region = match.get("region") or ""
 
