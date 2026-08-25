@@ -14,6 +14,7 @@ Same payload powers the web modal and the Telegram command.
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
 
 import numpy as np
@@ -268,33 +269,64 @@ def _extended_metrics(s: pd.Series, bench: pd.Series | None, rf_annual_pct: floa
     }
 
 
+# QuickChart's free tier hard-caps at 250 data points per chart ("Maximum
+# chart data exceeded" if you go over — confirmed empirically: even 255-256
+# points was rejected). 3 years of daily data is ~750 points, well past
+# that. Every series-based chart below must be downsampled first; only the
+# fixed-bin histogram is naturally small enough to skip this. Stay safely
+# under the real 250 cap rather than hugging it.
+_MAX_CHART_POINTS = 200
+
+
+def _downsample(labels: list, *value_lists: list, max_points: int = _MAX_CHART_POINTS) -> tuple:
+    """Evenly stride-sample labels + any number of parallel value lists down to
+    at most max_points, always keeping the most recent point. Preserves shape
+    well enough for a quick visual read; the real stats are computed on the
+    full-resolution series elsewhere, this only affects what gets *drawn*."""
+    n = len(labels)
+    if n <= max_points:
+        return (labels, *value_lists)
+    stride = math.ceil(n / max_points)
+    idx = list(range(0, n, stride))
+    if idx[-1] != n - 1:
+        idx.append(n - 1)
+    ds_labels = [labels[i] for i in idx]
+    ds_values = tuple([vl[i] for i in idx] for vl in value_lists)
+    return (ds_labels, *ds_values)
+
+
 def _build_charts(s: pd.Series, bench: pd.Series | None, bench_name: str, name: str,
                   rf_annual_pct: float = 0.0) -> dict:
     """Build the five chart URLs (QuickChart, rendered server-side as PNG)."""
     labels = [d.strftime("%Y-%m") for d in s.index]
     sma50 = s.rolling(50, min_periods=20).mean()
     sma200 = s.rolling(200, min_periods=60).mean()
+    price_vals = [round(x, 4) for x in s.values]
+    sma50_vals = [None if pd.isna(x) else round(x, 4) for x in sma50.values]
+    sma200_vals = [None if pd.isna(x) else round(x, 4) for x in sma200.values]
+    price_labels_ds, price_vals_ds, sma50_vals_ds, sma200_vals_ds = _downsample(
+        labels, price_vals, sma50_vals, sma200_vals
+    )
     chart_price = line_chart_multi(
         f"{name} — precio · SMA50 · SMA200",
-        labels,
+        price_labels_ds,
         [
-            {"name": "precio", "values": [round(x, 4) for x in s.values], "color": "#10b981", "width": 2},
-            {"name": "SMA50", "values": [None if pd.isna(x) else round(x, 4) for x in sma50.values], "color": "#f59e0b", "dashed": True, "width": 1.5},
-            {"name": "SMA200", "values": [None if pd.isna(x) else round(x, 4) for x in sma200.values], "color": "#ef4444", "dashed": True, "width": 1.5},
+            {"name": "precio", "values": price_vals_ds, "color": "#10b981", "width": 2},
+            {"name": "SMA50", "values": sma50_vals_ds, "color": "#f59e0b", "dashed": True, "width": 1.5},
+            {"name": "SMA200", "values": sma200_vals_ds, "color": "#ef4444", "dashed": True, "width": 1.5},
         ],
     )
 
     rets = s.pct_change().dropna()
     cum = (1 + rets).cumprod()
     dd = (cum - cum.cummax()) / cum.cummax() * 100
-    chart_dd = area_chart(
-        "Drawdown histórico (%)",
-        [d.strftime("%Y-%m") for d in dd.index],
-        [round(x, 2) for x in dd.values],
-        color="#ef4444",
+    dd_labels_ds, dd_vals_ds = _downsample(
+        [d.strftime("%Y-%m") for d in dd.index], [round(x, 2) for x in dd.values]
     )
+    chart_dd = area_chart("Drawdown histórico (%)", dd_labels_ds, dd_vals_ds, color="#ef4444")
 
     # Histogram of daily returns in 18 bins between -5% and +5% (cap outliers)
+    # — already just 18 bars regardless of history length, no downsampling needed.
     capped = np.clip(rets.values * 100, -5, 5)
     bins = np.linspace(-5, 5, 19)
     hist_counts, edges = np.histogram(capped, bins=bins)
@@ -304,24 +336,24 @@ def _build_charts(s: pd.Series, bench: pd.Series | None, bench_name: str, name: 
     # Rolling 60d annualized volatility
     rv = rets.rolling(60).std() * np.sqrt(252) * 100
     rv = rv.dropna()
-    chart_vol = area_chart(
-        "Volatilidad rodante 60d (%, anualizada)",
-        [d.strftime("%Y-%m") for d in rv.index],
-        [round(x, 2) for x in rv.values],
-        color="#f59e0b",
+    rv_labels_ds, rv_vals_ds = _downsample(
+        [d.strftime("%Y-%m") for d in rv.index], [round(x, 2) for x in rv.values]
     )
+    chart_vol = area_chart("Volatilidad rodante 60d (%, anualizada)", rv_labels_ds, rv_vals_ds, color="#f59e0b")
 
     # Rolling 60d Sharpe (excess returns), annualized — stability of risk-adjusted return.
     daily_rf = (rf_annual_pct / 100.0) / 252.0
     excess = rets - daily_rf
     rsh = (excess.rolling(60).mean() / excess.rolling(60).std()) * np.sqrt(252)
     rsh = rsh.dropna()
-    chart_rolling_sharpe = area_chart(
-        "Sharpe rodante 60d (Rf ajustada, anualizado)",
-        [d.strftime("%Y-%m") for d in rsh.index],
-        [round(x, 2) for x in rsh.values],
-        color="#10b981",
-    ) if len(rsh) else None
+    chart_rolling_sharpe = None
+    if len(rsh):
+        rsh_labels_ds, rsh_vals_ds = _downsample(
+            [d.strftime("%Y-%m") for d in rsh.index], [round(x, 2) for x in rsh.values]
+        )
+        chart_rolling_sharpe = area_chart(
+            "Sharpe rodante 60d (Rf ajustada, anualizado)", rsh_labels_ds, rsh_vals_ds, color="#10b981"
+        )
 
     # Relative cumulative performance vs benchmark
     chart_rel = None
@@ -332,10 +364,13 @@ def _build_charts(s: pd.Series, bench: pd.Series | None, bench_name: str, name: 
             a_cum = aligned["asset"] / aligned["asset"].iloc[0]
             b_cum = aligned["bench"] / aligned["bench"].iloc[0]
             rl = (a_cum / b_cum - 1) * 100
+            rl_labels_ds, rl_vals_ds = _downsample(
+                [d.strftime("%Y-%m") for d in rl.index], [round(x, 2) for x in rl.values]
+            )
             chart_rel = line_chart_multi(
                 f"Rendimiento relativo vs {bench_name} (%)",
-                [d.strftime("%Y-%m") for d in rl.index],
-                [{"name": f"vs {bench_name}", "values": [round(x, 2) for x in rl.values], "color": "#00d4aa"}],
+                rl_labels_ds,
+                [{"name": f"vs {bench_name}", "values": rl_vals_ds, "color": "#00d4aa"}],
             )
 
     return {
@@ -408,9 +443,18 @@ async def analyze_asset(ticker: str, name_override: str | None = None) -> dict:
         raise ValueError("ticker is required")
 
     scanner = MarketScanner()
-    # Try to get up to 3 years of history (more data → better stats).
-    hist = await scanner.yahoo.get_history(ticker, period="3y") or \
-           await scanner.yahoo.get_history(ticker, period="1y")
+    # Try to get up to 3 years of history (more data → better stats). Crypto
+    # tickers (BTC, ETH...) aren't quotable as-is on Yahoo — same -EUR/-USD
+    # suffix fallback used elsewhere (portfolio.py::get_asset_history).
+    yahoo_candidates = [ticker]
+    up = ticker.upper()
+    if up in {"BTC", "ETH", "SOL", "DOGE", "PEPE", "XRP", "ADA"}:
+        yahoo_candidates = [f"{up}-EUR", f"{up}-USD"]
+    hist = None
+    for yt in yahoo_candidates:
+        hist = await scanner.yahoo.get_history(yt, period="3y") or await scanner.yahoo.get_history(yt, period="1y")
+        if hist:
+            break
     s = _series_from_history(hist or [])
     if s is None:
         raise ValueError(f"Sin histórico suficiente para {ticker}")
