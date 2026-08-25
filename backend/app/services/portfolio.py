@@ -348,8 +348,6 @@ class PortfolioService:
         async with session_scope() as session:
             txs = await TransactionRepository(session).list_for_ticker(ticker_up)
         txs = sorted(txs, key=lambda t: t.executed_at)
-        if not txs:
-            return {"ticker": ticker_up, "history": [], "current_quantity": 0.0}
 
         positions = await self.load_positions()
         pos = positions[positions["ticker"].str.upper() == ticker_up]
@@ -359,6 +357,13 @@ class PortfolioService:
             asset_type = "crypto"  # fully-exited crypto position: no row in Position anymore
         else:
             asset_type = "stock"
+
+        if not txs:
+            # No per-trade record exists (common for Kraken: its API only returns
+            # actual buy/sell orders, not coins that arrived by deposit/transfer —
+            # the live position is still real, just not reconstructable over time).
+            live_qty = float(pos.iloc[0]["quantity"]) if not pos.empty else 0.0
+            return {"ticker": ticker_up, "history": [], "current_quantity": live_qty, "has_transactions": False}
 
         first_date = txs[0].executed_at.date()
         span_days = max(days, (datetime.now(timezone.utc).date() - first_date).days + 1)
@@ -395,7 +400,7 @@ class PortfolioService:
                 "cost_basis": round(max(cost_basis, 0.0), 2),
             })
 
-        return {"ticker": ticker_up, "history": history, "current_quantity": round(qty, 8)}
+        return {"ticker": ticker_up, "history": history, "current_quantity": round(qty, 8), "has_transactions": True}
 
     async def risk_analysis(self) -> dict:
         """Real (not hardcoded) risk distribution by realized annualized volatility,

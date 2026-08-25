@@ -161,7 +161,9 @@ async function loadAssetDetailPositionChart(ticker) {
             assetDetailPositionChart = null;
         }
         if (!hist.length) {
-            wrapper.innerHTML = '<p class="text-muted" style="padding:20px;">Aún no hay histórico de posición para este activo (¿lo compraste hoy?).</p>';
+            wrapper.innerHTML = data.has_transactions === false && data.current_quantity > 0
+                ? `<p class="text-muted" style="padding:20px;">Tienes ${data.current_quantity} unidades, pero no hay compras individuales registradas para reconstruir el histórico — probablemente porque llegaron a tu cuenta por depósito/transferencia en vez de una compra ejecutada en el propio broker (Kraken, por ejemplo, solo registra operaciones reales, no depósitos).</p>`
+                : '<p class="text-muted" style="padding:20px;">Aún no hay histórico de posición para este activo (¿lo compraste hoy?).</p>';
             return;
         }
         if (!canvas.isConnected) {
@@ -210,7 +212,15 @@ async function loadAssetDetailTransactions(ticker) {
         const txs = await resp.json();
         if (!resp.ok) throw new Error(txs.detail || `HTTP ${resp.status}`);
         if (!Array.isArray(txs) || !txs.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:20px;">Sin aportaciones registradas para este activo.</td></tr>';
+            let msg = 'Sin aportaciones registradas para este activo.';
+            try {
+                const posResp = await fetch(`${ASSET_DETAIL_API}/portfolio`);
+                const portfolio = await posResp.json();
+                if (portfolio.positions?.some(p => p.ticker === ticker)) {
+                    msg = 'Tienes esta posición, pero no hay compras individuales registradas — probablemente llegó por depósito/transferencia en vez de una compra ejecutada en el propio broker, que solo registra operaciones reales.';
+                }
+            } catch (e) { /* keep generic message */ }
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted" style="padding:20px;">${msg}</td></tr>`;
             return;
         }
         const typeLabel = { buy: '🟢 Compra', sell: '🔴 Venta', dividend: '💰 Dividendo' };
