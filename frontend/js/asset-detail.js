@@ -44,6 +44,15 @@ async function loadAssetDetailHeader(ticker) {
     document.getElementById('assetDetailPageTitle').textContent = `📊 ${info.name}`;
     document.getElementById('assetDetailDeepBtn').onclick = () => openDeepAnalysis(ticker, info.name);
 
+    const aboutSection = document.getElementById('assetDetailAboutSection');
+    const aboutEl = document.getElementById('assetDetailAbout');
+    if (info.about) {
+        aboutEl.textContent = info.about;
+        aboutSection.style.display = '';
+    } else {
+        aboutSection.style.display = 'none';
+    }
+
     try {
         const resp = await fetch(`${ASSET_DETAIL_API}/portfolio`);
         const portfolio = await resp.json();
