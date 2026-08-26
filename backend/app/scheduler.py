@@ -191,7 +191,13 @@ async def _monthly_fidelity_contribution_job() -> None:
     """Day 27 of every month: register the user's recurring 100EUR contribution
     to Fidelity MSCI World (IE00BYX5NX33 @ MyInvestor) — same math as
     POST /api/positions/movement (action=aportar): shares bought at that day's
-    live price, weighted-average cost updated, buy transaction recorded."""
+    live price, weighted-average cost updated, buy transaction recorded.
+
+    Idempotent per calendar month: MyInvestor's actual execution date has
+    drifted by a day before (e.g. Aug 2026 landed on the 26th, not the 27th,
+    for a slightly different amount — a manual entry covered that occurrence),
+    so this guards against ever recording a second contribution for a month
+    that's already covered, regardless of which day it lands on."""
     ticker, broker, eur_amount = "IE00BYX5NX33", "MyInvestor", 100.0
     try:
         from app.repositories import PositionRepository, TransactionRepository
@@ -203,6 +209,16 @@ async def _monthly_fidelity_contribution_job() -> None:
             existing = await repo.get(ticker, broker)
             if existing is None:
                 logger.error("monthly contribution: position {} @ {} not found", ticker, broker)
+                return
+
+            now = datetime.now(timezone.utc)
+            this_month_txs = await TransactionRepository(session).list_for_ticker(ticker, broker=broker)
+            already_done = any(
+                t.type == "buy" and t.executed_at.year == now.year and t.executed_at.month == now.month
+                for t in this_month_txs
+            )
+            if already_done:
+                logger.info("monthly contribution: {} already has a buy this month, skipping", ticker)
                 return
 
             price_info = await YahooFinanceService().get_price(ticker)
