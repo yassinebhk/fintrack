@@ -354,6 +354,9 @@ const pageContent = {
             <li style="margin-top:6px;"><strong>Cómo razona (los algoritmos)</strong></li>
             <li style="margin-left:14px;"><a href="#novedades">🆕 Novedades (asistente autónomo con IA)</a></li>
             <li style="margin-left:14px;"><a href="#algoritmos">🔬 Cómo funcionan nuestros algoritmos (teoría + ejemplos)</a></li>
+            <li style="margin-left:14px;"><a href="#autoentrenamiento">🎯 Autoentrenamiento: cómo (y cuándo) aprende de sus aciertos</a></li>
+            <li style="margin-left:14px;"><a href="#motor-sistematico">📈 El motor sistemático: la cartera en papel</a></li>
+            <li style="margin-left:14px;"><a href="#que-ia-usamos">🤖 Qué IA usamos y por qué</a></li>
             <li style="margin-top:6px;"><strong>Referencia técnica (cómo está montado)</strong></li>
             <li style="margin-left:14px;"><a href="#arquitectura">🏗️ Arquitectura del Sistema</a></li>
             <li style="margin-left:14px;"><a href="#inicio-rapido">Inicio Rápido</a></li>
@@ -604,6 +607,59 @@ en medio                                → NEUTRAL</pre>
 
         <h3>📚 Lo que NO usamos (a propósito)</h3>
         <p>Deep Learning (LSTM/Transformers) para "predecir precio": muy popular en YouTube, pero la investigación seria (Gu, Kelly &amp; Xiu, 2020) muestra que rara vez bate a métodos simples fuera de muestra y se sobreajusta con facilidad. El consenso (López de Prado) avisa: <strong>el enemigo no es el algoritmo, es el sobreajuste</strong>. Por eso nos quedamos en un núcleo de factores robustos, interpretables y defendibles — y por eso puedes <em>ver</em> el porqué de cada puntuación.</p>
+    </section>
+
+    <!-- ==================== AUTOENTRENAMIENTO ==================== -->
+    <section id="autoentrenamiento">
+        <h2>🎯 Autoentrenamiento: cómo (y cuándo) aprende de sus aciertos</h2>
+        <p>Cada recomendación que ves en Oportunidades queda <strong>guardada con su fecha, su enfoque (momentum/valor) y su convicción</strong>. Un proceso diario revisa esas recomendaciones antiguas y, cuando ha pasado el tiempo suficiente, calcula <strong>qué habría pasado de verdad</strong> si la hubieras seguido: rentabilidad a 1, 3 y 6 meses, comparada con su propio índice de referencia. Es el "boletín de notas" del motor — el <em>scorecard</em> — y es público: puedes consultarlo tú mismo en <code>/api/scorecard</code>.</p>
+        <p>La idea del autoentrenamiento es simple: si un enfoque (por ejemplo, "momentum") lleva un tiempo acertando sistemáticamente más o menos de lo esperado, ese resultado real debería <strong>calibrar la confianza</strong> con la que se presenta la siguiente idea de ese mismo enfoque. No se trata de que la IA improvise una teoría nueva; se trata de que el propio historial del sistema hable.</p>
+        <div class="formula-box">
+            <p><strong>La regla que lo protege de sí mismo:</strong> el resultado de un enfoque solo se usa si hay <strong>al menos 30 recomendaciones</strong> evaluadas a 3 meses <strong>Y</strong> esas recomendaciones están repartidas en <strong>al menos 90 días</strong> de calendario entre la más antigua y la más reciente. Si no se cumplen las dos condiciones a la vez, esa señal se descarta por completo — no se usa "un poco", se ignora del todo.</p>
+        </div>
+        <p><strong>¿Por qué tan estricto?</strong> Con pocos datos, cualquier racha (buena o mala) parece un patrón real cuando en realidad es ruido estadístico. El requisito de que las fechas abarquen 90 días evita otro error sutil: que 30 recomendaciones "maduras" resulten estar todas concentradas en la misma semana (por ejemplo, un mes especialmente bueno o malo del mercado), lo que daría una falsa sensación de solidez.</p>
+        <pre class="diagram-box">Ejemplo de por qué NO basta con "30 recomendaciones ya evaluadas":
+
+30 recomendaciones, todas creadas la misma semana de marzo
+  → sí n≥30, pero rango de fechas ≈ 7 días → SE DESCARTA (podría ser
+    solo "marzo fue un mes raro", no que el enfoque funcione o no)
+
+30 recomendaciones repartidas entre enero y julio (180 días)
+  → n≥30 Y rango≥90 días → SE USA (cubre distintas condiciones de mercado)</pre>
+        <p><strong>Qué pasa mientras tanto (y va a pasar durante meses):</strong> el sistema empezó a rastrear recomendaciones de verdad hace relativamente poco. Aunque ya haya cientos de ideas registradas, la primera vez que <em>alguna</em> llega a los 3 meses de edad es un punto en el tiempo fijo — y para que el <em>rango</em> de 90 días también se cumpla, hace falta esperar aún más: hasta que haya recomendaciones maduras separadas por un trimestre completo entre sí. En la práctica esto significa <strong>varios meses de arranque</strong> en los que el sistema funciona exactamente igual que siempre (motor cuantitativo + noticias + IA que explica), sin ningún ajuste automático todavía, y lo dice explícitamente en el propio historial ("insuficiente, sin conclusión") en vez de fingir que ya sabe algo.</p>
+        <p><strong>Qué NO hace, ni cuando se active:</strong> no toca las fórmulas del motor cuantitativo (los pesos de momentum/valor de la sección anterior siguen siendo fijos y auditables). El único efecto posible es que la nota de "convicción" de una idea baje un escalón si su enfoque tiene un historial real y suficiente de rendimiento flojo — nunca al revés hacia arriba de forma automática, y nunca sobre el ranking cuantitativo en sí.</p>
+    </section>
+
+    <!-- ==================== MOTOR SISTEMÁTICO ==================== -->
+    <section id="motor-sistematico">
+        <h2>📈 El motor sistemático: la cartera en papel</h2>
+        <p>Aparte de Oportunidades (que te <em>sugiere</em> ideas para que decidas tú), hay un segundo sistema completamente distinto corriendo en paralelo: una <strong>cartera con reglas fijas y automáticas</strong> — sin intervención humana ni de la IA en qué comprar — que se reequilibra sola cada semana. No mueve dinero real: es <em>paper trading</em> (simulado con precios reales) mientras se demuestra a sí mismo que funciona.</p>
+        <ul>
+            <li><strong>Universo comprable</strong>: un subconjunto de ETFs/fondos ya validados como líquidos y accesibles desde los brokers reales de la cartera.</li>
+            <li><strong>Tamaño de posición por volatilidad inversa</strong>: a más volátil un activo, menor peso se le asigna — la misma lógica de "arriesga lo mismo en cada apuesta", no "el mismo dinero en cada apuesta".</li>
+            <li><strong>Cinturones de seguridad</strong>: un límite máximo de peso por activo individual, un límite a la exposición cripto total, y un "cortacircuitos" que reduce exposición si la cartera cae demasiado desde su máximo.</li>
+        </ul>
+        <h3>El filtro antes de arriesgar dinero real: PSR</h3>
+        <p>Un Sharpe alto en pocas semanas puede ser simplemente suerte. El <strong>Probabilistic Sharpe Ratio</strong> (Bailey &amp; López de Prado) responde a una pregunta muy concreta: <em>dado lo poco que llevamos observando, ¿qué probabilidad hay de que el Sharpe real sea mayor que cero?</em> No es solo "el Sharpe ha sido bueno", es "hay evidencia estadística de que no es casualidad".</p>
+        <div class="formula-box">
+            <p><strong>El semáforo de salida a dinero real</strong> exige <strong>las cinco condiciones a la vez</strong>:</p>
+            <ol>
+                <li>Al menos 56 días (8 semanas) y 30 marcas diarias de histórico — muestra mínima, sin excepciones.</li>
+                <li>Rentabilidad por encima de su índice de referencia.</li>
+                <li>Sharpe por encima del de su índice de referencia.</li>
+                <li>PSR ≥ 75% — el resultado es estadísticamente significativo, no ruido.</li>
+                <li>Sin una caída (drawdown) catastrófica que indique un fallo de las reglas.</li>
+            </ol>
+        </div>
+        <p>Mientras falte cualquiera de las cinco, el propio sistema se etiqueta como <strong>"NO apto — sigue en papel"</strong>, con el contador exacto de días que faltan. Nadie decide subjetivamente cuándo "ya vale" — lo decide la regla, siempre igual, y puedes ver su estado real en cualquier momento en <code>/api/systematic/paper/report</code>.</p>
+    </section>
+
+    <!-- ==================== QUÉ IA USAMOS ==================== -->
+    <section id="que-ia-usamos">
+        <h2>🤖 Qué IA usamos y por qué</h2>
+        <p>Usamos <strong>Google Gemini</strong> (capa gratuita de AI Studio) como modelo principal para todo lo que es lenguaje: redactar el porqué de cada oportunidad, la nota de análisis de un activo, clasificar el sentimiento de una noticia, y el chat del Asesor IA. Si Gemini no responde (límite de cuota agotado, error temporal), el sistema cae automáticamente a <strong>Groq</strong> como segunda opción, sin que tengas que hacer nada.</p>
+        <p><strong>Por qué esta combinación y no otra</strong>: el proyecto funciona con un presupuesto de <strong>0€</strong> — cualquier modelo de pago (incluidos los más conocidos por chat, como GPT o Claude vía API) queda descartado mientras esa restricción siga en pie, por buenos que sean. Gemini y Groq tienen capas gratuitas genuinamente utilizables para este volumen de peticiones.</p>
+        <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;"><strong>Sobre "modelos nuevos muy fiables" que circulan por redes:</strong> si un modelo predictivo de mercados fuera realmente fiable, barato y de acceso público, dejaría de funcionar en cuanto todo el mundo lo usara — los propios mercados absorben esa ventaja (es la idea de "mercados eficientes"). La investigación académica seria sobre IA aplicada a inversión muestra mejoras modestas e inconsistentes sobre modelos de factores simples, no los resultados extraordinarios que se anuncian en Twitter o YouTube. Por eso la IA aquí tiene un rol acotado a propósito: <strong>redactar y explicar, no decidir ni predecir precio</strong> — esa decisión de diseño no depende de qué modelo de lenguaje esté de moda cada mes.</p>
     </section>
 
     <!-- ==================== REFERENCIA TÉCNICA (separador) ==================== -->
@@ -1279,8 +1335,9 @@ function initNavigation() {
 
 // Anchors that live inside the (dynamically injected) docs / learn pages.
 const DOCS_ANCHORS = new Set(['que-es', 'guia-uso', 'el-cerebro', 'novedades', 'algoritmos',
+    'autoentrenamiento', 'motor-sistematico', 'que-ia-usamos',
     'arquitectura', 'inicio-rapido', 'configuracion', 'añadir-posiciones', 'funcionalidades', 'api', 'faq']);
-const LEARN_ANCHORS = new Set(['conceptos-basicos', 'tipos-activos', 'metricas', 'estrategias', 'riesgos', 'fiscalidad']);
+const LEARN_ANCHORS = new Set(['conceptos-basicos', 'tipos-activos', 'metricas', 'estrategias', 'riesgos', 'fiscalidad', 'corto-plazo']);
 
 function navigateFromHash() {
     const raw = decodeURIComponent((location.hash || '').replace(/^#/, '')).trim();
