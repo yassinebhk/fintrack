@@ -707,19 +707,29 @@ en medio                                → NEUTRAL</pre>
 
         <h3>¿Por qué la condición 2 (el rango de 90 días) y no solo contar 30?</h3>
         <p>Porque 30 recomendaciones podrían, sin la condición 2, estar todas creadas la misma semana:</p>
-        <pre class="diagram-box">CASO A — 30 recomendaciones, todas de la primera semana de marzo
-  n = 30 ✔  pero rango de fechas ≈ 7 días ✘
-  → SE DESCARTA. Podría ser simplemente que "marzo fue un mes raro
-    para la bolsa", no que el enfoque MOMENTUM funcione o no en general.
-
-CASO B — 30 recomendaciones repartidas entre enero y julio (180 días)
-  n = 30 ✔  Y  rango = 180 días ≥ 90 ✔
-  → SE USA. Ha visto meses buenos y malos, subidas y bajadas — es
-    un resultado que ha sido puesto a prueba en condiciones distintas.</pre>
+        <div class="comparison-box">
+            <div class="comparison-item">
+                <h4>Caso A — sin rango</h4>
+                <p>30 recomendaciones, todas de <strong>la primera semana de marzo</strong>.<br>n = 30 ✔ — pero rango de fechas ≈ 7 días ✘</p>
+                <div class="result negative">SE DESCARTA — podría ser solo que "marzo fue un mes raro para la bolsa", no que MOMENTUM funcione en general.</div>
+            </div>
+            <div class="comparison-item">
+                <h4>Caso B — con rango</h4>
+                <p>30 recomendaciones repartidas <strong>entre enero y julio</strong> (180 días).<br>n = 30 ✔ y rango = 180 días ≥ 90 ✔</p>
+                <div class="result positive">SE USA — ha visto meses buenos y malos, subidas y bajadas: puesto a prueba en condiciones distintas.</div>
+            </div>
+        </div>
         <p>Es la misma lógica de "no juzgues un método de estudio por un solo examen": si un alumno saca un 9 en el único examen que ha hecho, no sabes si es bueno estudiando o si el examen era fácil ese día. Necesitas verlo en varios exámenes, en fechas distintas, con temarios distintos.</p>
 
         <h3>Entonces, ¿cuándo se activa de verdad?</h3>
-        <p>El sistema empezó a rastrear recomendaciones reales hace relativamente poco. Aunque ya haya cientos registradas, la <strong>primera</strong> que llega a los 3 meses de vida marca un punto fijo en el calendario — y como además hace falta que el conjunto de recomendaciones maduras <em>abarque</em> 90 días entre sí (condición 2), la cuenta real es: primero hay que esperar a que la recomendación más antigua cumpla 90 días, y ADEMÁS que haya otras recomendaciones creadas ~90 días después de esa primera que TAMBIÉN hayan cumplido sus propios 90 días. Sumando ambos plazos, la primera vez que el gate puede abrirse ronda los <strong>5-6 meses desde que se empezó a rastrear en serio</strong> — no antes, por diseño, sea cual sea el volumen de recomendaciones que se acumulen mientras tanto.</p>
+        <p>El sistema empezó a rastrear recomendaciones reales hace relativamente poco. Aunque ya haya cientos registradas, no basta con que la primera cumpla 3 meses — hacen falta <strong>dos plazos, uno detrás del otro</strong>:</p>
+        <div class="formula-box">
+            <ol style="text-align:left;">
+                <li>Que la recomendación <strong>más antigua</strong> registrada cumpla sus 90 días.</li>
+                <li>Que, ADEMÁS, haya otras 29+ recomendaciones creadas hasta 90 días después de esa primera que <strong>también</strong> hayan cumplido ya sus propios 90 días.</li>
+            </ol>
+            <p>Sumando ambos plazos, la primera vez que el gate puede abrirse ronda los <strong>5-6 meses desde que se empezó a rastrear en serio</strong> — no antes, por diseño, sea cual sea el volumen de recomendaciones que se acumulen mientras tanto.</p>
+        </div>
         <p>Mientras tanto (y va a ser así durante meses), el sistema funciona <strong>exactamente igual que siempre</strong> — motor cuantitativo + noticias + IA que explica, sin ningún ajuste — y el propio <em>scorecard</em> lo dice explícitamente ("insuficiente, sin conclusión") en vez de fingir que ya sabe algo que todavía no sabe.</p>
         <p><strong>Qué NO hace, ni cuando se active:</strong> no toca las fórmulas del motor cuantitativo — los pesos de momentum/valor de <a href="#algoritmos">la sección de algoritmos</a> siguen siendo fijos y auditables, siempre los mismos. El único efecto posible, y solo para un enfoque que ya haya superado el filtro con un resultado real negativo, es que la próxima idea de ese enfoque se presente con la convicción un escalón más baja (de "alta" a "media", por ejemplo) — nunca al revés hacia arriba de forma automática, y nunca sobre qué activos entran al ranking.</p>
 
@@ -763,13 +773,19 @@ alpha (exceso sobre el benchmark) = retorno del ETF − retorno del benchmark
         <p>Es una tercera capa de seguridad, además de las dos condiciones de cantidad y de fechas: incluso si hay suficientes datos bien repartidos, si el resultado no es estadísticamente claro, se sigue mostrando pero marcado como "sin significancia estadística clara" en vez de presentarlo como una conclusión firme.</p>
 
         <h3>❓ Preguntas que probablemente te estés haciendo</h3>
-        <div class="info-box">
-            <p><strong>¿Y si en 6 meses el resultado sigue siendo malo (como el 42,6% actual de aciertos frente a benchmark)?</strong><br>
-            El sistema lo diría igual de claro que ahora. No hay ningún mecanismo que "maquille" un mal resultado — el scorecard es el mismo cálculo, gane o pierda el motor. Si el resultado real es que MOMENTUM no bate a su benchmark de forma consistente, la convicción de las ideas de momentum empezaría a bajar automáticamente, y tú lo verías reflejado tanto aquí como en cada oportunidad nueva.</p>
-            <p style="margin-top:10px;"><strong>¿Puedo ver esto por ticker individual, no solo por enfoque?</strong><br>
-            Ahora mismo el agrupamiento es por enfoque (momentum/valor) y por convicción (alta/media/baja), no por activo individual — agrupar por ticker individual necesitaría muchísimas más recomendaciones del MISMO activo exacto para tener una muestra mínima decente, algo que tardaría mucho más en darse de forma natural.</p>
-            <p style="margin-top:10px;"><strong>¿Se puede "hacer trampa" metiendo 30 recomendaciones de golpe para forzar el gate?</strong><br>
-            No — la condición 2 (rango de 90 días entre fechas) existe precisamente para impedir esto: 30 recomendaciones metidas el mismo día tendrían rango de fechas = 0, y se descartarían igual que el "Caso A" del ejemplo de arriba.</p>
+        <div class="faq-list">
+            <div class="faq-item">
+                <p class="faq-q">¿Y si en 6 meses el resultado sigue siendo malo (como el 42,6% actual de aciertos frente a benchmark)?</p>
+                <p>El sistema lo diría igual de claro que ahora. No hay ningún mecanismo que "maquille" un mal resultado — el scorecard es el mismo cálculo, gane o pierda el motor. Si el resultado real es que MOMENTUM no bate a su benchmark de forma consistente, la convicción de las ideas de momentum empezaría a bajar automáticamente, y tú lo verías reflejado tanto aquí como en cada oportunidad nueva.</p>
+            </div>
+            <div class="faq-item">
+                <p class="faq-q">¿Puedo ver esto por ticker individual, no solo por enfoque?</p>
+                <p>Ahora mismo el agrupamiento es por enfoque (momentum/valor) y por convicción (alta/media/baja), no por activo individual — agrupar por ticker individual necesitaría muchísimas más recomendaciones del MISMO activo exacto para tener una muestra mínima decente, algo que tardaría mucho más en darse de forma natural.</p>
+            </div>
+            <div class="faq-item">
+                <p class="faq-q">¿Se puede "hacer trampa" metiendo 30 recomendaciones de golpe para forzar el gate?</p>
+                <p>No — la condición 2 (rango de 90 días entre fechas) existe precisamente para impedir esto: 30 recomendaciones metidas el mismo día tendrían rango de fechas = 0, y se descartarían igual que el "Caso A" del ejemplo de arriba.</p>
+            </div>
         </div>
     </section>
 
@@ -851,21 +867,35 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
         <p>La historia de las finanzas está llena de estrategias que parecían matemáticamente impecables y acabaron mal por no haber sido puestas a prueba en condiciones reales el tiempo suficiente — el caso más citado en la industria es <strong>LTCM (Long-Term Capital Management)</strong>, un fondo de los años 90 dirigido por premios Nobel de economía, con modelos matemáticos sofisticados, que colapsó en 1998 al asumir que ciertos escenarios extremos eran "estadísticamente casi imposibles" y esos escenarios ocurrieron igualmente. La lección que se ha quedado en la gestión de riesgo moderna: <strong>ninguna fórmula, por elegante que sea, sustituye a comprobar cómo se comporta de verdad con datos y tiempo suficientes</strong> — exactamente lo que este filtro de 56 días + PSR está diseñado para forzar antes de considerar dinero real.</p>
 
         <h3>❓ Preguntas frecuentes</h3>
-        <div class="info-box">
-            <p><strong>¿"Deflated Sharpe" y "PSR" son lo mismo?</strong><br>
-            Están muy relacionados — el Deflated Sharpe Ratio es una versión del PSR pensada además para corregir el sesgo de haber probado <em>muchas</em> estrategias distintas antes de quedarte con la que mejor resultado dio (si pruebas 100 monedas, alguna saldrá cara 8 veces seguidas por puro azar). Aquí ambos números suelen coincidir porque solo hay una única configuración de reglas en marcha, no un proceso de prueba-y-error entre muchas variantes.</p>
-            <p style="margin-top:10px;"><strong>¿Qué pasa el día que cumple las 5 condiciones?</strong><br>
-            El sistema pasaría de "NO apto" a "apto" en su propio veredicto — pero eso NO significa que automáticamente se mueva dinero real. Sería el punto de partida para una decisión consciente (tuya), no una orden de compra automática.</p>
-            <p style="margin-top:10px;"><strong>¿Puede este motor perder dinero real alguna vez sin que yo lo sepa?</strong><br>
-            No — mientras esté "en papel" no toca ni un euro real de tu cartera. Es una simulación completa, con precios reales pero dinero ficticio, precisamente para que cualquier fallo se descubra sin coste real.</p>
+        <div class="faq-list">
+            <div class="faq-item">
+                <p class="faq-q">¿"Deflated Sharpe" y "PSR" son lo mismo?</p>
+                <p>Están muy relacionados — el Deflated Sharpe Ratio es una versión del PSR pensada además para corregir el sesgo de haber probado <em>muchas</em> estrategias distintas antes de quedarte con la que mejor resultado dio (si pruebas 100 monedas, alguna saldrá cara 8 veces seguidas por puro azar). Aquí ambos números suelen coincidir porque solo hay una única configuración de reglas en marcha, no un proceso de prueba-y-error entre muchas variantes.</p>
+            </div>
+            <div class="faq-item">
+                <p class="faq-q">¿Qué pasa el día que cumple las 5 condiciones?</p>
+                <p>El sistema pasaría de "NO apto" a "apto" en su propio veredicto — pero eso NO significa que automáticamente se mueva dinero real. Sería el punto de partida para una decisión consciente (tuya), no una orden de compra automática.</p>
+            </div>
+            <div class="faq-item">
+                <p class="faq-q">¿Puede este motor perder dinero real alguna vez sin que yo lo sepa?</p>
+                <p>No — mientras esté "en papel" no toca ni un euro real de tu cartera. Es una simulación completa, con precios reales pero dinero ficticio, precisamente para que cualquier fallo se descubra sin coste real.</p>
+            </div>
         </div>
     </section>
 
     <!-- ==================== QUÉ IA USAMOS ==================== -->
     <section id="que-ia-usamos">
         <h2>🤖 Qué IA usamos y por qué</h2>
-        <p><strong>Desde cero — qué es un "LLM":</strong> las siglas vienen de <em>Large Language Model</em> (modelo grande de lenguaje) — es el tipo de IA detrás de ChatGPT, Gemini, Claude, etc.: un programa entrenado con muchísimo texto que predice qué palabra viene después, y con eso consigue mantener conversaciones, redactar textos o resumir información. <strong>No</strong> es una IA que "piensa" en el sentido humano, ni tiene acceso a los mercados en tiempo real por sí sola — solo hace bien lo que le pidas con las palabras y los datos que le des en el mensaje.</p>
-        <p>Usamos <strong>Google Gemini</strong> (capa gratuita de AI Studio) como modelo principal para todo lo que es lenguaje: redactar el porqué de cada oportunidad, la nota de análisis de un activo, clasificar el sentimiento de una noticia, y el chat del Asesor IA. Si Gemini no responde (límite de cuota agotado, error temporal), el sistema cae automáticamente a <strong>Groq</strong> como segunda opción, sin que tengas que hacer nada.</p>
+        <p><strong>Desde cero — qué es un "LLM":</strong> las siglas vienen de <em>Large Language Model</em> (modelo grande de lenguaje) — es el tipo de IA detrás de ChatGPT, Gemini, Claude, etc.: un programa entrenado con muchísimo texto que predice qué palabra viene después, y con eso consigue mantener conversaciones, redactar textos o resumir información.</p>
+        <p><strong>No</strong> es una IA que "piensa" en el sentido humano, ni tiene acceso a los mercados en tiempo real por sí sola — solo hace bien lo que le pidas con las palabras y los datos que le des en el mensaje.</p>
+        <p>Usamos <strong>Google Gemini</strong> (capa gratuita de AI Studio) como modelo principal para todo lo que es lenguaje:</p>
+        <ul>
+            <li>Redactar el porqué de cada oportunidad de inversión.</li>
+            <li>La nota de análisis de un activo (deep-analysis).</li>
+            <li>Clasificar el sentimiento de una noticia.</li>
+            <li>El chat del Asesor IA.</li>
+        </ul>
+        <p>Si Gemini no responde (límite de cuota agotado, error temporal), el sistema cae automáticamente a <strong>Groq</strong> como segunda opción, sin que tengas que hacer nada.</p>
         <div class="example-box">
             <h4>Ejemplo concreto: qué le pasamos a la IA y qué nos devuelve</h4>
             <p><strong>Le damos</strong>: "Este ETF tiene momentum +1,91 (top del ranking), RSI neutral, MACD alcista, retorno anualizado +721%, y esta noticia real: 'Nvidia sube precios de chips de IA un 15%'."<br>
