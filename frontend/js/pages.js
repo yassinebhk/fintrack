@@ -612,52 +612,108 @@ en medio                                → NEUTRAL</pre>
     <!-- ==================== AUTOENTRENAMIENTO ==================== -->
     <section id="autoentrenamiento">
         <h2>🎯 Autoentrenamiento: cómo (y cuándo) aprende de sus aciertos</h2>
-        <p>Cada recomendación que ves en Oportunidades queda <strong>guardada con su fecha, su enfoque (momentum/valor) y su convicción</strong>. Un proceso diario revisa esas recomendaciones antiguas y, cuando ha pasado el tiempo suficiente, calcula <strong>qué habría pasado de verdad</strong> si la hubieras seguido: rentabilidad a 1, 3 y 6 meses, comparada con su propio índice de referencia. Es el "boletín de notas" del motor — el <em>scorecard</em> — y es público: puedes consultarlo tú mismo en <code>/api/scorecard</code>.</p>
-        <p>La idea del autoentrenamiento es simple: si un enfoque (por ejemplo, "momentum") lleva un tiempo acertando sistemáticamente más o menos de lo esperado, ese resultado real debería <strong>calibrar la confianza</strong> con la que se presenta la siguiente idea de ese mismo enfoque. No se trata de que la IA improvise una teoría nueva; se trata de que el propio historial del sistema hable.</p>
-        <div class="formula-box">
-            <p><strong>La regla que lo protege de sí mismo:</strong> el resultado de un enfoque solo se usa si hay <strong>al menos 30 recomendaciones</strong> evaluadas a 3 meses <strong>Y</strong> esas recomendaciones están repartidas en <strong>al menos 90 días</strong> de calendario entre la más antigua y la más reciente. Si no se cumplen las dos condiciones a la vez, esa señal se descarta por completo — no se usa "un poco", se ignora del todo.</p>
+        <p><strong>Empezando desde cero — qué significa "autoentrenar" aquí:</strong> no es que una red neuronal reajuste sus propios números por dentro (eso es lo que mucha gente imagina al oír "IA que aprende", y aquí no funciona así). Es algo más simple y más verificable: el sistema <strong>apunta cada recomendación que hace</strong>, espera a ver <strong>qué pasó de verdad</strong> con el precio después, y usa ese resultado real para ser más o menos "confiado" la próxima vez que proponga algo parecido. Como un alumno que lleva la cuenta de en qué tipo de examen suele fallar más, en vez de cambiar de cerebro.</p>
+
+        <h3>Paso a paso, con datos inventados pero realistas</h3>
+        <p>Cada recomendación que ves en Oportunidades se guarda con tres datos: <strong>la fecha</strong>, <strong>su enfoque</strong> (MOMENTUM = "esto está subiendo con fuerza" o VALOR = "esto está barato pero es de calidad" — ver <a href="#algoritmos">Cómo funcionan nuestros algoritmos</a>) y <strong>su convicción</strong> (alta/media/baja). Un proceso automático revisa cada día las recomendaciones antiguas y, si ha pasado suficiente tiempo, calcula <strong>qué rentabilidad habría dado de verdad</strong> esa idea a 1, 3 y 6 meses, comparada con su propio índice de referencia (por ejemplo, un ETF de semiconductores se compara contra el índice de semiconductores, no contra el IBEX). A este informe de resultados reales lo llamamos <em>scorecard</em> ("boletín de notas"), y es público — lo puedes consultar tú mismo entrando a <code>fintrack-front.onrender.com/api/scorecard</code> desde el navegador.</p>
+
+        <div class="example-box">
+            <h4>Ejemplo: imagina que hoy es 1 de octubre</h4>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Recomendación creada</th><th>Enfoque</th><th>Edad hoy</th><th>¿Tiene ya 3 meses (90 días)?</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>25 julio</td><td>Momentum</td><td>68 días</td><td>No — le faltan 22 días</td></tr>
+                    <tr><td>10 agosto</td><td>Momentum</td><td>52 días</td><td>No</td></tr>
+                    <tr><td>3 septiembre</td><td>Momentum</td><td>28 días</td><td>No</td></tr>
+                    <tr><td>20 abril (6 meses antes)</td><td>Momentum</td><td>164 días</td><td>Sí</td></tr>
+                </tbody>
+            </table>
+            <p>De estas 4, solo <strong>1 sola</strong> ya tiene 3 meses cumplidos. Para activar el autoentrenamiento hacen falta <strong>al menos 30</strong> así de "maduras" — y encima, veremos ahora por qué ni con 30 basta siempre.</p>
         </div>
-        <p><strong>¿Por qué tan estricto?</strong> Con pocos datos, cualquier racha (buena o mala) parece un patrón real cuando en realidad es ruido estadístico. El requisito de que las fechas abarquen 90 días evita otro error sutil: que 30 recomendaciones "maduras" resulten estar todas concentradas en la misma semana (por ejemplo, un mes especialmente bueno o malo del mercado), lo que daría una falsa sensación de solidez.</p>
-        <pre class="diagram-box">Ejemplo de por qué NO basta con "30 recomendaciones ya evaluadas":
 
-30 recomendaciones, todas creadas la misma semana de marzo
-  → sí n≥30, pero rango de fechas ≈ 7 días → SE DESCARTA (podría ser
-    solo "marzo fue un mes raro", no que el enfoque funcione o no)
+        <div class="formula-box">
+            <p><strong>La regla exacta que lo protege de sí mismo (las dos condiciones deben cumplirse A LA VEZ):</strong></p>
+            <ol>
+                <li><strong>Al menos 30 recomendaciones</strong> de ese enfoque ya "maduras" (con 90+ días de vida, para poder medir su resultado a 3 meses).</li>
+                <li>Esas 30+ recomendaciones deben tener <strong>fechas de creación repartidas en al menos 90 días</strong> entre la más antigua y la más reciente del grupo.</li>
+            </ol>
+            <p>Si falla cualquiera de las dos, el resultado de ese enfoque se descarta <strong>por completo</strong> — no "se usa un poco", se ignora del todo, como si no existiera.</p>
+        </div>
 
-30 recomendaciones repartidas entre enero y julio (180 días)
-  → n≥30 Y rango≥90 días → SE USA (cubre distintas condiciones de mercado)</pre>
-        <p><strong>Qué pasa mientras tanto (y va a pasar durante meses):</strong> el sistema empezó a rastrear recomendaciones de verdad hace relativamente poco. Aunque ya haya cientos de ideas registradas, la primera vez que <em>alguna</em> llega a los 3 meses de edad es un punto en el tiempo fijo — y para que el <em>rango</em> de 90 días también se cumpla, hace falta esperar aún más: hasta que haya recomendaciones maduras separadas por un trimestre completo entre sí. En la práctica esto significa <strong>varios meses de arranque</strong> en los que el sistema funciona exactamente igual que siempre (motor cuantitativo + noticias + IA que explica), sin ningún ajuste automático todavía, y lo dice explícitamente en el propio historial ("insuficiente, sin conclusión") en vez de fingir que ya sabe algo.</p>
-        <p><strong>Qué NO hace, ni cuando se active:</strong> no toca las fórmulas del motor cuantitativo (los pesos de momentum/valor de la sección anterior siguen siendo fijos y auditables). El único efecto posible es que la nota de "convicción" de una idea baje un escalón si su enfoque tiene un historial real y suficiente de rendimiento flojo — nunca al revés hacia arriba de forma automática, y nunca sobre el ranking cuantitativo en sí.</p>
+        <h3>¿Por qué la condición 2 (el rango de 90 días) y no solo contar 30?</h3>
+        <p>Porque 30 recomendaciones podrían, sin la condición 2, estar todas creadas la misma semana:</p>
+        <pre class="diagram-box">CASO A — 30 recomendaciones, todas de la primera semana de marzo
+  n = 30 ✔  pero rango de fechas ≈ 7 días ✘
+  → SE DESCARTA. Podría ser simplemente que "marzo fue un mes raro
+    para la bolsa", no que el enfoque MOMENTUM funcione o no en general.
+
+CASO B — 30 recomendaciones repartidas entre enero y julio (180 días)
+  n = 30 ✔  Y  rango = 180 días ≥ 90 ✔
+  → SE USA. Ha visto meses buenos y malos, subidas y bajadas — es
+    un resultado que ha sido puesto a prueba en condiciones distintas.</pre>
+        <p>Es la misma lógica de "no juzgues un método de estudio por un solo examen": si un alumno saca un 9 en el único examen que ha hecho, no sabes si es bueno estudiando o si el examen era fácil ese día. Necesitas verlo en varios exámenes, en fechas distintas, con temarios distintos.</p>
+
+        <h3>Entonces, ¿cuándo se activa de verdad?</h3>
+        <p>El sistema empezó a rastrear recomendaciones reales hace relativamente poco. Aunque ya haya cientos registradas, la <strong>primera</strong> que llega a los 3 meses de vida marca un punto fijo en el calendario — y como además hace falta que el conjunto de recomendaciones maduras <em>abarque</em> 90 días entre sí (condición 2), la cuenta real es: primero hay que esperar a que la recomendación más antigua cumpla 90 días, y ADEMÁS que haya otras recomendaciones creadas ~90 días después de esa primera que TAMBIÉN hayan cumplido sus propios 90 días. Sumando ambos plazos, la primera vez que el gate puede abrirse ronda los <strong>5-6 meses desde que se empezó a rastrear en serio</strong> — no antes, por diseño, sea cual sea el volumen de recomendaciones que se acumulen mientras tanto.</p>
+        <p>Mientras tanto (y va a ser así durante meses), el sistema funciona <strong>exactamente igual que siempre</strong> — motor cuantitativo + noticias + IA que explica, sin ningún ajuste — y el propio <em>scorecard</em> lo dice explícitamente ("insuficiente, sin conclusión") en vez de fingir que ya sabe algo que todavía no sabe.</p>
+        <p><strong>Qué NO hace, ni cuando se active:</strong> no toca las fórmulas del motor cuantitativo — los pesos de momentum/valor de <a href="#algoritmos">la sección de algoritmos</a> siguen siendo fijos y auditables, siempre los mismos. El único efecto posible, y solo para un enfoque que ya haya superado el filtro con un resultado real negativo, es que la próxima idea de ese enfoque se presente con la convicción un escalón más baja (de "alta" a "media", por ejemplo) — nunca al revés hacia arriba de forma automática, y nunca sobre qué activos entran al ranking.</p>
     </section>
 
     <!-- ==================== MOTOR SISTEMÁTICO ==================== -->
     <section id="motor-sistematico">
         <h2>📈 El motor sistemático: la cartera en papel</h2>
-        <p>Aparte de Oportunidades (que te <em>sugiere</em> ideas para que decidas tú), hay un segundo sistema completamente distinto corriendo en paralelo: una <strong>cartera con reglas fijas y automáticas</strong> — sin intervención humana ni de la IA en qué comprar — que se reequilibra sola cada semana. No mueve dinero real: es <em>paper trading</em> (simulado con precios reales) mientras se demuestra a sí mismo que funciona.</p>
+        <p><strong>Desde cero — qué es "paper trading":</strong> significa simular una inversión con precios reales del mercado, calculando ganancias y pérdidas exactamente como si fuera dinero de verdad, pero <strong>sin mover ni un euro real</strong>. Es como practicar a conducir en un simulador antes de sacarte el carné: los reflejos que desarrollas son reales, pero si chocas no pasa nada grave. Aquí se usa para probar una estrategia de inversión "sobre el papel" durante meses, antes de decidir si algún día se usaría con dinero de verdad.</p>
+        <p>Aparte de Oportunidades (que te <em>sugiere</em> ideas para que decidas tú), hay un segundo sistema completamente distinto corriendo en paralelo: una <strong>cartera con reglas fijas y automáticas</strong> — nadie, ni humano ni IA, decide semana a semana qué comprar; lo decide siempre la misma fórmula — que se reequilibra sola cada semana.</p>
         <ul>
-            <li><strong>Universo comprable</strong>: un subconjunto de ETFs/fondos ya validados como líquidos y accesibles desde los brokers reales de la cartera.</li>
-            <li><strong>Tamaño de posición por volatilidad inversa</strong>: a más volátil un activo, menor peso se le asigna — la misma lógica de "arriesga lo mismo en cada apuesta", no "el mismo dinero en cada apuesta".</li>
-            <li><strong>Cinturones de seguridad</strong>: un límite máximo de peso por activo individual, un límite a la exposición cripto total, y un "cortacircuitos" que reduce exposición si la cartera cae demasiado desde su máximo.</li>
+            <li><strong>Universo comprable</strong>: un subconjunto de ETFs/fondos ya validados como líquidos y accesibles desde los brokers reales de la cartera (nada exótico ni imposible de comprar en la vida real).</li>
+            <li><strong>Tamaño de posición por volatilidad inversa</strong>: a un activo que se mueve mucho (volátil) se le asigna menos peso en la cartera; a uno más tranquilo, más peso. La idea es que cada posición aporte un riesgo parecido al total, no que todas tengan el mismo dinero encima. <em>Ejemplo: si el oro se mueve la mitad de rápido que el Bitcoin, el sistema le asigna aproximadamente el doble de peso en euros al oro que al Bitcoin, para que el "susto" potencial de cada uno sea similar.</em></li>
+            <li><strong>Cinturones de seguridad</strong>: un límite máximo de peso por activo individual (para no depender demasiado de uno solo), un límite a cuánto puede pesar la cripto en total, y un "cortacircuitos" que reduce la exposición si la cartera cae demasiado desde su punto más alto.</li>
         </ul>
         <h3>El filtro antes de arriesgar dinero real: PSR</h3>
-        <p>Un Sharpe alto en pocas semanas puede ser simplemente suerte. El <strong>Probabilistic Sharpe Ratio</strong> (Bailey &amp; López de Prado) responde a una pregunta muy concreta: <em>dado lo poco que llevamos observando, ¿qué probabilidad hay de que el Sharpe real sea mayor que cero?</em> No es solo "el Sharpe ha sido bueno", es "hay evidencia estadística de que no es casualidad".</p>
+        <p><strong>Antes de nada, dos términos que hacen falta aquí:</strong></p>
+        <ul>
+            <li><strong>Ratio de Sharpe</strong>: mide cuánta rentabilidad obtienes por cada unidad de riesgo (de volatilidad) que asumes. Cuanto más alto, mejor "premio" te da el riesgo que corres — se explica con más detalle y ejemplos en <a href="#algoritmos">Cómo funcionan nuestros algoritmos</a>.</li>
+            <li><strong>El problema con medir el Sharpe en poco tiempo</strong>: con pocos días de datos, un Sharpe alto puede ser simplemente <strong>suerte</strong> — igual que lanzar una moneda 5 veces y sacar 4 caras no demuestra que la moneda esté trucada.</li>
+        </ul>
+        <p>El <strong>PSR (Probabilistic Sharpe Ratio)</strong>, de Bailey &amp; López de Prado, responde a la pregunta exacta que hace falta: <em>dado lo poco (o mucho) que llevamos observando, ¿qué probabilidad hay de que ese Sharpe sea real y no un golpe de suerte?</em></p>
+        <div class="example-box">
+            <h4>Ejemplo: el mismo Sharpe, dos confianzas distintas</h4>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Situación</th><th>Sharpe medido</th><th>Días de datos</th><th>PSR (confianza de que sea real)</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Cartera A</td><td>2,4</td><td>10 días</td><td>≈ 55% — podría ser suerte</td></tr>
+                    <tr><td>Cartera B</td><td>2,4</td><td>45 días</td><td>≈ 80% — ya empieza a ser creíble</td></tr>
+                </tbody>
+            </table>
+            <p>Mismo Sharpe (2,4) en las dos, pero la confianza es muy distinta — porque B lo ha sostenido durante más tiempo. Por eso el PSR, no el Sharpe a solas, es el que decide.</p>
+        </div>
         <div class="formula-box">
-            <p><strong>El semáforo de salida a dinero real</strong> exige <strong>las cinco condiciones a la vez</strong>:</p>
+            <p><strong>El semáforo de salida a dinero real</strong> exige <strong>las cinco condiciones a la vez</strong> (si falta una sola, sigue en papel):</p>
             <ol>
-                <li>Al menos 56 días (8 semanas) y 30 marcas diarias de histórico — muestra mínima, sin excepciones.</li>
-                <li>Rentabilidad por encima de su índice de referencia.</li>
-                <li>Sharpe por encima del de su índice de referencia.</li>
-                <li>PSR ≥ 75% — el resultado es estadísticamente significativo, no ruido.</li>
-                <li>Sin una caída (drawdown) catastrófica que indique un fallo de las reglas.</li>
+                <li>Al menos <strong>56 días (8 semanas)</strong> y <strong>30 marcas diarias</strong> de histórico — muestra mínima, sin excepciones ni prisas.</li>
+                <li>Rentabilidad por encima de su índice de referencia (el "examen" con el que se compara, p. ej. un ETF global).</li>
+                <li>Sharpe por encima del de ese mismo índice de referencia.</li>
+                <li><strong>PSR ≥ 75%</strong> — el resultado es estadísticamente significativo, no ruido (como en la tabla de arriba).</li>
+                <li>Sin una caída (<strong>drawdown</strong>: la peor pérdida desde un máximo) catastrófica que indique que las reglas fallan en momentos duros.</li>
             </ol>
         </div>
-        <p>Mientras falte cualquiera de las cinco, el propio sistema se etiqueta como <strong>"NO apto — sigue en papel"</strong>, con el contador exacto de días que faltan. Nadie decide subjetivamente cuándo "ya vale" — lo decide la regla, siempre igual, y puedes ver su estado real en cualquier momento en <code>/api/systematic/paper/report</code>.</p>
+        <p>Mientras falte cualquiera de las cinco, el propio sistema se etiqueta a sí mismo como <strong>"NO apto — sigue en papel"</strong>, con el contador exacto de días que faltan. Nadie decide a ojo cuándo "ya vale" — lo decide siempre la misma regla, y puedes ver su estado real en cualquier momento entrando a <code>fintrack-front.onrender.com/api/systematic/paper/report</code> desde el navegador.</p>
     </section>
 
     <!-- ==================== QUÉ IA USAMOS ==================== -->
     <section id="que-ia-usamos">
         <h2>🤖 Qué IA usamos y por qué</h2>
+        <p><strong>Desde cero — qué es un "LLM":</strong> las siglas vienen de <em>Large Language Model</em> (modelo grande de lenguaje) — es el tipo de IA detrás de ChatGPT, Gemini, Claude, etc.: un programa entrenado con muchísimo texto que predice qué palabra viene después, y con eso consigue mantener conversaciones, redactar textos o resumir información. <strong>No</strong> es una IA que "piensa" en el sentido humano, ni tiene acceso a los mercados en tiempo real por sí sola — solo hace bien lo que le pidas con las palabras y los datos que le des en el mensaje.</p>
         <p>Usamos <strong>Google Gemini</strong> (capa gratuita de AI Studio) como modelo principal para todo lo que es lenguaje: redactar el porqué de cada oportunidad, la nota de análisis de un activo, clasificar el sentimiento de una noticia, y el chat del Asesor IA. Si Gemini no responde (límite de cuota agotado, error temporal), el sistema cae automáticamente a <strong>Groq</strong> como segunda opción, sin que tengas que hacer nada.</p>
+        <div class="example-box">
+            <h4>Ejemplo concreto: qué le pasamos a la IA y qué nos devuelve</h4>
+            <p><strong>Le damos</strong>: "Este ETF tiene momentum +1,91 (top del ranking), RSI neutral, MACD alcista, retorno anualizado +721%, y esta noticia real: 'Nvidia sube precios de chips de IA un 15%'."<br>
+            <strong>La IA devuelve</strong>: un párrafo en español explicando qué es el ETF, por qué esos números y esa noticia son relevantes, y los riesgos — pero <strong>usando solo esos datos</strong>, sin inventar ninguno nuevo. Si la IA fallara o no tuviera esos datos, no habría "oportunidad" que mostrar; el ranking numérico (que no depende de la IA) seguiría intacto.</p>
+        </div>
         <p><strong>Por qué esta combinación y no otra</strong>: el proyecto funciona con un presupuesto de <strong>0€</strong> — cualquier modelo de pago (incluidos los más conocidos por chat, como GPT o Claude vía API) queda descartado mientras esa restricción siga en pie, por buenos que sean. Gemini y Groq tienen capas gratuitas genuinamente utilizables para este volumen de peticiones.</p>
         <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;"><strong>Sobre "modelos nuevos muy fiables" que circulan por redes:</strong> si un modelo predictivo de mercados fuera realmente fiable, barato y de acceso público, dejaría de funcionar en cuanto todo el mundo lo usara — los propios mercados absorben esa ventaja (es la idea de "mercados eficientes"). La investigación académica seria sobre IA aplicada a inversión muestra mejoras modestas e inconsistentes sobre modelos de factores simples, no los resultados extraordinarios que se anuncian en Twitter o YouTube. Por eso la IA aquí tiene un rol acotado a propósito: <strong>redactar y explicar, no decidir ni predecir precio</strong> — esa decisión de diseño no depende de qué modelo de lenguaje esté de moda cada mes.</p>
     </section>
