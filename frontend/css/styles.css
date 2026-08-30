@@ -1625,7 +1625,14 @@ body::before {
    ============================================ */
 .learn-content,
 .docs-content {
-    max-width: 900px;
+    max-width: 1200px;
+}
+
+.learn-content > p,
+.learn-content > section > p,
+.docs-content > p,
+.docs-content > section > p {
+    max-width: 850px;
 }
 
 .learn-content h1,
