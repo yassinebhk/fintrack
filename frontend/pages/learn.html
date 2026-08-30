@@ -43,43 +43,49 @@
                 <span class="toc-badge nivel-basico">Básico</span>
             </a>
             <a href="#divisas" class="toc-card">
-                <span class="toc-icon">5️⃣</span>
-                <span class="toc-title">Divisas: EUR vs USD</span>
-                <span class="toc-desc">Cómo el tipo de cambio afecta a tu rentabilidad real sin que lo notes.</span>
+                <span class="toc-icon toc-num">5</span>
+                <span class="toc-title">Divisas y el Mercado Forex</span>
+                <span class="toc-desc">Tipo de cambio, pares, pips, spread, apalancamiento y carry trade.</span>
+                <span class="toc-badge nivel-intermedio">Intermedio</span>
+            </a>
+            <a href="#dividendos" class="toc-card">
+                <span class="toc-icon toc-num">6</span>
+                <span class="toc-title">Dividendos: Cómo Funcionan</span>
+                <span class="toc-desc">Yield, payout ratio, fecha ex-dividendo, DRIP y su fiscalidad real.</span>
                 <span class="toc-badge nivel-intermedio">Intermedio</span>
             </a>
             <a href="#metricas" class="toc-card">
-                <span class="toc-icon">6️⃣</span>
+                <span class="toc-icon toc-num">7</span>
                 <span class="toc-title">Métricas que Debes Conocer</span>
-                <span class="toc-desc">Sharpe, volatilidad, drawdown, CAGR — las que verás por toda la app.</span>
+                <span class="toc-desc">Sharpe, volatilidad, drawdown, CAGR, PER, capitalización, beta — las que verás por toda la app.</span>
                 <span class="toc-badge nivel-intermedio">Intermedio</span>
             </a>
             <a href="#estrategias" class="toc-card">
-                <span class="toc-icon">7️⃣</span>
+                <span class="toc-icon toc-num">8</span>
                 <span class="toc-title">Estrategias de Inversión</span>
-                <span class="toc-desc">DCA, buy&amp;hold, value, growth — con ejemplos numéricos de cada una.</span>
+                <span class="toc-desc">DCA, value, growth, dividendos, gestión pasiva, momentum y más, con ejemplos numéricos.</span>
                 <span class="toc-badge nivel-intermedio">Intermedio</span>
             </a>
             <a href="#ejemplos" class="toc-card">
-                <span class="toc-icon">8️⃣</span>
+                <span class="toc-icon toc-num">9</span>
                 <span class="toc-title">Ejemplos Reales con Números</span>
                 <span class="toc-desc">Simulaciones completas para ver el efecto del tiempo y las comisiones.</span>
                 <span class="toc-badge nivel-intermedio">Intermedio</span>
             </a>
             <a href="#errores" class="toc-card">
-                <span class="toc-icon">9️⃣</span>
+                <span class="toc-icon toc-num">10</span>
                 <span class="toc-title">Errores Comunes a Evitar</span>
                 <span class="toc-desc">Los fallos más habituales de quien empieza, y cómo no cometerlos.</span>
                 <span class="toc-badge nivel-basico">Básico</span>
             </a>
             <a href="#primeros-pasos" class="toc-card">
-                <span class="toc-icon">🔟</span>
+                <span class="toc-icon toc-num">11</span>
                 <span class="toc-title">Tus Primeros Pasos</span>
                 <span class="toc-desc">Checklist concreto para abrir tu primera posición esta semana.</span>
                 <span class="toc-badge nivel-basico">Básico</span>
             </a>
             <a href="#corto-plazo" class="toc-card">
-                <span class="toc-icon">📉</span>
+                <span class="toc-icon toc-num">12</span>
                 <span class="toc-title">Inversión a Corto Plazo (Trading)</span>
                 <span class="toc-desc">Cómo funciona el trading apalancado, sus costes reales y por qué la mayoría pierde.</span>
                 <span class="toc-badge nivel-avanzado">Avanzado</span>
@@ -506,7 +512,7 @@
 
     <!-- SECCIÓN 5 -->
     <section id="divisas">
-        <h2>5. Divisas: EUR vs USD</h2>
+        <h2>5. Divisas y el Mercado Forex</h2>
 
         <h3>¿Por qué importa la divisa?</h3>
         <p>Si vives en España (EUR) pero compras acciones americanas (USD), estás expuesto al <strong>riesgo de divisa</strong>.</p>
@@ -528,6 +534,36 @@
             </ul>
         </div>
 
+        <h3>🌐 El mercado Forex: el más grande del mundo</h3>
+        <p><strong>Forex</strong> (<em>Foreign Exchange</em>) es el mercado donde se compran y venden divisas. Es, con diferencia, el mercado financiero más grande que existe: se mueven unos <strong>7,5 billones de dólares al día</strong> (dato del Banco de Pagos Internacionales, BIS), muchísimo más que todas las bolsas de acciones del mundo juntas. Abre 24 horas de lunes a viernes (cuando cierra Tokio abre Londres, cuando cierra Londres abre Nueva York...) y participan bancos centrales, grandes bancos, fondos y, en última posición por volumen, particulares especulando con apalancamiento.</p>
+
+        <h3>Cómo se leen los pares de divisas</h3>
+        <p>Las divisas siempre cotizan en <strong>pares</strong>: EUR/USD, GBP/JPY, USD/MXN... El primer código es la <strong>divisa base</strong>, el segundo la <strong>divisa cotizada</strong>. El precio te dice cuánta divisa cotizada necesitas para comprar 1 unidad de la divisa base.</p>
+        <div class="formula-box">
+            <p class="formula">EUR/USD = 1,08 → 1 euro = 1,08 dólares</p>
+            <p>Si el par SUBE, el euro se está fortaleciendo frente al dólar (necesitas más dólares para comprar el mismo euro). Si BAJA, se debilita.</p>
+        </div>
+
+        <h3>El pip: la unidad mínima de movimiento</h3>
+        <p>Un <strong>pip</strong> es, en la mayoría de pares, el cuarto decimal (0,0001). Si el EUR/USD pasa de 1,0800 a 1,0850, se ha movido <strong>50 pips</strong>. Parece minúsculo, pero con las cantidades que se mueven en forex (y el apalancamiento que ofrecen los brokers) esos "pips" se traducen en dinero real rápido:</p>
+        <div class="example-box">
+            <h4>Ejemplo: cuánto vale un pip</h4>
+            <p>Con un "lote estándar" (100.000€ de posición, algo habitual en forex apalancado), 1 pip en EUR/USD equivale aproximadamente a <strong>10€</strong>. Un movimiento de 50 pips en tu contra son <strong>500€</strong> — sobre una posición que quizá abriste poniendo solo 1.000€ de tu bolsillo (apalancamiento x100).</p>
+        </div>
+
+        <h3>Spread: cómo ganan dinero los brokers de forex</h3>
+        <p>La mayoría de brokers de forex no cobran comisión visible — ganan con el <strong>spread</strong>: la diferencia entre el precio al que te compran y al que te venden la divisa. Si el EUR/USD se compra a 1,0801 y se vende a 1,0799, ese spread de 2 pips es el coste real de operar, aunque parezca "gratis".</p>
+
+        <h3>⚠️ Apalancamiento en forex: por qué es el mercado más peligroso para un principiante</h3>
+        <p>Es habitual encontrar brokers de forex que ofrecen apalancamiento de <strong>x30, x100 o incluso x500</strong> — mucho más alto que en acciones. Esto multiplica tanto las ganancias como las pérdidas (repasa la tabla de apalancamiento en <a href="#corto-plazo">Inversión a Corto Plazo</a>): con x100, un movimiento en tu contra de solo el <strong>1%</strong> se lleva el <strong>100% de tu depósito</strong>. El EUR/USD se mueve un 1% en un día con cierta frecuencia — por eso la inmensa mayoría de cuentas minoristas de forex apalancado pierden dinero (los propios brokers europeos están obligados por ley a publicar el % de clientes que pierden, y suele rondar el 70-80%).</p>
+
+        <h3>Carry trade</h3>
+        <p>Es una estrategia clásica (y arriesgada) de forex: pedir "prestado" en una divisa con tipo de interés muy bajo (tradicionalmente el yen japonés) e invertir ese dinero en una divisa con tipo de interés alto, embolsándote la diferencia de tipos cada día que mantienes la posición.</p>
+        <div class="example-box">
+            <h4>Ejemplo simplificado</h4>
+            <p>Tipo de interés en Japón: 0,1%. Tipo de interés en México: 11%. Diferencial: 10,9% anual "gratis" — siempre que el tipo de cambio JPY/MXN no se mueva en tu contra. El problema: en momentos de pánico de mercado, todo el mundo deshace el carry trade a la vez, la divisa "prestada" se dispara de golpe, y ese diferencial de tipos que ganaste durante meses se puede borrar en un solo día. Es exactamente lo que pasó con el carry trade del yen en agosto de 2024.</p>
+        </div>
+
         <h3>¿Qué hacer?</h3>
         <ul>
             <li><strong>A largo plazo (10+ años):</strong> El efecto divisa tiende a equilibrarse. No te preocupes demasiado.</li>
@@ -541,8 +577,70 @@
     </section>
 
     <!-- SECCIÓN 6 -->
+    <section id="dividendos">
+        <h2>6. Dividendos: Cómo Funcionan y Cómo se Cobran</h2>
+        <p>Un <strong>dividendo</strong> es la parte del beneficio que una empresa reparte a sus accionistas, en vez de reinvertirlo todo en el negocio. No todas las empresas lo hacen — muchas de crecimiento (Amazon durante años, por ejemplo) reinvierten el 100% del beneficio y no reparten nada.</p>
+
+        <h3>Dividend Yield (rentabilidad por dividendo)</h3>
+        <p>Es el dato que más se cita, y mide cuánto cobras en dividendos al año en relación con el precio de la acción.</p>
+        <div class="formula-box">
+            <p class="formula">Dividend Yield = (Dividendo anual por acción / Precio de la acción) × 100</p>
+        </div>
+        <div class="example-box">
+            <h4>Ejemplo</h4>
+            <p>Una acción cotiza a 50€ y reparte 2€ al año en dividendos.</p>
+            <p>Dividend Yield = (2 / 50) × 100 = <strong>4%</strong></p>
+            <p>Si tienes 10.000€ invertidos en esa acción, cobrarías unos 400€/año en dividendos, antes de impuestos.</p>
+        </div>
+
+        <h3>Payout ratio: qué parte del beneficio se reparte</h3>
+        <p>Te dice si el dividendo es sostenible o no.</p>
+        <div class="formula-box">
+            <p class="formula">Payout Ratio = (Dividendo pagado / Beneficio neto) × 100</p>
+        </div>
+        <div class="info-box warning">
+            <strong>⚠️ Cuidado con un payout ratio &gt;100%:</strong> significa que la empresa está pagando MÁS de lo que gana — sacándolo de reservas o de deuda. No es sostenible a largo plazo, y suele ser la antesala de un recorte del dividendo.
+        </div>
+
+        <h3>La fecha ex-dividendo: por qué el precio "baja" ese día</h3>
+        <p>Cobrar un dividendo pasa por tres fechas: <strong>fecha de declaración</strong> (la empresa anuncia el dividendo), <strong>fecha ex-dividendo</strong> (a partir de aquí, quien compre la acción YA NO tiene derecho a ese dividendo) y <strong>fecha de pago</strong> (el dinero llega a tu cuenta).</p>
+        <div class="example-box">
+            <h4>Ejemplo</h4>
+            <p>Una acción cotiza a 100€ y va a repartir 2€ de dividendo. El día de la fecha ex-dividendo, el precio abre en torno a <strong>98€</strong> — no es una caída "de verdad", es puramente mecánico: la empresa acaba de repartir esos 2€ por acción, así que vale 2€ menos. Si tenías la acción antes de esa fecha, cobras los 2€; si la compras ese mismo día, no.</p>
+        </div>
+
+        <h3>DRIP: reinversión automática de dividendos</h3>
+        <p><strong>DRIP</strong> (<em>Dividend Reinvestment Plan</em>) reinvierte automáticamente cada dividendo cobrado en comprar más participaciones del mismo activo, en vez de ingresarlo en tu cuenta. Es interés compuesto puro aplicado a dividendos:</p>
+        <div class="comparison-box">
+            <div class="comparison-item">
+                <h4>Cobrando el dividendo</h4>
+                <p>10.000€ al 4% de yield durante 20 años, cobrando cada año sin reinvertir: acabas con esos mismos 10.000€ de principal + el dinero de dividendos que hayas gastado o ahorrado aparte.</p>
+                <div class="result negative">Sin efecto multiplicador</div>
+            </div>
+            <div class="comparison-item">
+                <h4>Reinvirtiendo (DRIP)</h4>
+                <p>Los mismos 10.000€ al 4% de yield, reinvertido cada año durante 20 años (asumiendo precio estable): acabas con aproximadamente <strong>21.900€</strong> — el dividendo compra más participaciones, que generan más dividendo, que compran más participaciones.</p>
+                <div class="result positive">Interés compuesto sobre el dividendo</div>
+            </div>
+        </div>
+
+        <h3>Dividend Aristocrats y "Dividend Growth Investing"</h3>
+        <p>Se llama así a un grupo selecto de empresas del S&amp;P 500 que llevan <strong>25 años consecutivos o más</strong> subiendo su dividendo cada año (Coca-Cola y Procter &amp; Gamble llevan más de 60). No es garantía de nada hacia el futuro, pero sí es una señal de negocios muy estables y disciplinados con el capital. Es la base de la estrategia "Income Investing" que verás en <a href="#estrategias">Estrategias de Inversión</a>.</p>
+
+        <h3>Fiscalidad de los dividendos (lo que de verdad te queda)</h3>
+        <p>Como residente fiscal en España, los dividendos tributan en dos sitios, aunque solo una vez de verdad:</p>
+        <ul>
+            <li><strong>Retención en origen (EE. UU.):</strong> el bróker americano retiene un 15% automáticamente si has firmado el formulario W-8BEN (lo hacen la mayoría de brokers por defecto) — sin él, la retención es del 30%.</li>
+            <li><strong>En España:</strong> los dividendos tributan como rendimiento del capital mobiliario en la base del ahorro (19% hasta 6.000€, 21% hasta 50.000€, 23-30% por encima). El 15% ya retenido en EE. UU. se puede deducir (hay un convenio de doble imposición), así que no pagas dos veces sobre lo mismo — pero si tu tramo español es más alto que el 15%, pagas la diferencia.</li>
+        </ul>
+
+        <h3>El peligro de la "dividend trap"</h3>
+        <p>Un yield muy alto (8%, 12%...) no es un regalo — casi siempre significa que el precio de la acción se ha desplomado porque el mercado espera problemas, y el yield "alto" es solo aritmética (mismo dividendo ÷ precio mucho más bajo). Muchas veces termina en un recorte del dividendo, momento en el que también cae el precio. Un yield sostenible y creciente durante años vale mucho más que un yield puntualmente alto.</p>
+    </section>
+
+    <!-- SECCIÓN 7 -->
     <section id="metricas">
-        <h2>6. Métricas que Debes Conocer</h2>
+        <h2>7. Métricas que Debes Conocer</h2>
 
         <h3>CAGR (Tasa de Crecimiento Anual Compuesto)</h3>
         <p>Es la rentabilidad anualizada "suavizada". Te dice cuánto habría crecido tu inversión cada año SI hubiera crecido de forma constante.</p>
@@ -600,11 +698,68 @@
             <li><strong>Media volatilidad (15-20%):</strong> Acciones de empresas grandes</li>
             <li><strong>Alta volatilidad (30%+):</strong> Acciones pequeñas, criptomonedas</li>
         </ul>
+
+        <h3>PER / P/E Ratio (Precio sobre Beneficio)</h3>
+        <p>La métrica que más vas a escuchar sobre una acción concreta. Te dice cuántos años de beneficio actual estás pagando por la empresa.</p>
+        <div class="formula-box">
+            <p class="formula">PER = Precio de la acción / Beneficio por acción (BPA)</p>
+        </div>
+        <div class="example-box">
+            <h4>Ejemplo</h4>
+            <p>Una acción cotiza a 60€ y gana 3€ por acción al año.</p>
+            <p>PER = 60 / 3 = <strong>20</strong> → estás pagando 20 veces el beneficio anual actual.</p>
+            <p>Un PER bajo (8-12) suele señalar una empresa "barata" o de poco crecimiento esperado (tesis VALOR); un PER alto (30+) suele señalar altas expectativas de crecimiento futuro (tesis GROWTH) — o que está sobrevalorada. No existe un PER "bueno" universal: hay que compararlo con el de su sector.</p>
+        </div>
+
+        <h3>BPA / EPS (Beneficio por Acción)</h3>
+        <p>Es el beneficio neto de la empresa dividido entre el número de acciones en circulación — el dato que usa el PER de arriba.</p>
+        <div class="formula-box">
+            <p class="formula">BPA = Beneficio neto / Número de acciones en circulación</p>
+        </div>
+        <p>Cuando lees titulares tipo "Apple bate expectativas de beneficio por acción", se refieren a esto: los analistas estiman un BPA antes de que la empresa publique resultados, y el mercado reacciona según si lo supera o se queda corto.</p>
+
+        <h3>Capitalización bursátil (Market Cap)</h3>
+        <p>El valor total de una empresa en bolsa — lo que "costaría" comprarla entera al precio actual.</p>
+        <div class="formula-box">
+            <p class="formula">Capitalización = Precio de la acción × Número de acciones en circulación</p>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr><th>Categoría</th><th>Capitalización</th><th>Ejemplo típico</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Large Cap</td><td>&gt; 10.000 millones $</td><td>Apple, Microsoft, Inditex</td></tr>
+                <tr><td>Mid Cap</td><td>2.000 - 10.000 millones $</td><td>Empresas medianas consolidadas</td></tr>
+                <tr><td>Small Cap</td><td>300 - 2.000 millones $</td><td>Empresas pequeñas, más volátiles</td></tr>
+                <tr><td>Micro Cap</td><td>&lt; 300 millones $</td><td>Muy especulativo, poca liquidez</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Beta: cuánto se mueve un activo respecto al mercado</h3>
+        <p>Mide la sensibilidad de un activo a los movimientos generales del mercado (normalmente el S&amp;P 500 como referencia).</p>
+        <table class="data-table">
+            <thead>
+                <tr><th>Beta</th><th>Qué significa</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Beta = 1</td><td>Se mueve igual que el mercado (si el mercado sube 10%, ella sube ~10%)</td></tr>
+                <tr><td>Beta &gt; 1 (ej. 1,5)</td><td>Más volátil que el mercado — amplifica subidas y bajadas (tecnológicas, small caps)</td></tr>
+                <tr><td>Beta &lt; 1 (ej. 0,5)</td><td>Menos volátil — se mueve menos que el mercado (utilities, consumo básico)</td></tr>
+                <tr><td>Beta negativa</td><td>Se mueve EN CONTRA del mercado (poco común; el oro a veces se acerca a esto)</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Valor en libros (Book Value) y Price-to-Book</h3>
+        <p>El <strong>valor en libros</strong> es lo que quedaría para los accionistas si la empresa liquidara todos sus activos y pagara todas sus deudas hoy mismo (activos - pasivos, según su contabilidad). El <strong>Price-to-Book (P/B)</strong> compara el precio de mercado con ese valor contable:</p>
+        <div class="formula-box">
+            <p class="formula">P/B = Precio de la acción / Valor en libros por acción</p>
+        </div>
+        <p>Un P/B por debajo de 1 significa que, en teoría, el mercado valora la empresa por debajo de lo que dicen sus propios libros contables — una señal clásica que buscan los inversores VALOR, aunque también puede significar que el mercado no se fía de esa contabilidad. Es especialmente relevante en bancos y aseguradoras, donde el valor en libros refleja bastante bien sus activos reales (dinero, préstamos).</p>
     </section>
 
-    <!-- SECCIÓN 7 -->
+    <!-- SECCIÓN 8 -->
     <section id="estrategias">
-        <h2>7. Estrategias de Inversión</h2>
+        <h2>8. Estrategias de Inversión</h2>
 
         <h3>🔄 DCA (Dollar Cost Averaging)</h3>
         <p><strong>La estrategia más recomendada para principiantes.</strong> Consiste en invertir la misma cantidad cada mes, sin importar el precio.</p>
@@ -661,11 +816,57 @@
             <p class="formula">Número FIRE = Gastos Anuales × 25</p>
             <p>Si gastas 24.000€/año, necesitas 600.000€ para retirarte.</p>
         </div>
+
+        <h3>💎 Value Investing (Inversión en Valor)</h3>
+        <p>La escuela de Benjamin Graham y Warren Buffett: buscar empresas <strong>infravaloradas</strong> por el mercado respecto a lo que realmente valen (su "valor intrínseco"), comprando con un <strong>margen de seguridad</strong> — es decir, pagando claramente menos de lo que crees que vale, para que incluso si te equivocas un poco, no pierdas dinero.</p>
+        <div class="example-box">
+            <h4>Ejemplo</h4>
+            <p>Una empresa cotiza a un PER de 8 (ver <a href="#metricas">Métricas</a>) mientras sus competidoras del sector cotizan a PER 18-20, con beneficios estables y sin señales de que el negocio se esté deteriorando. Un inversor value investigaría por qué está "barata": ¿problema temporal y solucionable, o negocio en declive estructural? Si es lo primero, puede ser una oportunidad; si es lo segundo, es una "trampa de valor" (value trap).</p>
+        </div>
+
+        <h3>🚀 Growth Investing (Inversión en Crecimiento)</h3>
+        <p>La escuela opuesta: comprar empresas que están creciendo sus ingresos y beneficios muy por encima de la media (20-40%+ anual), aunque coticen "caras" en PER, porque se apuesta a que ese crecimiento seguirá justificando (y superando) el precio actual. Amazon durante los 2000-2010 es el ejemplo de libro: PER altísimo (o pérdidas contables por reinvertirlo todo), y aun así una de las mejores inversiones de las últimas décadas para quien confió en el crecimiento.</p>
+        <div class="info-box warning">
+            <strong>⚠️ El riesgo del growth:</strong> pagas por expectativas futuras. Si el crecimiento se frena antes de lo esperado, el precio puede desplomarse con fuerza porque estaba descontando años de crecimiento que ya no van a llegar.
+        </div>
+
+        <h3>💰 Income Investing (Inversión en Dividendos)</h3>
+        <p>Construir una cartera centrada en generar <strong>ingresos recurrentes</strong> vía dividendos, en vez de depender de vender participaciones para tener liquidez. Muy popular entre quienes buscan complementar una pensión o alcanzar la independencia financiera sin depender de vender activos en un mal momento de mercado. Se apoya en los conceptos de <a href="#dividendos">Dividendos</a>: yield sostenible, payout ratio razonable, e idealmente "dividend aristocrats" con historial de subidas constantes.</p>
+
+        <h3>📇 Gestión Pasiva / Index Investing</h3>
+        <p>En vez de intentar elegir qué acciones van a batir al mercado, compras <strong>el mercado entero</strong> a través de un fondo indexado o ETF, aceptando la rentabilidad media del conjunto.</p>
+        <div class="info-box">
+            <strong>📊 Dato real (estudios SPIVA, S&amp;P Dow Jones Indices):</strong> a 15 años vista, más del <strong>85-90% de los fondos de gestión activa</strong> no consiguen batir a su índice de referencia, una vez descontadas sus comisiones (normalmente 1-2% anual, frente al 0,1-0,3% de un fondo indexado). Es la base de la recomendación de Warren Buffett a su propia herencia: "invertid el 90% en un fondo indexado al S&amp;P 500 de bajo coste".
+        </div>
+
+        <h3>🧮 Asset Allocation: carteras modelo</h3>
+        <p>En vez de elegir una única estrategia, se define de antemano <strong>qué % de la cartera va en cada tipo de activo</strong>, según cuánto riesgo se quiere asumir — y se mantiene ese reparto con rebalanceos periódicos.</p>
+        <table class="data-table">
+            <thead>
+                <tr><th>Modelo</th><th>Reparto</th><th>Perfil</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Cartera 60/40</td><td>60% acciones, 40% bonos</td><td>Clásico, moderado — el más estudiado de la historia</td></tr>
+                <tr><td>All Weather (Ray Dalio)</td><td>30% acciones, 40% bonos largo plazo, 15% bonos medio plazo, 7,5% oro, 7,5% materias primas</td><td>Diseñada para aguantar bien en cualquier "clima" económico (inflación, deflación, crecimiento, recesión)</td></tr>
+                <tr><td>Cartera 100% renta variable</td><td>100% acciones (vía ETFs globales)</td><td>Máximo crecimiento a muy largo plazo, máxima volatilidad a corto</td></tr>
+            </tbody>
+        </table>
+
+        <h3>📈 Momentum Investing</h3>
+        <p>Comprar los activos que <strong>ya están subiendo con fuerza</strong>, apoyándose en la anomalía de mercado más documentada académicamente (Jegadeesh &amp; Titman, 1993): lo que ha subido de forma sostenida durante meses tiende a seguir subiendo a medio plazo, más de lo que predicen los modelos clásicos de mercados eficientes. Es, de hecho, uno de los dos motores estadísticos que usa el propio motor de FinTrack — puedes ver la fórmula exacta y ejemplos numéricos en <a href="#" onclick="document.querySelector('[data-page=docs]').click(); return false;">Documentación → Cómo funcionan nuestros algoritmos</a>.</p>
+
+        <h3>🎯 Value Averaging (variante avanzada del DCA)</h3>
+        <p>Como el DCA, inviertes periódicamente — pero en vez de aportar siempre la misma cantidad fija, ajustas cuánto aportas cada mes para que el <strong>valor total de la cartera</strong> crezca según un objetivo prefijado.</p>
+        <div class="example-box">
+            <h4>Ejemplo</h4>
+            <p>Tu objetivo es que la cartera valga 1.000€ más cada mes. Si el mes pasado subió y ya vale 900€ más que hace un mes, este mes solo aportas 100€. Si bajó y vale 200€ menos que el objetivo, este mes aportas 1.200€ para "ponerte al día".</p>
+            <p>El efecto es un DCA todavía más agresivo comprando en las caídas — aportas más cuando está barato y menos (o incluso vendes) cuando sube mucho. Es más complejo de gestionar que el DCA simple y requiere disciplina para aportar más justo cuando el mercado da más miedo.</p>
+        </div>
     </section>
 
-    <!-- SECCIÓN 8 -->
+    <!-- SECCIÓN 9 -->
     <section id="ejemplos">
-        <h2>8. Ejemplos Reales con Números</h2>
+        <h2>9. Ejemplos Reales con Números</h2>
 
         <h3>Ejemplo 1: El universitario precavido</h3>
         <div class="case-study">
@@ -714,9 +915,9 @@
         </div>
     </section>
 
-    <!-- SECCIÓN 9 -->
+    <!-- SECCIÓN 10 -->
     <section id="errores">
-        <h2>9. Errores Comunes a Evitar</h2>
+        <h2>10. Errores Comunes a Evitar</h2>
 
         <div class="error-list">
             <div class="error-item">
@@ -751,9 +952,9 @@
         </div>
     </section>
 
-    <!-- SECCIÓN 10 -->
+    <!-- SECCIÓN 11 -->
     <section id="primeros-pasos">
-        <h2>10. Tus Primeros Pasos</h2>
+        <h2>11. Tus Primeros Pasos</h2>
 
         <div class="steps-list">
             <div class="step">
@@ -807,9 +1008,9 @@
         </div>
     </section>
 
-    <!-- SECCIÓN 11 -->
+    <!-- SECCIÓN 12 -->
     <section id="corto-plazo">
-        <h2>11. Inversión a Corto Plazo (Trading): Cómo Funciona y Sus Riesgos</h2>
+        <h2>12. Inversión a Corto Plazo (Trading): Cómo Funciona y Sus Riesgos</h2>
         <p>Todo lo anterior en esta guía es inversión a <strong>largo plazo</strong>: comprar y aguantar años, dejando que el crecimiento de la economía trabaje para ti. El <strong>trading a corto plazo</strong> es otra cosa completamente distinta — no es "lo mismo pero más rápido", es un juego diferente con reglas, herramientas y probabilidades de éxito distintas. Aquí tienes cómo funciona de verdad, sin adornos.</p>
 
         <h3>🕐 Los tres horizontes de "corto plazo"</h3>

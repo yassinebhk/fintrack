@@ -1806,6 +1806,20 @@ body::before {
     transform: translateY(-2px);
 }
 
+.toc-card .toc-icon.toc-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: rgba(99, 102, 241, 0.18);
+    color: var(--accent-primary);
+    font-size: 0.82rem;
+    font-weight: 700;
+    font-style: normal;
+}
+
 .toc-card .toc-icon {
     font-size: 1.3rem;
     display: block;
