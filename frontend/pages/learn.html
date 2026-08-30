@@ -811,6 +811,47 @@
         </div>
         <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;"><strong>Por qué es tan difícil:</strong> al otro lado de cada operación de corto plazo suele haber fondos institucionales con más datos, más velocidad de ejecución y más capital que tú. No es imposible ganar, pero las probabilidades de partida son mucho peores que las del largo plazo — donde básicamente "apuestas" a que la economía mundial siga creciendo, algo que ha pasado de forma consistente durante más de un siglo.</p>
 
+        <h3>🏦 Por qué el otro lado de la operación tiene ventaja (en concreto)</h3>
+        <p>No es solo "tienen más dinero" — son ventajas estructurales concretas que un particular no puede replicar:</p>
+        <ul>
+            <li><strong>Colocation / alta frecuencia:</strong> algunos fondos pagan por tener sus servidores físicamente dentro del edificio de la bolsa, para que sus órdenes lleguen microsegundos antes que las tuyas. En ese margen de tiempo ya han comprado o vendido antes de que tu orden llegue.</li>
+            <li><strong>Acceso a datos antes que el público:</strong> terminales profesionales (Bloomberg, Reuters) y flujos de datos de pago llegan antes y con más detalle que lo que ve un particular en una app gratuita.</li>
+            <li><strong>Capital para diversificar el propio error:</strong> un fondo puede permitirse que 6 de cada 10 operaciones pierdan si las 4 que ganan compensan de sobra, porque reparte el riesgo en cientos de operaciones simultáneas — un particular con poco capital no puede permitirse tantos intentos fallidos seguidos sin quedarse sin fondos antes de que la estadística "funcione".</li>
+        </ul>
+
+        <h3>📖 Glosario mínimo antes de mirar cualquier plataforma de trading</h3>
+        <table class="data-table">
+            <thead>
+                <tr><th>Término</th><th>Qué significa</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>Orden de mercado</strong></td><td>Comprar/vender YA, al mejor precio disponible en ese instante.</td></tr>
+                <tr><td><strong>Orden limitada</strong></td><td>Comprar/vender solo si el precio llega a un valor que tú fijas — puede no ejecutarse nunca si el precio no llega.</td></tr>
+                <tr><td><strong>Stop-loss</strong></td><td>Orden automática que cierra la posición si las pérdidas llegan a un nivel que decides de antemano.</td></tr>
+                <tr><td><strong>Take-profit</strong></td><td>Orden automática que cierra la posición al llegar a una ganancia objetivo, para no "querer más" y acabar perdiendo lo ganado.</td></tr>
+                <tr><td><strong>Spread</strong></td><td>Diferencia entre el precio al que puedes comprar y el precio al que puedes vender en ese instante — es un coste oculto que pagas en cada operación, aunque no se llame "comisión".</td></tr>
+                <tr><td><strong>Apalancamiento / margen</strong></td><td>Operar con más dinero del que tienes, prestado por el bróker — multiplica ganancias y pérdidas por igual (ver Ejemplo 1 arriba).</td></tr>
+                <tr><td><strong>CFD</strong></td><td>"Contract for Difference": un contrato donde apuestas por la diferencia de precio sin poseer el activo real — habitual en trading apalancado y con fama merecida de ser donde más dinero pierde el particular medio.</td></tr>
+            </tbody>
+        </table>
+
+        <div class="example-box">
+            <h4>Ejemplo completo de una operación con gestión del riesgo</h4>
+            <p>Compras una acción a 50€, decidido a no arriesgar más de un 2% de tu capital de 1.000€ (es decir, 20€ máximo de pérdida) en esta operación:</p>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Parámetro</th><th>Valor</th><th>Por qué</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Precio de entrada</td><td>50,00€</td><td>El precio al que compras</td></tr>
+                    <tr><td>Stop-loss</td><td>48,00€ (-4%)</td><td>Si baja hasta aquí, se cierra sola — pérdida máxima asumida</td></tr>
+                    <tr><td>Take-profit</td><td>55,00€ (+10%)</td><td>Objetivo de ganancia — ratio riesgo/recompensa de 1:2,5</td></tr>
+                    <tr><td>Nº de acciones (con el límite de 20€ de riesgo)</td><td>10 acciones</td><td>10 × (50−48) = 20€ de pérdida máxima si salta el stop</td></tr>
+                </tbody>
+            </table>
+            <p>Fíjate en el "ratio riesgo/recompensa" (1:2,5 en este caso: arriesgas 2€ por acción para intentar ganar 5€ por acción) — con un ratio así, ni siquiera hace falta acertar más de la mitad de las veces para salir ganando a largo plazo, siempre que respetes el stop-loss sin excepciones. El fallo más común de los principiantes no es elegir mal la operación, es <strong>mover el stop-loss cuando ya va perdiendo</strong> "esperando a que se recupere" — eso es precisamente lo que convierte una pérdida pequeña y controlada en una grande y descontrolada.</p>
+        </div>
+
         <h3>🛡️ Si aun así quieres aprender/probarlo</h3>
         <ul>
             <li><strong>Nunca con dinero que necesitas o que no puedes permitirte perder por completo.</strong> Trátalo como una partida presupuestada para aprender, no como una forma de generar ingresos.</li>

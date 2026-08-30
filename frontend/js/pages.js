@@ -698,7 +698,7 @@ en medio                                → NEUTRAL</pre>
 
         <div class="formula-box">
             <p><strong>La regla exacta que lo protege de sí mismo (las dos condiciones deben cumplirse A LA VEZ):</strong></p>
-            <ol>
+            <ol style="text-align:left;">
                 <li><strong>Al menos 30 recomendaciones</strong> de ese enfoque ya "maduras" (con 90+ días de vida, para poder medir su resultado a 3 meses).</li>
                 <li>Esas 30+ recomendaciones deben tener <strong>fechas de creación repartidas en al menos 90 días</strong> entre la más antigua y la más reciente del grupo.</li>
             </ol>
@@ -722,6 +722,55 @@ CASO B — 30 recomendaciones repartidas entre enero y julio (180 días)
         <p>El sistema empezó a rastrear recomendaciones reales hace relativamente poco. Aunque ya haya cientos registradas, la <strong>primera</strong> que llega a los 3 meses de vida marca un punto fijo en el calendario — y como además hace falta que el conjunto de recomendaciones maduras <em>abarque</em> 90 días entre sí (condición 2), la cuenta real es: primero hay que esperar a que la recomendación más antigua cumpla 90 días, y ADEMÁS que haya otras recomendaciones creadas ~90 días después de esa primera que TAMBIÉN hayan cumplido sus propios 90 días. Sumando ambos plazos, la primera vez que el gate puede abrirse ronda los <strong>5-6 meses desde que se empezó a rastrear en serio</strong> — no antes, por diseño, sea cual sea el volumen de recomendaciones que se acumulen mientras tanto.</p>
         <p>Mientras tanto (y va a ser así durante meses), el sistema funciona <strong>exactamente igual que siempre</strong> — motor cuantitativo + noticias + IA que explica, sin ningún ajuste — y el propio <em>scorecard</em> lo dice explícitamente ("insuficiente, sin conclusión") en vez de fingir que ya sabe algo que todavía no sabe.</p>
         <p><strong>Qué NO hace, ni cuando se active:</strong> no toca las fórmulas del motor cuantitativo — los pesos de momentum/valor de <a href="#algoritmos">la sección de algoritmos</a> siguen siendo fijos y auditables, siempre los mismos. El único efecto posible, y solo para un enfoque que ya haya superado el filtro con un resultado real negativo, es que la próxima idea de ese enfoque se presente con la convicción un escalón más baja (de "alta" a "media", por ejemplo) — nunca al revés hacia arriba de forma automática, y nunca sobre qué activos entran al ranking.</p>
+
+        <h3>🧮 Cómo se calcula "qué habría pasado de verdad" — paso a paso con números</h3>
+        <p>Cuando una recomendación de un ETF cumple 3 meses, el sistema no adivina ni pregunta a la IA — hace una resta y una división, con precios reales de mercado obtenidos de Yahoo Finance:</p>
+        <div class="example-box">
+            <h4>Ejemplo completo: un ETF de cobre recomendado el 1 de mayo</h4>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Dato</th><th>Valor</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Precio del ETF el día de la recomendación (1 mayo)</td><td>42,00€</td></tr>
+                    <tr><td>Precio del ETF 3 meses después (1 agosto)</td><td>46,20€</td></tr>
+                    <tr><td>Precio de su benchmark el 1 mayo</td><td>100,00 (índice)</td></tr>
+                    <tr><td>Precio de su benchmark el 1 agosto</td><td>103,00 (índice)</td></tr>
+                </tbody>
+            </table>
+            <pre class="diagram-box">retorno del ETF     = (46,20 − 42,00) / 42,00 × 100  = +10,0%
+retorno del benchmark = (103,00 − 100,00) / 100,00 × 100 = +3,0%
+
+alpha (exceso sobre el benchmark) = retorno del ETF − retorno del benchmark
+                                   = 10,0% − 3,0% = +7,0%</pre>
+            <p>Este +10,0% de retorno y +7,0% de alpha son los dos números que se guardan para esta recomendación en concreto. El proceso se repite, exactamente igual, para las 400+ recomendaciones registradas — cada una con su propio ETF/fondo/cripto y su propio benchmark de comparación (un ETF de semiconductores se compara contra un índice de semiconductores, no contra el IBEX, para que la comparación sea justa).</p>
+        </div>
+
+        <h3>📐 Qué significan exactamente "% de aciertos" y "alpha media"</h3>
+        <ul>
+            <li><strong>% de aciertos (hit rate)</strong>: de todas las recomendaciones evaluadas, qué porcentaje tuvo retorno positivo (o alpha positiva, según cuál mires). Si de 197 recomendaciones 100 tuvieron retorno &gt;0%, el hit rate es 100/197 ≈ 50,8%.</li>
+            <li><strong>Alpha media</strong>: la media aritmética simple del alpha de todas las recomendaciones evaluadas. Si sumas el alpha de las 197 y divides entre 197, te da ese número — puede ser negativo aunque el hit rate esté cerca del 50%, si las pérdidas cuando falla son mayores que las ganancias cuando acierta.</li>
+        </ul>
+        <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;"><strong>Por qué miramos ambas cosas y no solo una:</strong> un motor podría acertar el 70% de las veces pero con alpha media negativa, si las pocas veces que falla lo hace estrepitosamente (fallos grandes, aciertos pequeños). O al revés: acertar poco pero con aciertos grandes que compensan. El % de aciertos solo no cuenta toda la historia — por eso el scorecard siempre muestra los dos.</p>
+
+        <h3>🔬 La comprobación estadística: ¿es un patrón real o es casualidad?</h3>
+        <p>Antes de dejar que un enfoque influya en algo, además de cumplir n≥30 y rango≥90 días, se hace una prueba estadística llamada <strong>test-t de una muestra</strong> (el mismo tipo de test que se usa en investigación científica para saber si un efecto es "real"). En términos sencillos: compara la media de los resultados (por ejemplo, +7% de alpha media) contra cero, teniendo en cuenta cuánto varían esos resultados entre sí (si todos rondan +7% es más convincente que si van de −40% a +50% con esa misma media).</p>
+        <div class="formula-box">
+            <p>El resultado de ese test es un <strong>p-valor</strong>: la probabilidad de que veas ese patrón "por pura casualidad" si en realidad no hubiera ningún efecto real. Usamos el umbral habitual en estadística aplicada:</p>
+            <p class="formula">p-valor &lt; 0,10 → se considera "significativo" (hay indicios razonables de que no es azar)<br>
+            p-valor ≥ 0,10 → no se considera concluyente, aunque ya haya pasado el filtro de n≥30 y 90 días</p>
+        </div>
+        <p>Es una tercera capa de seguridad, además de las dos condiciones de cantidad y de fechas: incluso si hay suficientes datos bien repartidos, si el resultado no es estadísticamente claro, se sigue mostrando pero marcado como "sin significancia estadística clara" en vez de presentarlo como una conclusión firme.</p>
+
+        <h3>❓ Preguntas que probablemente te estés haciendo</h3>
+        <div class="info-box">
+            <p><strong>¿Y si en 6 meses el resultado sigue siendo malo (como el 42,6% actual de aciertos frente a benchmark)?</strong><br>
+            El sistema lo diría igual de claro que ahora. No hay ningún mecanismo que "maquille" un mal resultado — el scorecard es el mismo cálculo, gane o pierda el motor. Si el resultado real es que MOMENTUM no bate a su benchmark de forma consistente, la convicción de las ideas de momentum empezaría a bajar automáticamente, y tú lo verías reflejado tanto aquí como en cada oportunidad nueva.</p>
+            <p style="margin-top:10px;"><strong>¿Puedo ver esto por ticker individual, no solo por enfoque?</strong><br>
+            Ahora mismo el agrupamiento es por enfoque (momentum/valor) y por convicción (alta/media/baja), no por activo individual — agrupar por ticker individual necesitaría muchísimas más recomendaciones del MISMO activo exacto para tener una muestra mínima decente, algo que tardaría mucho más en darse de forma natural.</p>
+            <p style="margin-top:10px;"><strong>¿Se puede "hacer trampa" metiendo 30 recomendaciones de golpe para forzar el gate?</strong><br>
+            No — la condición 2 (rango de 90 días entre fechas) existe precisamente para impedir esto: 30 recomendaciones metidas el mismo día tendrían rango de fechas = 0, y se descartarían igual que el "Caso A" del ejemplo de arriba.</p>
+        </div>
     </section>
 
     <!-- ==================== MOTOR SISTEMÁTICO ==================== -->
@@ -762,7 +811,7 @@ CASO B — 30 recomendaciones repartidas entre enero y julio (180 días)
         </div>
         <div class="formula-box">
             <p><strong>El semáforo de salida a dinero real</strong> exige <strong>las cinco condiciones a la vez</strong> (si falta una sola, sigue en papel):</p>
-            <ol>
+            <ol style="text-align:left;">
                 <li>Al menos <strong>56 días (8 semanas)</strong> y <strong>30 marcas diarias</strong> de histórico — muestra mínima, sin excepciones ni prisas.</li>
                 <li>Rentabilidad por encima de su índice de referencia (el "examen" con el que se compara, p. ej. un ETF global).</li>
                 <li>Sharpe por encima del de ese mismo índice de referencia.</li>
@@ -771,6 +820,45 @@ CASO B — 30 recomendaciones repartidas entre enero y julio (180 días)
             </ol>
         </div>
         <p>Mientras falte cualquiera de las cinco, el propio sistema se etiqueta a sí mismo como <strong>"NO apto — sigue en papel"</strong>, con el contador exacto de días que faltan. Nadie decide a ojo cuándo "ya vale" — lo decide siempre la misma regla, y puedes ver su estado real en cualquier momento entrando a <code>fintrack-front.onrender.com/api/systematic/paper/report</code> desde el navegador.</p>
+
+        <h3>🧮 Cómo se calcula el peso de cada activo — ejemplo con números reales</h3>
+        <p>La "volatilidad inversa" no es solo una idea, es una fórmula concreta: el peso de cada activo es inversamente proporcional a su volatilidad, y luego se normaliza para que todos los pesos sumen 100%.</p>
+        <div class="example-box">
+            <h4>Ejemplo: repartir capital entre 3 activos</h4>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Activo</th><th>Volatilidad anual</th><th>1 / volatilidad</th><th>Peso final (normalizado)</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Bonos corporativos</td><td>6%</td><td>1/0,06 = 16,7</td><td>16,7 / 30,9 ≈ <strong>54%</strong></td></tr>
+                    <tr><td>ETF global de acciones</td><td>15%</td><td>1/0,15 = 6,7</td><td>6,7 / 30,9 ≈ <strong>22%</strong></td></tr>
+                    <tr><td>ETF de semiconductores</td><td>35%</td><td>1/0,35 = 2,9</td><td>2,9 / 30,9 ≈ <strong>9%</strong></td></tr>
+                </tbody>
+            </table>
+            <pre class="diagram-box">Suma de "1/volatilidad" = 16,7 + 6,7 + 2,9 = 26,3 (aprox., redondeos aparte)
+Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
+            <p>El activo más tranquilo (bonos) se lleva más de la mitad del capital; el más agitado (semiconductores) se lleva menos de una décima parte — así, si cualquiera de los tres tiene un mal día, el "susto" en euros es parecido entre ellos, no descompensado.</p>
+        </div>
+        <p>Esto se recalcula <strong>cada semana</strong> con la volatilidad más reciente de cada activo — si un activo se vuelve más tranquilo o más agitado, su peso se ajusta automáticamente la siguiente vez que se reequilibra la cartera.</p>
+
+        <h3>📡 Qué es el "régimen de mercado" y cómo cambia las reglas</h3>
+        <p>El sistema mide qué porcentaje de un universo amplio de activos cotiza por encima de su media de los últimos 200 días de mercado (una forma estándar de medir si "el mercado en general" está en tendencia alcista o bajista, ver <a href="#algoritmos">algoritmos, apartado ⑨</a>). Ahora mismo ese porcentaje ronda el <strong>78%</strong> (dato real, visible en el bloque de estado de arriba) — muy por encima del 55% que ya se considera "alcista". Cuando el régimen es claramente alcista o bajista, el sistema no cambia sus reglas de gestión de riesgo (los cinturones de seguridad siguen igual), pero sí influye en qué universo de activos considera atractivo para el reequilibrio semanal, de forma parecida a como influye en Oportunidades.</p>
+
+        <h3>🛑 El "cortacircuitos" de drawdown, con números</h3>
+        <p>El <strong>drawdown</strong> es la caída porcentual desde el punto más alto que ha alcanzado la cartera hasta el valor actual — no desde que empezaste, sino desde el mejor momento. Ahora mismo el máximo drawdown registrado en el motor sistemático es de <strong>-2,1%</strong> (dato real, ver arriba), muy lejos de activar ninguna alarma. El cortacircuitos entra en juego con caídas mucho mayores: si la cartera cayera de forma pronunciada desde su máximo, las reglas reducen automáticamente la exposición a activos de riesgo, en vez de mantener el mismo reparto pase lo que pase — es una salvaguarda contra el peor de los escenarios, no algo que se espere activar en el día a día.</p>
+
+        <h3>🏛️ Por qué "en papel" primero — no es solo teoría</h3>
+        <p>La historia de las finanzas está llena de estrategias que parecían matemáticamente impecables y acabaron mal por no haber sido puestas a prueba en condiciones reales el tiempo suficiente — el caso más citado en la industria es <strong>LTCM (Long-Term Capital Management)</strong>, un fondo de los años 90 dirigido por premios Nobel de economía, con modelos matemáticos sofisticados, que colapsó en 1998 al asumir que ciertos escenarios extremos eran "estadísticamente casi imposibles" y esos escenarios ocurrieron igualmente. La lección que se ha quedado en la gestión de riesgo moderna: <strong>ninguna fórmula, por elegante que sea, sustituye a comprobar cómo se comporta de verdad con datos y tiempo suficientes</strong> — exactamente lo que este filtro de 56 días + PSR está diseñado para forzar antes de considerar dinero real.</p>
+
+        <h3>❓ Preguntas frecuentes</h3>
+        <div class="info-box">
+            <p><strong>¿"Deflated Sharpe" y "PSR" son lo mismo?</strong><br>
+            Están muy relacionados — el Deflated Sharpe Ratio es una versión del PSR pensada además para corregir el sesgo de haber probado <em>muchas</em> estrategias distintas antes de quedarte con la que mejor resultado dio (si pruebas 100 monedas, alguna saldrá cara 8 veces seguidas por puro azar). Aquí ambos números suelen coincidir porque solo hay una única configuración de reglas en marcha, no un proceso de prueba-y-error entre muchas variantes.</p>
+            <p style="margin-top:10px;"><strong>¿Qué pasa el día que cumple las 5 condiciones?</strong><br>
+            El sistema pasaría de "NO apto" a "apto" en su propio veredicto — pero eso NO significa que automáticamente se mueva dinero real. Sería el punto de partida para una decisión consciente (tuya), no una orden de compra automática.</p>
+            <p style="margin-top:10px;"><strong>¿Puede este motor perder dinero real alguna vez sin que yo lo sepa?</strong><br>
+            No — mientras esté "en papel" no toca ni un euro real de tu cartera. Es una simulación completa, con precios reales pero dinero ficticio, precisamente para que cualquier fallo se descubra sin coste real.</p>
+        </div>
     </section>
 
     <!-- ==================== QUÉ IA USAMOS ==================== -->
@@ -785,6 +873,30 @@ CASO B — 30 recomendaciones repartidas entre enero y julio (180 días)
         </div>
         <p><strong>Por qué esta combinación y no otra</strong>: el proyecto funciona con un presupuesto de <strong>0€</strong> — cualquier modelo de pago (incluidos los más conocidos por chat, como GPT o Claude vía API) queda descartado mientras esa restricción siga en pie, por buenos que sean. Gemini y Groq tienen capas gratuitas genuinamente utilizables para este volumen de peticiones.</p>
         <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;"><strong>Sobre "modelos nuevos muy fiables" que circulan por redes:</strong> si un modelo predictivo de mercados fuera realmente fiable, barato y de acceso público, dejaría de funcionar en cuanto todo el mundo lo usara — los propios mercados absorben esa ventaja (es la idea de "mercados eficientes"). La investigación académica seria sobre IA aplicada a inversión muestra mejoras modestas e inconsistentes sobre modelos de factores simples, no los resultados extraordinarios que se anuncian en Twitter o YouTube. Por eso la IA aquí tiene un rol acotado a propósito: <strong>redactar y explicar, no decidir ni predecir precio</strong> — esa decisión de diseño no depende de qué modelo de lenguaje esté de moda cada mes.</p>
+
+        <h3>🏭 Gemini vs. Groq: no son "competidores", son cosas distintas</h3>
+        <p>Es una confusión habitual, así que merece una aclaración: <strong>Gemini</strong> es un modelo de IA (creado por Google) — el "cerebro" que redacta el texto. <strong>Groq</strong> no es un modelo, es una empresa de <strong>hardware especializado</strong> (chips propios, no GPUs normales) que ejecuta modelos de otros (como Llama, de Meta) a una velocidad muy superior a la infraestructura habitual. Aquí Groq entra solo como red de seguridad: si Gemini no responde, un modelo distinto corriendo sobre la infraestructura de Groq toma el relevo para que el usuario no se quede sin respuesta.</p>
+
+        <h3>🔒 Los tres candados técnicos que evitan que la IA "se invente cosas"</h3>
+        <p>No basta con pedirle "no inventes" en el mensaje — eso ayuda pero no lo garantiza. Hay tres mecanismos técnicos reales detrás:</p>
+        <ol>
+            <li><strong>Esquema de salida forzado (JSON Schema)</strong>: no dejamos que la IA escriba libremente. Le exigimos una estructura fija con campos concretos (nombre, ticker, por qué ahora, riesgos, convicción...) — si intenta desviarse de esa estructura, la respuesta se rechaza automáticamente antes de llegar a la pantalla.</li>
+            <li><strong>Temperatura baja</strong>: los modelos de lenguaje tienen un parámetro llamado "temperatura" que controla cuánto "improvisan" — a mayor temperatura, respuestas más creativas pero también más propensas a desviarse de los datos; a menor temperatura, respuestas más ceñidas a lo que se le ha dado. Aquí se usa una temperatura deliberadamente baja para el análisis cuantitativo, priorizando la fidelidad a los datos sobre la creatividad.</li>
+            <li><strong>Verificación del ticker contra el ranking real</strong>: a la IA se le exige citar tickers que existan literalmente en la lista que el motor cuantitativo ya generó — no puede "recomendar" un activo que el motor no haya puntuado primero, así que no puede fabricar una idea de la nada.</li>
+        </ol>
+
+        <h3>📋 Para qué es buena una IA de este tipo aquí, y para qué no</h3>
+        <table class="data-table">
+            <thead>
+                <tr><th>Buena en...</th><th>Mala en... (por eso no se le pide)</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Redactar en lenguaje claro un dato numérico ya calculado</td><td>Calcular ella misma esos números con precisión fiable</td></tr>
+                <tr><td>Resumir varias noticias y clasificar su sentimiento</td><td>Saber si el mercado subirá o bajará mañana</td></tr>
+                <tr><td>Mantener una conversación con contexto de tu cartera</td><td>Recordar nada de una conversación a otra (cada consulta parte de cero, solo con lo que se le pasa esa vez)</td></tr>
+                <tr><td>Adaptar el tono/idioma a quien lee</td><td>Garantizar que un hecho concreto (una fecha, una cifra) sea 100% exacto sin una fuente de datos real detrás</td></tr>
+            </tbody>
+        </table>
     </section>
 
     <!-- ==================== REFERENCIA TÉCNICA (separador) ==================== -->
