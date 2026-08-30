@@ -23,6 +23,64 @@ async function loadLearnPage(targetPage) {
     }
 }
 
+/**
+ * Fetch the real, current scorecard + systematic-engine status and fill in
+ * the "Estado real ahora mismo" boxes in Documentación. Live on every visit
+ * — never hardcoded, so it can't go stale like a written-in-prose number would.
+ */
+async function loadLiveDocsStatus() {
+    const API = window.API_BASE_URL || 'http://localhost:8000/api';
+
+    const autoEl = document.getElementById('liveAutoentrenamientoContent');
+    if (autoEl) {
+        try {
+            const r = await fetch(`${API}/scorecard`, { cache: 'no-store' });
+            const d = await r.json();
+            const m1 = d.horizons?.ret_1m;
+            const gate = d.feedback_gate || { by_approach: {}, by_conviction: {} };
+            const gatedBuckets = [...Object.entries(gate.by_approach || {}), ...Object.entries(gate.by_conviction || {})]
+                .filter(([, v]) => v.gated);
+            let html = `<strong>${d.total_recommendations_tracked ?? '—'}</strong> recomendaciones registradas · `
+                + `<strong>${d.evaluated_any ?? 0}</strong> ya evaluadas a 1 mes`;
+            if (m1?.return) {
+                html += ` (rentabilidad media ${m1.return.avg >= 0 ? '+' : ''}${m1.return.avg}%, ${m1.return.hit_rate_pct}% de aciertos; `
+                    + `frente a su benchmark: ${m1.alpha_vs_benchmark.hit_rate_pct}% de aciertos)`;
+            }
+            html += `.<br>A 3 meses (el horizonte que de verdad activa el autoentrenamiento): `
+                + `<strong>${d.horizons?.ret_3m?.return?.n ?? 0}</strong> evaluadas todavía.<br>`;
+            html += gatedBuckets.length
+                ? `<strong style="color:#00d4aa;">${gatedBuckets.length} enfoque(s) ya han cruzado el filtro anti-ruido</strong> y están influyendo en la convicción de nuevas ideas.`
+                : `El filtro anti-ruido sigue <strong>cerrado</strong> para todos los enfoques — cero influencia real todavía sobre las recomendaciones.`;
+            autoEl.innerHTML = html;
+        } catch (err) {
+            autoEl.innerHTML = 'No se pudo consultar el scorecard en vivo ahora mismo — inténtalo recargando la página.';
+        }
+    }
+
+    const sisEl = document.getElementById('liveSistematicoContent');
+    if (sisEl) {
+        try {
+            const r = await fetch(`${API}/systematic/paper/report`, { cache: 'no-store' });
+            const d = await r.json();
+            const rd = d.readiness || {};
+            const pct = (v) => (typeof v === 'number' ? `${v >= 0 ? '+' : ''}${v}%` : '—');
+            if (typeof d.days !== 'number') {
+                // No marks yet at all — a genuinely different (minimal) response shape.
+                sisEl.innerHTML = `Todavía sin histórico que mostrar (${d.status || 'aún no ha empezado a marcar NAV'}). `
+                    + `Veredicto: <strong style="color:#f59e0b;">${rd.verdict || rd.note || '—'}</strong>`;
+            } else {
+                sisEl.innerHTML = `<strong>${d.days}</strong> días en papel (de los 56 mínimos), <strong>${d.marks ?? '—'}</strong> marcas diarias.<br>`
+                    + `Rentabilidad: <strong>${pct(d.return_pct)}</strong> vs <strong>${pct(d.benchmark_return_pct)}</strong> del benchmark `
+                    + `(alpha ${pct(d.alpha_pct)}). Sharpe ${d.sharpe ?? '—'} vs ${d.benchmark_sharpe ?? '—'} del benchmark.<br>`
+                    + `PSR: <strong>${Math.round((d.psr ?? 0) * 100)}%</strong> (necesita ≥75%).<br>`
+                    + `Veredicto del propio sistema: <strong style="color:${rd.ready ? '#00d4aa' : '#f59e0b'};">${rd.verdict ?? '—'}</strong>`;
+            }
+        } catch (err) {
+            sisEl.innerHTML = 'No se pudo consultar el estado en vivo ahora mismo — inténtalo recargando la página.';
+        }
+    }
+}
+
 // Page content templates (fallback)
 const pageContent = {
     learn: `
@@ -614,7 +672,12 @@ en medio                                → NEUTRAL</pre>
         <h2>🎯 Autoentrenamiento: cómo (y cuándo) aprende de sus aciertos</h2>
         <p><strong>Empezando desde cero — qué significa "autoentrenar" aquí:</strong> no es que una red neuronal reajuste sus propios números por dentro (eso es lo que mucha gente imagina al oír "IA que aprende", y aquí no funciona así). Es algo más simple y más verificable: el sistema <strong>apunta cada recomendación que hace</strong>, espera a ver <strong>qué pasó de verdad</strong> con el precio después, y usa ese resultado real para ser más o menos "confiado" la próxima vez que proponga algo parecido. Como un alumno que lleva la cuenta de en qué tipo de examen suele fallar más, en vez de cambiar de cerebro.</p>
 
-        <h3>Paso a paso, con datos inventados pero realistas</h3>
+        <div class="info-box" id="liveAutoentrenamientoBox">
+            <strong>📡 Estado real ahora mismo</strong> <span style="font-size:11px; color:#94a3b8;">(se consulta en vivo cada vez que abres esta página — no son cifras fijas)</span>
+            <p id="liveAutoentrenamientoContent" style="margin-top:8px;">Cargando datos reales del scorecard…</p>
+        </div>
+
+        <h3>Paso a paso, con un ejemplo (fechas inventadas para que se vea claro)</h3>
         <p>Cada recomendación que ves en Oportunidades se guarda con tres datos: <strong>la fecha</strong>, <strong>su enfoque</strong> (MOMENTUM = "esto está subiendo con fuerza" o VALOR = "esto está barato pero es de calidad" — ver <a href="#algoritmos">Cómo funcionan nuestros algoritmos</a>) y <strong>su convicción</strong> (alta/media/baja). Un proceso automático revisa cada día las recomendaciones antiguas y, si ha pasado suficiente tiempo, calcula <strong>qué rentabilidad habría dado de verdad</strong> esa idea a 1, 3 y 6 meses, comparada con su propio índice de referencia (por ejemplo, un ETF de semiconductores se compara contra el índice de semiconductores, no contra el IBEX). A este informe de resultados reales lo llamamos <em>scorecard</em> ("boletín de notas"), y es público — lo puedes consultar tú mismo entrando a <code>fintrack-front.onrender.com/api/scorecard</code> desde el navegador.</p>
 
         <div class="example-box">
@@ -666,6 +729,12 @@ CASO B — 30 recomendaciones repartidas entre enero y julio (180 días)
         <h2>📈 El motor sistemático: la cartera en papel</h2>
         <p><strong>Desde cero — qué es "paper trading":</strong> significa simular una inversión con precios reales del mercado, calculando ganancias y pérdidas exactamente como si fuera dinero de verdad, pero <strong>sin mover ni un euro real</strong>. Es como practicar a conducir en un simulador antes de sacarte el carné: los reflejos que desarrollas son reales, pero si chocas no pasa nada grave. Aquí se usa para probar una estrategia de inversión "sobre el papel" durante meses, antes de decidir si algún día se usaría con dinero de verdad.</p>
         <p>Aparte de Oportunidades (que te <em>sugiere</em> ideas para que decidas tú), hay un segundo sistema completamente distinto corriendo en paralelo: una <strong>cartera con reglas fijas y automáticas</strong> — nadie, ni humano ni IA, decide semana a semana qué comprar; lo decide siempre la misma fórmula — que se reequilibra sola cada semana.</p>
+
+        <div class="info-box" id="liveSistematicoBox">
+            <strong>📡 Estado real ahora mismo</strong> <span style="font-size:11px; color:#94a3b8;">(se consulta en vivo cada vez que abres esta página — no son cifras fijas)</span>
+            <p id="liveSistematicoContent" style="margin-top:8px;">Cargando datos reales del motor sistemático…</p>
+        </div>
+
         <ul>
             <li><strong>Universo comprable</strong>: un subconjunto de ETFs/fondos ya validados como líquidos y accesibles desde los brokers reales de la cartera (nada exótico ni imposible de comprar en la vida real).</li>
             <li><strong>Tamaño de posición por volatilidad inversa</strong>: a un activo que se mueve mucho (volátil) se le asigna menos peso en la cartera; a uno más tranquilo, más peso. La idea es que cada posición aporte un riesgo parecido al total, no que todas tengan el mismo dinero encima. <em>Ejemplo: si el oro se mueve la mitad de rápido que el Bitcoin, el sistema le asigna aproximadamente el doble de peso en euros al oro que al Bitcoin, para que el "susto" potencial de cada uno sea similar.</em></li>
@@ -1358,6 +1427,7 @@ function initNavigation() {
             }
             if (pageName === 'docs') {
                 targetPage.innerHTML = pageContent.docs;
+                loadLiveDocsStatus();
             }
             if (pageName === 'news' && window.renderNews) {
                 window.renderNews();
