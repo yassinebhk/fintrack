@@ -10,7 +10,7 @@ async function loadLearnPage(targetPage) {
     if (targetPage.dataset.loaded === 'true') return;
     
     try {
-        const response = await fetch('pages/learn.html?v=20260530a', { cache: 'no-store' });
+        const response = await fetch('pages/learn.html?v=20260830a', { cache: 'no-store' });
         if (response.ok) {
             targetPage.innerHTML = await response.text();
             targetPage.dataset.loaded = 'true';
@@ -403,27 +403,110 @@ const pageContent = {
 
     <div class="table-of-contents">
         <h4>Índice</h4>
-        <p style="font-size:13px; color:#94a3b8; margin:0 0 8px;">Léelo de arriba abajo: va de <em>qué es</em> → <em>cómo se usa</em> → <em>cómo funciona por dentro</em> → <em>detalle técnico</em>.</p>
-        <ul>
-            <li><strong>Empezar aquí</strong></li>
-            <li style="margin-left:14px;"><a href="#que-es">🎯 Qué es FinTrack y la visión</a></li>
-            <li style="margin-left:14px;"><a href="#guia-uso">🧭 Guía de uso: pestaña por pestaña</a></li>
-            <li style="margin-left:14px;"><a href="#el-cerebro">🧠 El cerebro: cómo descubre y recomienda (paso a paso)</a></li>
-            <li style="margin-top:6px;"><strong>Cómo razona (los algoritmos)</strong></li>
-            <li style="margin-left:14px;"><a href="#novedades">🆕 Novedades (asistente autónomo con IA)</a></li>
-            <li style="margin-left:14px;"><a href="#algoritmos">🔬 Cómo funcionan nuestros algoritmos (teoría + ejemplos)</a></li>
-            <li style="margin-left:14px;"><a href="#autoentrenamiento">🎯 Autoentrenamiento: cómo (y cuándo) aprende de sus aciertos</a></li>
-            <li style="margin-left:14px;"><a href="#motor-sistematico">📈 El motor sistemático: la cartera en papel</a></li>
-            <li style="margin-left:14px;"><a href="#que-ia-usamos">🤖 Qué IA usamos y por qué</a></li>
-            <li style="margin-top:6px;"><strong>Referencia técnica (cómo está montado)</strong></li>
-            <li style="margin-left:14px;"><a href="#arquitectura">🏗️ Arquitectura del Sistema</a></li>
-            <li style="margin-left:14px;"><a href="#inicio-rapido">Inicio Rápido</a></li>
-            <li style="margin-left:14px;"><a href="#configuracion">Configuración</a></li>
-            <li style="margin-left:14px;"><a href="#añadir-posiciones">Añadir Posiciones</a></li>
-            <li style="margin-left:14px;"><a href="#funcionalidades">Funcionalidades</a></li>
-            <li style="margin-left:14px;"><a href="#api">API Reference</a></li>
-            <li style="margin-left:14px;"><a href="#faq">Preguntas Frecuentes</a></li>
-        </ul>
+        <p style="font-size:13px; color:#94a3b8; margin:0 0 8px;">Léelo de arriba abajo: va de <em>qué es</em> → <em>cómo se usa</em> → <em>cómo funciona por dentro</em> → <em>detalle técnico</em>. Cada tarjeta lleva una etiqueta de nivel para que sepas qué esperar antes de entrar.</p>
+        <div class="toc-grid">
+            <p class="toc-category-label">Empezar aquí</p>
+            <a href="#que-es" class="toc-card">
+                <span class="toc-icon">🎯</span>
+                <span class="toc-title">Qué es FinTrack y la visión</span>
+                <span class="toc-desc">Qué hace por ti la app en una frase, y qué NO hace (no predice, no ordena comprar).</span>
+                <span class="toc-badge nivel-basico">Básico</span>
+            </a>
+            <a href="#guia-uso" class="toc-card">
+                <span class="toc-icon">🧭</span>
+                <span class="toc-title">Guía de uso: pestaña por pestaña</span>
+                <span class="toc-desc">Qué hace cada sección de la barra lateral y cuándo usarla.</span>
+                <span class="toc-badge nivel-basico">Básico</span>
+            </a>
+            <a href="#el-cerebro" class="toc-card">
+                <span class="toc-icon">🧠</span>
+                <span class="toc-title">El cerebro: cómo descubre y recomienda</span>
+                <span class="toc-desc">El recorrido paso a paso: de escanear el mercado a explicarte una idea concreta.</span>
+                <span class="toc-badge nivel-intermedio">Intermedio</span>
+            </a>
+
+            <p class="toc-category-label">Cómo razona (los algoritmos)</p>
+            <a href="#novedades" class="toc-card">
+                <span class="toc-icon">🆕</span>
+                <span class="toc-title">Novedades (asistente autónomo con IA)</span>
+                <span class="toc-desc">Qué ha cambiado últimamente en el motor y por qué.</span>
+                <span class="toc-badge nivel-basico">Básico</span>
+            </a>
+            <a href="#algoritmos" class="toc-card">
+                <span class="toc-icon">🔬</span>
+                <span class="toc-title">Cómo funcionan nuestros algoritmos</span>
+                <span class="toc-desc">Los 10 "jueces" estadísticos que puntúan cada activo, con fórmulas y ejemplos numéricos.</span>
+                <span class="toc-badge nivel-avanzado">Avanzado</span>
+            </a>
+            <a href="#autoentrenamiento" class="toc-card">
+                <span class="toc-icon">🎯</span>
+                <span class="toc-title">Autoentrenamiento</span>
+                <span class="toc-desc">Cómo (y cuándo, con qué condiciones anti-ruido) el motor aprende de sus propios aciertos y fallos.</span>
+                <span class="toc-badge nivel-intermedio">Intermedio</span>
+            </a>
+            <a href="#motor-sistematico" class="toc-card">
+                <span class="toc-icon">📈</span>
+                <span class="toc-title">El motor sistemático: cartera en papel</span>
+                <span class="toc-desc">La segunda cartera 100% automática que se prueba sin dinero real hasta que supere un examen estadístico.</span>
+                <span class="toc-badge nivel-avanzado">Avanzado</span>
+            </a>
+            <a href="#que-ia-usamos" class="toc-card">
+                <span class="toc-icon">🤖</span>
+                <span class="toc-title">Qué IA usamos y por qué</span>
+                <span class="toc-desc">Gemini, Groq, y los tres candados técnicos que evitan que la IA se invente cosas.</span>
+                <span class="toc-badge nivel-basico">Básico</span>
+            </a>
+            <a href="#glosario" class="toc-card">
+                <span class="toc-icon">📔</span>
+                <span class="toc-title">Glosario completo</span>
+                <span class="toc-desc">Todos los términos técnicos de esta página (Sharpe, PSR, RSI, alpha...) en una sola tabla A-Z.</span>
+                <span class="toc-badge nivel-basico">Básico</span>
+            </a>
+
+            <p class="toc-category-label">Referencia técnica (cómo está montado)</p>
+            <a href="#arquitectura" class="toc-card">
+                <span class="toc-icon">🏗️</span>
+                <span class="toc-title">Arquitectura del Sistema</span>
+                <span class="toc-desc">Diagrama completo de frontend, backend y servicios externos.</span>
+                <span class="toc-badge nivel-tecnico">Técnico</span>
+            </a>
+            <a href="#inicio-rapido" class="toc-card">
+                <span class="toc-icon">⚡</span>
+                <span class="toc-title">Inicio Rápido</span>
+                <span class="toc-desc">Cómo levantar el proyecto en local desde cero.</span>
+                <span class="toc-badge nivel-tecnico">Técnico</span>
+            </a>
+            <a href="#configuracion" class="toc-card">
+                <span class="toc-icon">⚙️</span>
+                <span class="toc-title">Configuración</span>
+                <span class="toc-desc">Variables de entorno y ajustes disponibles.</span>
+                <span class="toc-badge nivel-tecnico">Técnico</span>
+            </a>
+            <a href="#añadir-posiciones" class="toc-card">
+                <span class="toc-icon">➕</span>
+                <span class="toc-title">Añadir Posiciones</span>
+                <span class="toc-desc">Cómo dar de alta un activo o broker nuevo en tu cartera.</span>
+                <span class="toc-badge nivel-tecnico">Técnico</span>
+            </a>
+            <a href="#funcionalidades" class="toc-card">
+                <span class="toc-icon">🧩</span>
+                <span class="toc-title">Funcionalidades</span>
+                <span class="toc-desc">Listado completo de lo que la app puede hacer hoy.</span>
+                <span class="toc-badge nivel-tecnico">Técnico</span>
+            </a>
+            <a href="#api" class="toc-card">
+                <span class="toc-icon">🔌</span>
+                <span class="toc-title">API Reference</span>
+                <span class="toc-desc">Endpoints REST disponibles, para quien quiera consultar los datos crudos.</span>
+                <span class="toc-badge nivel-tecnico">Técnico</span>
+            </a>
+            <a href="#faq" class="toc-card">
+                <span class="toc-icon">❓</span>
+                <span class="toc-title">Preguntas Frecuentes</span>
+                <span class="toc-desc">Dudas comunes sobre seguridad, datos y coste del proyecto.</span>
+                <span class="toc-badge nivel-basico">Básico</span>
+            </a>
+        </div>
     </div>
 
     <!-- ==================== QUÉ ES FINTRACK ==================== -->
@@ -925,6 +1008,44 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
                 <tr><td>Resumir varias noticias y clasificar su sentimiento</td><td>Saber si el mercado subirá o bajará mañana</td></tr>
                 <tr><td>Mantener una conversación con contexto de tu cartera</td><td>Recordar nada de una conversación a otra (cada consulta parte de cero, solo con lo que se le pasa esa vez)</td></tr>
                 <tr><td>Adaptar el tono/idioma a quien lee</td><td>Garantizar que un hecho concreto (una fecha, una cifra) sea 100% exacto sin una fuente de datos real detrás</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ==================== GLOSARIO ==================== -->
+    <section id="glosario">
+        <h2>📔 Glosario completo (de toda esta página, A-Z)</h2>
+        <p>Todos los términos técnicos usados en <em>Cómo funcionan nuestros algoritmos</em>, <em>Autoentrenamiento</em>, <em>El motor sistemático</em> y <em>Qué IA usamos</em>, reunidos en una sola tabla para no tener que buscarlos uno a uno.</p>
+        <table class="data-table">
+            <thead>
+                <tr><th>Término</th><th>Qué significa aquí</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>Alpha</strong></td><td>El retorno de más (o de menos) que obtuvo una recomendación frente a su propio benchmark. Alpha +7% = ganó 7 puntos más que el índice con el que se compara. Ver <a href="#autoentrenamiento">Autoentrenamiento</a>.</td></tr>
+                <tr><td><strong>Bollinger %B</strong></td><td>Indicador técnico que sitúa el precio dentro de su banda de volatilidad reciente (cerca del techo o del suelo). Ver <a href="#algoritmos">algoritmos ③</a>.</td></tr>
+                <tr><td><strong>Convicción</strong></td><td>Etiqueta (alta/media/baja) que acompaña cada recomendación, según lo fuerte que sea su puntuación combinada.</td></tr>
+                <tr><td><strong>Drawdown</strong></td><td>La peor caída porcentual desde el punto más alto alcanzado, no desde que empezaste. Mide el "dolor" máximo real.</td></tr>
+                <tr><td><strong>EWMA (volatilidad)</strong></td><td>Media exponencial que da más peso a los días recientes al calcular el riesgo, para reaccionar antes que una media simple. Ver <a href="#algoritmos">algoritmos ⑤</a>.</td></tr>
+                <tr><td><strong>Gate / semáforo</strong></td><td>El conjunto de condiciones numéricas que hay que cumplir TODAS a la vez antes de confiar en un resultado o pasar a dinero real. Nunca se decide "a ojo".</td></tr>
+                <tr><td><strong>Hit rate</strong></td><td>% de recomendaciones evaluadas que tuvieron retorno (o alpha) positivo. Ver <a href="#autoentrenamiento">Autoentrenamiento</a>.</td></tr>
+                <tr><td><strong>JSON Schema (salida forzada)</strong></td><td>Estructura fija que se le exige a la IA para responder — si se desvía, la respuesta se descarta automáticamente. Ver <a href="#que-ia-usamos">Qué IA usamos</a>.</td></tr>
+                <tr><td><strong>LLM</strong></td><td><em>Large Language Model</em>: el tipo de IA (Gemini, Groq...) que redacta texto a partir de datos que se le pasan, sin "pensar" como un humano.</td></tr>
+                <tr><td><strong>MACD</strong></td><td>Indicador técnico que detecta cambios de tendencia mediante el cruce de dos medias móviles. Ver <a href="#algoritmos">algoritmos ③</a>.</td></tr>
+                <tr><td><strong>Momentum</strong></td><td>La fuerza de una tendencia: lo que ha subido de forma sostenida tiende a seguir subiendo a medio plazo. Ver <a href="#algoritmos">algoritmos ①</a>.</td></tr>
+                <tr><td><strong>Paper trading</strong></td><td>Simular una inversión con precios reales, calculando ganancias y pérdidas reales, pero sin mover ni un euro de verdad. Ver <a href="#motor-sistematico">El motor sistemático</a>.</td></tr>
+                <tr><td><strong>p-valor</strong></td><td>La probabilidad de que un resultado se deba a pura casualidad. Por debajo de 0,10 se considera un indicio razonable de que no es azar. Ver <a href="#autoentrenamiento">Autoentrenamiento</a>.</td></tr>
+                <tr><td><strong>PSR (Probabilistic Sharpe Ratio)</strong></td><td>La confianza (en %) de que un Sharpe medido sea real y no un golpe de suerte, dado cuánto tiempo se ha observado. Ver <a href="#motor-sistematico">El motor sistemático</a>.</td></tr>
+                <tr><td><strong>Régimen de mercado (breadth)</strong></td><td>% de un universo amplio de activos que cotiza por encima de su media de 200 sesiones — mide si el mercado en general está alcista o bajista. Ver <a href="#algoritmos">algoritmos ⑨</a>.</td></tr>
+                <tr><td><strong>Reversión a la media</strong></td><td>La tendencia de un precio muy alejado de su media a "volver" hacia ella. Ver <a href="#algoritmos">algoritmos ⑥</a>.</td></tr>
+                <tr><td><strong>RSI</strong></td><td>Termómetro de 0 a 100 de sobrecompra/sobreventa a corto plazo. Ver <a href="#algoritmos">algoritmos ③</a>.</td></tr>
+                <tr><td><strong>Scorecard</strong></td><td>El "boletín de notas" público del motor: qué habría pasado de verdad con cada recomendación pasada. Consultable en <code>/api/scorecard</code>.</td></tr>
+                <tr><td><strong>Sharpe (ratio)</strong></td><td>Retorno obtenido por cada unidad de riesgo (volatilidad) asumida. &gt;1 bueno, &gt;2 muy bueno. Ver <a href="#algoritmos">algoritmos ②</a>.</td></tr>
+                <tr><td><strong>Sortino (ratio)</strong></td><td>Como el Sharpe, pero solo penaliza la volatilidad a la baja (subir a saltos no se considera "malo"). Ver <a href="#algoritmos">algoritmos ②</a>.</td></tr>
+                <tr><td><strong>Temperatura (de un LLM)</strong></td><td>Parámetro que controla cuánto "improvisa" la IA — cuanto más baja, más ceñida a los datos que se le dan. Ver <a href="#que-ia-usamos">Qué IA usamos</a>.</td></tr>
+                <tr><td><strong>Ticker</strong></td><td>El código corto con el que se identifica un activo en el mercado (p. ej. SOXX, BTC).</td></tr>
+                <tr><td><strong>Valor / Contrarian (tesis)</strong></td><td>La segunda de las dos tesis del motor: activos castigados pero de calidad (baratos y sanos), frente al MOMENTUM.</td></tr>
+                <tr><td><strong>Volatilidad anualizada</strong></td><td>Cuánto oscila el precio de un activo, expresado en términos de un año. Ver <a href="#algoritmos">algoritmos ②</a>.</td></tr>
+                <tr><td><strong>Z-score (winsorizado)</strong></td><td>Cuántas desviaciones típicas se aparta un valor de la media de todo el universo comparado ese día, recortado a ±3 para evitar que un dato extremo distorsione el ranking. Ver <a href="#algoritmos">algoritmos ⑦</a>.</td></tr>
             </tbody>
         </table>
     </section>
@@ -1603,7 +1724,7 @@ function initNavigation() {
 
 // Anchors that live inside the (dynamically injected) docs / learn pages.
 const DOCS_ANCHORS = new Set(['que-es', 'guia-uso', 'el-cerebro', 'novedades', 'algoritmos',
-    'autoentrenamiento', 'motor-sistematico', 'que-ia-usamos',
+    'autoentrenamiento', 'motor-sistematico', 'que-ia-usamos', 'glosario',
     'arquitectura', 'inicio-rapido', 'configuracion', 'añadir-posiciones', 'funcionalidades', 'api', 'faq']);
 const LEARN_ANCHORS = new Set(['conceptos-basicos', 'tipos-activos', 'metricas', 'estrategias', 'riesgos', 'fiscalidad', 'corto-plazo']);
 
