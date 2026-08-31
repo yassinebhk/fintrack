@@ -10,7 +10,7 @@ async function loadLearnPage(targetPage) {
     if (targetPage.dataset.loaded === 'true') return;
     
     try {
-        const response = await fetch('pages/learn.html?v=20260831a', { cache: 'no-store' });
+        const response = await fetch('pages/learn.html?v=20260831b', { cache: 'no-store' });
         if (response.ok) {
             targetPage.innerHTML = await response.text();
             targetPage.dataset.loaded = 'true';
@@ -1726,7 +1726,7 @@ function initNavigation() {
 const DOCS_ANCHORS = new Set(['que-es', 'guia-uso', 'el-cerebro', 'novedades', 'algoritmos',
     'autoentrenamiento', 'motor-sistematico', 'que-ia-usamos', 'glosario',
     'arquitectura', 'inicio-rapido', 'configuracion', 'añadir-posiciones', 'funcionalidades', 'api', 'faq']);
-const LEARN_ANCHORS = new Set(['conceptos-basicos', 'tipos-activos', 'metricas', 'estrategias', 'riesgos', 'fiscalidad', 'corto-plazo', 'dividendos', 'divisas']);
+const LEARN_ANCHORS = new Set(['conceptos-basicos', 'tipos-activos', 'metricas', 'estrategias', 'riesgos', 'fiscalidad', 'corto-plazo', 'dividendos', 'divisas', 'otros-conceptos']);
 
 function navigateFromHash() {
     const raw = decodeURIComponent((location.hash || '').replace(/^#/, '')).trim();
