@@ -292,6 +292,17 @@ async def _systematic_mark_job() -> None:
         logger.error("systematic mark job failed: {}", exc)
 
 
+async def _day_trading_mark_job() -> None:
+    """Daily: close any open paper day-trade whose stop-loss, take-profit, or max
+    hold time was hit."""
+    try:
+        from app.services.daytrading import journal
+        res = await journal.mark_open_trades()
+        logger.info("day trading daily mark: {}", res)
+    except Exception as exc:
+        logger.error("day trading mark job failed: {}", exc)
+
+
 async def _ipo_spacex_reminder() -> None:
     """One-off heads-up around the SpaceX IPO (12-Jun-2026): how the user's space
     ETF (JEDI) is moving, plus a 'sell the news' caution. Fires on 11 and 12 Jun."""
@@ -470,6 +481,15 @@ def setup_jobs() -> None:
         replace_existing=True, max_instances=1, coalesce=True,
     )
     logger.info("scheduled: systematic rebalance (Mon 07:30) + daily mark (22:30) {}", settings.timezone)
+
+    sched.add_job(
+        _day_trading_mark_job,
+        trigger=CronTrigger(hour=22, minute=15, timezone=settings.timezone),
+        id="day_trading_mark",
+        name="Day trading paper journal daily mark",
+        replace_existing=True, max_instances=1, coalesce=True,
+    )
+    logger.info("scheduled: day trading paper journal daily mark (22:15) {}", settings.timezone)
 
 
 def start_scheduler() -> None:

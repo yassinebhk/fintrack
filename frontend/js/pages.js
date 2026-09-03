@@ -456,6 +456,12 @@ const pageContent = {
                 <span class="toc-desc">Gemini, Groq, y los tres candados técnicos que evitan que la IA se invente cosas.</span>
                 <span class="toc-badge nivel-basico">Básico</span>
             </a>
+            <a href="#trading-diario" class="toc-card">
+                <span class="toc-icon">📓</span>
+                <span class="toc-title">Trading Diario (papel)</span>
+                <span class="toc-desc">El laboratorio de trading discrecional en papel, con tesis y stop-loss obligatorios.</span>
+                <span class="toc-badge nivel-avanzado">Avanzado</span>
+            </a>
             <a href="#glosario" class="toc-card">
                 <span class="toc-icon">📔</span>
                 <span class="toc-title">Glosario completo</span>
@@ -1010,6 +1016,46 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
                 <tr><td>Adaptar el tono/idioma a quien lee</td><td>Garantizar que un hecho concreto (una fecha, una cifra) sea 100% exacto sin una fuente de datos real detrás</td></tr>
             </tbody>
         </table>
+    </section>
+
+    <!-- ==================== TRADING DIARIO ==================== -->
+    <section id="trading-diario">
+        <h2>📓 Trading Diario: el laboratorio de trading en papel</h2>
+        <p>Tras la sección de <a href="#" onclick="document.querySelector('[data-page=learn]').click(); return false;">Corto Plazo</a> de Aprender, este es el sitio para comprobarlo con datos reales, no solo leerlo: un diario de operaciones <strong>100% en papel</strong> (sin dinero real) donde cada operación exige una <strong>tesis escrita</strong> y un <strong>stop-loss</strong> antes de abrirse.</p>
+
+        <h3>La puerta anti-ruido</h3>
+        <p>Igual que el <a href="#motor-sistematico">motor sistemático</a> y el <a href="#autoentrenamiento">autoentrenamiento</a>, el veredicto de "esto funciona" no aparece con 2 o 3 operaciones con suerte — exige las cuatro condiciones a la vez:</p>
+        <div class="formula-box">
+            <ol style="text-align:left;">
+                <li>Al menos <strong>30 operaciones cerradas</strong> — muestra mínima, la misma que usa el resto de la app.</li>
+                <li>Al menos <strong>60 días</strong> de histórico entre la primera y la última.</li>
+                <li>El resultado medio debe <strong>batir al benchmark</strong> pasivo (el mismo MSCI World de referencia).</li>
+                <li>El resultado debe ser <strong>estadísticamente significativo</strong> (p-valor &lt; 0,10, test-t contra cero, igual que el scorecard).</li>
+            </ol>
+        </div>
+        <p>Mientras falte cualquiera, la propia página se etiqueta <strong>"NO apto — sigue en papel"</strong>, con el contador exacto de operaciones y días que faltan.</p>
+
+        <h3>Ejemplo: un cierre automático por stop-loss</h3>
+        <div class="example-box">
+            <h4>Compras (en papel) 100€ de una acción a 50€, con stop-loss al 4%</h4>
+            <p>Stop-loss = 50€ × (1 − 0,04) = <strong>48€</strong>. Cada noche, un proceso automático revisa el precio real de cierre. Si baja a 48€ o menos, la operación se cierra sola con motivo <em>stop_loss</em> y P&amp;L = −4% — nadie decide "aguantar a ver si rebota" en caliente, la regla ya estaba puesta antes de saber el resultado.</p>
+        </div>
+
+        <h3>❓ Preguntas frecuentes</h3>
+        <div class="faq-list">
+            <div class="faq-item">
+                <p class="faq-q">¿Por qué exige una tesis escrita para abrir una operación?</p>
+                <p>Porque sin ella es imposible distinguir después si acertaste por una razón real o por casualidad — y porque escribirla ANTES obliga a pensar el "por qué" antes de dejarse llevar por el impulso, justo lo que enseña la sección de Corto Plazo de Aprender.</p>
+            </div>
+            <div class="faq-item">
+                <p class="faq-q">¿Revisa los precios en tiempo real durante el día?</p>
+                <p>No — por las limitaciones del hosting gratuito donde corre la app, la revisión de stop-loss/take-profit es <strong>una vez al día</strong>, al cierre del mercado americano. Hay un botón "comprobar ahora" para revisiones puntuales, pero no es vigilancia intradía.</p>
+            </div>
+            <div class="faq-item">
+                <p class="faq-q">¿En algún momento mueve dinero real?</p>
+                <p>Nunca de forma automática. Aunque el veredicto pase a "apto", la decisión de arriesgar dinero real sigue siendo tuya y manual, exactamente igual que en el motor sistemático.</p>
+            </div>
+        </div>
     </section>
 
     <!-- ==================== GLOSARIO ==================== -->
@@ -1675,6 +1721,7 @@ function initNavigation() {
                 'opportunities': 'Oportunidades',
                 'backtest': 'Backtest',
                 'polymarket': 'Polymarket Lab',
+                'daytrading': 'Trading Diario',
                 'learn': 'Aprender',
                 'docs': 'Documentación'
             };
@@ -1701,6 +1748,9 @@ function initNavigation() {
             if (pageName === 'analysis' && window.initAssetAnalysis) {
                 window.initAssetAnalysis();
             }
+            if (pageName === 'daytrading' && window.renderDayTrading) {
+                window.renderDayTrading();
+            }
             
             // Close sidebar on mobile
             if (window.innerWidth <= 900) {
@@ -1724,7 +1774,7 @@ function initNavigation() {
 
 // Anchors that live inside the (dynamically injected) docs / learn pages.
 const DOCS_ANCHORS = new Set(['que-es', 'guia-uso', 'el-cerebro', 'novedades', 'algoritmos',
-    'autoentrenamiento', 'motor-sistematico', 'que-ia-usamos', 'glosario',
+    'autoentrenamiento', 'motor-sistematico', 'que-ia-usamos', 'trading-diario', 'glosario',
     'arquitectura', 'inicio-rapido', 'configuracion', 'añadir-posiciones', 'funcionalidades', 'api', 'faq']);
 const LEARN_ANCHORS = new Set(['conceptos-basicos', 'tipos-activos', 'metricas', 'estrategias', 'riesgos', 'fiscalidad', 'corto-plazo', 'dividendos', 'divisas', 'otros-conceptos', 'macro-noticias']);
 

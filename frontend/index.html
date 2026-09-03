@@ -73,6 +73,10 @@
                     <span class="nav-icon">🎲</span>
                     <span class="nav-label">Polymarket Lab</span>
                 </li>
+                <li class="nav-item" data-page="daytrading">
+                    <span class="nav-icon">📓</span>
+                    <span class="nav-label">Trading Diario</span>
+                </li>
                 <li class="nav-item" data-page="learn">
                     <span class="nav-icon">📚</span>
                     <span class="nav-label">Aprender</span>
@@ -1586,6 +1590,131 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                     </div>
                 </div>
 
+                <!-- Day Trading Lab Page -->
+                <div class="page page-daytrading" id="page-daytrading">
+                    <section class="manager-header">
+                        <div>
+                            <h2>📓 Trading Diario <span style="font-size:12px; background:var(--warning); color:#000; padding:2px 8px; border-radius:10px; vertical-align:middle;">PAPEL</span></h2>
+                            <p>Diario de operaciones discrecionales en papel — sin dinero real, con tesis y stop-loss obligatorios</p>
+                        </div>
+                    </section>
+
+                    <div class="integrations-banner-inner" style="margin-bottom:16px;">
+                        <div class="integrations-banner-icon">⚠️</div>
+                        <div class="integrations-banner-body">
+                            <strong>100% papel, sin dinero real.</strong>
+                            <p style="margin:6px 0 0;">Esto existe para comprobar, con datos reales y durante meses, si el trading diario informado te da resultado antes de arriesgar nada. Cada operación exige una tesis escrita (mín. 20 caracteres) y un stop-loss — sin eso, no se abre. El veredicto de si "funciona" solo se emite con al menos 30 operaciones cerradas y 60 días de histórico; antes de eso, cualquier resultado es ruido y se etiqueta como tal.</p>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-bottom:16px;">
+                        <div class="card-header">
+                            <h3>Nueva operación</h3>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Ticker</label>
+                                <input type="text" id="dtTicker" placeholder="p.ej. AAPL, MU, BTC">
+                            </div>
+                            <div class="form-group">
+                                <label>Dirección</label>
+                                <select id="dtDirection">
+                                    <option value="long">Long (sube)</option>
+                                    <option value="short">Short (baja)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Cantidad en papel (€)</label>
+                                <input type="number" id="dtStake" placeholder="100">
+                            </div>
+                            <div class="form-group">
+                                <label>Convicción</label>
+                                <select id="dtConviction">
+                                    <option value="baja">Baja</option>
+                                    <option value="media" selected>Media</option>
+                                    <option value="alta">Alta</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Stop-loss % (obligatorio)</label>
+                                <input type="number" id="dtStopLoss" placeholder="3">
+                            </div>
+                            <div class="form-group">
+                                <label>Take-profit % (opcional)</label>
+                                <input type="number" id="dtTakeProfit" placeholder="6">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <button class="btn-secondary" onclick="dtLoadNews()" id="dtNewsBtn" type="button">📰 Ver noticias reales de este ticker</button>
+                            <div id="dtNewsResult" style="margin-top:8px;"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Tesis (mín. 20 caracteres — por qué entras, ANTES de saber el resultado)</label>
+                            <textarea id="dtThesis" rows="3" placeholder="Ej: sube tras batir expectativas de beneficio y subir el guidance del próximo trimestre..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>URL de la noticia que respalda la tesis (opcional pero recomendado)</label>
+                            <input type="text" id="dtNewsUrl" placeholder="https://...">
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn-primary" onclick="dtOpenTrade()" id="dtSubmitBtn">Abrir operación en papel</button>
+                        </div>
+                        <div id="dtFormMsg" style="margin-top:8px;"></div>
+                    </div>
+
+                    <div class="card" style="margin-bottom:16px;">
+                        <div class="card-header">
+                            <h3>Operaciones abiertas</h3>
+                            <button class="btn-secondary" onclick="dtRefresh()">🔄 Actualizar</button>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="manager-table">
+                                <thead>
+                                    <tr>
+                                        <th>Ticker</th><th>Dir.</th><th class="text-right">Entrada</th>
+                                        <th class="text-right">Actual</th><th class="text-right">P/L no realizado</th>
+                                        <th class="text-right">Stop-loss</th><th>Abierta</th><th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dtOpenBody">
+                                    <tr><td colspan="8" class="text-center text-muted">Cargando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-bottom:16px;">
+                        <div class="card-header">
+                            <h3>Historial</h3>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="manager-table">
+                                <thead>
+                                    <tr>
+                                        <th>Ticker</th><th>Dir.</th><th class="text-right">Entrada</th>
+                                        <th class="text-right">Salida</th><th class="text-right">P/L</th>
+                                        <th>Motivo cierre</th><th>Cerrada</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dtClosedBody">
+                                    <tr><td colspan="7" class="text-center text-muted">Cargando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card" id="dtReportCard">
+                        <div class="card-header">
+                            <h3>Veredicto</h3>
+                        </div>
+                        <div id="dtReportBody"><p class="text-muted">Cargando...</p></div>
+                    </div>
+                </div>
+
                 <!-- News Page -->
                 <div class="page page-news" id="page-news">
                     <section class="news-header">
@@ -1642,6 +1771,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/transactions.js?v=20260824c"></script>
     <script src="js/position-review.js?v=20260530a"></script>
     <script src="js/polymarket.js?v=20260530a"></script>
-    <script src="js/pages.js?v=20260831c"></script>
+    <script src="js/daytrading.js?v=20260903a"></script>
+    <script src="js/pages.js?v=20260903a"></script>
 </body>
 </html>
