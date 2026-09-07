@@ -15,6 +15,7 @@ Set DRY_RUN=1 to print the message without sending.
 import json
 import os
 import re
+import time
 import urllib.request
 import urllib.parse
 import datetime
@@ -78,13 +79,29 @@ def short(ticker, name):
     return nm.replace("&", "y")[:10]
 
 
+def name_cell(x, width):
+    """Name truncated to `width`; stale (non-live) values get a trailing ≈
+    without breaking column alignment."""
+    s = short(x["ticker"], x["name"])
+    return (s[:width - 1] + "≈") if x.get("stale") else s[:width]
+
+
 def esc(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _get(url):
-    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=TIMEOUT) as r:
-        return json.loads(r.read().decode())
+def _get(url, tries=3):
+    """GET+JSON with a small retry — Yahoo/Coingecko fail transiently, and a
+    silent fallback to a stale value is worse than a 1.5s wait."""
+    last = None
+    for i in range(tries):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=TIMEOUT) as r:
+                return json.loads(r.read().decode())
+        except Exception as e:
+            last = e
+            time.sleep(1.5 * (i + 1))
+    raise last
 
 
 def yahoo_full(symbol):
@@ -96,6 +113,7 @@ def yahoo_full(symbol):
     the pre-range close (~3 months ago), which would turn the 'day change' into a
     quarter's move. The prior session is closes[-2] instead."""
     try:
+        time.sleep(0.3)  # gentle throttle: ~16 symbols in a burst can trip Yahoo's rate limit
         d = _get(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}?interval=1d&range=3mo")
         res = d["chart"]["result"][0]
         meta = res["meta"]
@@ -176,16 +194,13 @@ def main():
                     prev = last
                 ep, epv = fx(price, c), fx(prev, c)
                 if ep is not None:
-                    cand = qty * ep
-                    if snap > 0 and (cand > snap * 4 or cand < snap / 4):
-                        mv = snap  # corrupt qty/price (known cost bug) → last known, flat
-                    else:
-                        mv, day_eur, dp = cand, qty * (ep - epv), (price / prev - 1) * 100
-                        closes = [x for x in cl]
-        if mv is None:
-            mv = snap  # no live feed → last known, flat
+                    mv, day_eur, dp = qty * ep, qty * (ep - epv), (price / prev - 1) * 100
+                    closes = [x for x in cl]
+        stale = mv is None  # live price unavailable → fall back to last known, and flag it
+        if stale:
+            mv = snap
         enriched.append({
-            "ticker": ticker, "name": name, "kind": kind, "sym": sym,
+            "ticker": ticker, "name": name, "kind": kind, "sym": sym, "stale": stale,
             "mv": mv, "cost": cost, "day": day_eur, "dp": dp, "closes": closes,
             "glpct": (mv - cost) / cost * 100 if cost > 0 else 0.0,
         })
@@ -211,7 +226,7 @@ def main():
     Wd = 26
     hoy = [f"{'HOY':<10}{'€':>8}{'%':>8}", "─" * Wd]
     for x in rows:
-        nm = short(x['ticker'], x['name'])[:10]
+        nm = name_cell(x, 10)
         de, dp = x["day"], x["dp"]
         hoy.append(f"{nm:<10}{f'{de:+.2f}€':>8}{f'{dp:+.1f}%':>8}")
     hoy.append("─" * Wd)
@@ -221,7 +236,7 @@ def main():
     acum = [f"{'ACUMUL':<8}{'PUESTO':>6}{'AHORA':>6}{'P/L€':>7}{'P/L%':>6}", "─" * Wa]
     for x in rows:
         pv, nv, gl = x["cost"], x["mv"], x["glpct"]
-        nm8 = short(x['ticker'], x['name'])[:8]
+        nm8 = name_cell(x, 8)
         acum.append(f"{nm8:<8}{f'{pv:.0f}€':>6}{f'{nv:.0f}€':>6}{f'{nv-pv:+.1f}€':>7}{f'{gl:+.0f}%':>6}")
     acum.append("─" * Wa)
     acum.append(f"{'TOTAL':<8}{f'{cost:.0f}€':>6}{f'{total:.0f}€':>6}{f'{pl:+.1f}€':>7}{f'{pl_pct:+.0f}%':>6}")
@@ -267,6 +282,9 @@ def main():
         msg += "\n⚖️ <b>REPARTO</b> (objetivo vs real)\n<pre>" + esc("\n".join(rep)) + "</pre>"
         msg += f"\n<i>{esc(hint + '. ' + tail if hint else tail)}</i>"
 
+    stale_shown = [short(x["ticker"], x["name"]) for x in rows if x.get("stale")]
+    if stale_shown:
+        msg += f"\n<i>≈ último dato conocido (Yahoo sin precio hoy): {', '.join(stale_shown)}</i>"
     msg += f"\n<i>excl.: {', '.join(sorted(EXCLUDED))}</i>"
     msg += "\n📌 <i>Resumen diario</i>"
 
