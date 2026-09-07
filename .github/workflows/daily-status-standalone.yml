@@ -1,0 +1,33 @@
+name: daily-status-standalone
+
+# Sends the daily portfolio table to Telegram, computed from LIVE prices
+# (Yahoo/Coingecko) against an embedded positions snapshot. Depends on NOTHING
+# in the backend, Render, or Neon — so it keeps working during an outage, unlike:
+#   - daily-summary.yml            (needs the Render backend up)
+#   - daily-summary-direct-stopgap (needs the Neon DB up)
+# Single cron (the script is not idempotent, so avoid redundant sends); use the
+# manual "Run workflow" button if a scheduled run is skipped/delayed by GitHub.
+#
+# Required GitHub Secrets (already used by daily-summary-direct-stopgap.yml):
+#   TELEGRAM_BOT_TOKEN
+#   TELEGRAM_CHAT_ID
+
+on:
+  schedule:
+    - cron: "15 6 * * 1-5"   # ≈ 08:15 Europe/Madrid (07:15 in winter), Mon–Fri
+  workflow_dispatch: {}
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Send daily portfolio status to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python tools/daily_status.py
