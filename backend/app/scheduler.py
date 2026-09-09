@@ -142,40 +142,6 @@ async def _creators_job() -> None:
         logger.error("creators job failed: {}", exc)
 
 
-async def _keepalive_job() -> None:
-    """Ping our OWN public URL so Render's free tier keeps the dyno awake.
-
-    Render's free web service sleeps after ~15 min without an INBOUND HTTP request.
-    Internal APScheduler jobs do NOT reset that idle timer, so cron jobs would never
-    fire on a slept dyno. Pinging our public URL every 10 min arrives as inbound
-    traffic and keeps the box awake, so all cron jobs fire reliably.
-
-    Only runs 06:00-23:00 (settings.timezone): staying awake 24/7 burns through
-    Render's free 750h/month quota mid-cycle and gets the whole service suspended
-    (happened 2026-07-25). Letting the dyno sleep overnight keeps monthly usage
-    around ~510h, covering every scheduled job (earliest 06:30, latest 22:30).
-    No-ops in local/dev where RENDER_EXTERNAL_URL isn't set."""
-    import os
-
-    settings = get_settings()
-    now = datetime.now(tz=ZoneInfo(settings.timezone))
-    if not (6 <= now.hour < 23):
-        return
-
-    url = os.getenv("RENDER_EXTERNAL_URL")
-    if not url:
-        host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
-        url = f"https://{host}" if host else None
-    if not url:
-        return
-    try:
-        import httpx
-
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            r = await client.get(f"{url.rstrip('/')}/api/health")
-        logger.debug("keepalive self-ping -> {}", r.status_code)
-    except Exception as exc:  # never let a transient ping error crash the scheduler
-        logger.debug("keepalive self-ping failed: {}", exc)
 
 
 async def _alerts_job() -> None:
@@ -340,19 +306,6 @@ def get_scheduler() -> AsyncIOScheduler:
 def setup_jobs() -> None:
     settings = get_settings()
     sched = get_scheduler()
-
-    # Keep-alive self-ping (Render free tier) — must run unconditionally and first,
-    # because every other scheduled job depends on the dyno being awake.
-    sched.add_job(
-        _keepalive_job,
-        trigger=IntervalTrigger(minutes=10),
-        id="keepalive_self_ping",
-        name="Keep Render dyno awake (self-ping /api/health)",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    logger.info("scheduled: keepalive_self_ping every 10 min")
 
     if settings.has_kraken:
         sched.add_job(
