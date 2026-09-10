@@ -72,5 +72,24 @@ Open caveats that keep it PAPER-ONLY:
 - **Small edge** (~0.31pp/event over baseline) — fragile to real costs beyond the
   haircut.
 
-**Next step:** promote to the live paper engine (size via the systematic pipeline,
-gated by PSR) and/or run the block-bootstrap re-test. No real money.
+### Robustness re-test — 2026-09-10 (overlapping-window correction)
+
+The naive n=415 CI assumes independent observations, but down-days cluster and the
+3-5d windows overlap. Two corrections:
+
+| test | result | reading |
+|---|---|---|
+| **Non-overlapping events** (≥5d apart, n=193, truly independent) | mean +0.537%, 95% CI **[−0.015%, +1.089%]**, baseline +0.466% | absolute return's CI **touches zero**; edge over baseline only ~0.07pp |
+| **Moving-block bootstrap** on the edge (cond − baseline, block=20) | edge **+0.307%**, 95% CI [+0.026%, +0.599%], **P(edge≤0)=1.7%** | the *relative* edge is statistically real even with autocorrelation |
+
+**Resolved status: UNPROVEN → SHELVED (paper-only, not wired live).** The two tests
+tell a consistent, humbling story: conditioning on a Nasdaq down-day adds a small,
+statistically detectable *relative* edge (~0.3pp vs always-in), **but the absolute
+forward return is not reliably positive** once windows are independent, and the
+whole effect lives in a single 2020-26 semis bull regime. ~0.3pp before real
+frictions is not tradeable. The naive [+0.33%, +1.08%] CI was the false-positive
+trap — overlap, not edge, did most of the work.
+
+**Kept as the reference example** of why the block-bootstrap / non-overlap step is
+mandatory before any hypothesis here graduates. To revive H1 it must clear a
+bear-inclusive sample AND a materially larger edge — as a NEW dated entry.

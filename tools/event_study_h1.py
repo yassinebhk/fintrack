@@ -96,6 +96,82 @@ def fwd_returns(series, entry_dates):
     return out
 
 
+# --- robustness: correct for OVERLAPPING / clustered windows ------------------
+# Consecutive events share forward days, so the 415 observations are NOT
+# independent → the naive 95% CI is too tight. Two honest corrections:
+
+def _per_day_fwd(series):
+    """Forward 3-5d net return for EVERY index in the series (None near the end)."""
+    dates = [d for d, _ in series]
+    px = {d: c for d, c in series}
+    out = []
+    for i in range(len(dates)):
+        if i + max(HORIZONS) >= len(dates):
+            out.append(None)
+            continue
+        rs = [px[dates[i + h]] / px[dates[i]] - 1 for h in HORIZONS]
+        out.append(sum(rs) / len(rs) - HAIRCUT)
+    return out
+
+
+def non_overlapping(series, entry_dates):
+    """Greedily keep only events ≥ max-horizon apart → independent windows."""
+    idx = {d: i for i, (d, _) in enumerate(series)}
+    fwd = _per_day_fwd(series)
+    ei = sorted(idx[d] for d in entry_dates if d in idx)
+    chosen, last = [], -10 ** 9
+    for i in ei:
+        if fwd[i] is not None and i - last >= max(HORIZONS):
+            chosen.append(fwd[i])
+            last = i
+    # baseline sampled the same way (every max-horizon-th valid day)
+    base, i = [], 0
+    while i < len(fwd):
+        if fwd[i] is not None:
+            base.append(fwd[i])
+            i += max(HORIZONS)
+        else:
+            i += 1
+    return chosen, base
+
+
+def block_bootstrap_edge(series, entry_dates, block=20, iters=3000, seed=1234):
+    """Moving-block bootstrap on the edge = mean(fwd|signal) − mean(fwd|all).
+    Blocks of consecutive (fwd, is_signal) pairs preserve BOTH the overlap
+    autocorrelation and the clustering of down-days → an honest CI on the edge."""
+    import random
+    rnd = random.Random(seed)
+    idx = {d: i for i, (d, _) in enumerate(series)}
+    sig = {idx[d] for d in entry_dates if d in idx}
+    fwd = _per_day_fwd(series)
+    pairs = [(fwd[i], i in sig) for i in range(len(fwd)) if fwd[i] is not None]
+    n = len(pairs)
+
+    def edge(sample):
+        cond = [x for x, s in sample if s]
+        allx = [x for x, _ in sample]
+        if not cond or not allx:
+            return None
+        return sum(cond) / len(cond) - sum(allx) / len(allx)
+
+    obs = edge(pairs)
+    dist = []
+    nblk = n // block + 1
+    for _ in range(iters):
+        samp = []
+        for _ in range(nblk):
+            start = rnd.randrange(n)
+            samp.extend(pairs[(start + k) % n] for k in range(block))
+        e = edge(samp[:n])
+        if e is not None:
+            dist.append(e)
+    dist.sort()
+    lo = dist[int(0.025 * len(dist))]
+    hi = dist[int(0.975 * len(dist))]
+    p_le0 = sum(1 for e in dist if e <= 0) / len(dist)
+    return obs, lo, hi, p_le0, n
+
+
 def main():
     print("H1 event study — semis rebound after a Nasdaq down-day\n" + "=" * 55)
     ndx = fetch(NDX, years=10)
@@ -150,12 +226,32 @@ def main():
     print(f"  4) beats unconditional baseline .... {'PASS' if c4 else 'FAIL'}")
 
     verdict = all([c1, c2, c3, c4])
+
+    # --- ROBUSTNESS: does the edge survive the overlapping-window correction? ---
+    no_ev, no_base = non_overlapping(semis, entries)
+    nm, nlo, nhi = mean_ci(no_ev)
+    nbm = sum(no_base) / len(no_base)
+    obs, blo, bhi, p_le0, nn = block_bootstrap_edge(semis, entries)
+    print("\nROBUSTNESS — correcting for overlapping/clustered windows:")
+    print(f"  Non-overlapping events: n={len(no_ev)}  mean {nm:+.3%}  "
+          f"95% CI [{nlo:+.3%}, {nhi:+.3%}]  vs baseline {nbm:+.3%}")
+    print(f"  Block-bootstrap edge (cond − baseline): {obs:+.3%}  "
+          f"95% CI [{blo:+.3%}, {bhi:+.3%}]  P(edge≤0)={p_le0:.1%}")
+    robust = (nlo > 0) and (blo > 0)
+    print("  → edge " + ("SURVIVES the independence correction."
+                         if robust else "does NOT survive — naive CI overstated it."))
+
     print("\n" + "=" * 55)
-    print("VERDICT: " + ("H1 SURVIVES — candidate for the engine (still paper-only, "
-                         "size via the systematic pipeline)."
-                         if verdict else
-                         "H1 REJECTED — do NOT trade it. Per the kill rule, no "
-                         "re-slicing horizon/threshold/proxy to force a pass."))
+    if verdict and robust:
+        print("VERDICT: H1 SURVIVES pre-reg AND the overlap correction — promote to "
+              "the LIVE paper engine (size via the pipeline, PSR gate). Still no real money.")
+    elif verdict and not robust:
+        print("VERDICT: H1 passes the pre-reg criteria but the edge does NOT survive the "
+              "overlap correction → treat as UNPROVEN, keep paper-only. The naive CI was "
+              "the false-positive trap.")
+    else:
+        print("VERDICT: H1 REJECTED — do NOT trade it. Per the kill rule, no "
+              "re-slicing horizon/threshold/proxy to force a pass.")
 
 
 if __name__ == "__main__":
