@@ -11,6 +11,9 @@ from __future__ import annotations
 MAX_WEIGHT_PER_NAME = 0.25       # no single position above 25%
 MAX_CRYPTO_SLEEVE = 0.20         # crypto, combined, capped at 20%
 MAX_THEME_SLEEVE = 0.60          # thematic/sector bets combined capped at 60%
+MAX_SINGLE_STOCK_SLEEVE = 0.40   # all individual stocks combined ≤ 40% — single-name
+                                 # (idiosyncratic) risk is real, so cap the sleeve even
+                                 # though inverse-vol sizing already down-weights each
 DRAWDOWN_CIRCUIT_BREAKER = -0.18  # if paper NAV is >18% below its peak → go to cash
 
 
@@ -37,9 +40,23 @@ def cap_sleeve(weights: dict[str, float], meta: dict[str, dict],
 
 
 def apply_gates(weights: dict[str, float], meta: dict[str, dict]) -> dict[str, float]:
-    """Apply sleeve caps (crypto, thematic). Per-name cap is handled in sizing."""
-    w = cap_sleeve(weights, meta, "crypto", MAX_CRYPTO_SLEEVE)
-    w = cap_sleeve(w, meta, "equity_theme", MAX_THEME_SLEEVE)
+    """Apply sleeve caps (crypto, thematic, single stocks). Per-name cap is handled
+    in sizing.
+
+    Capping one sleeve redistributes its excess to the others, which can push a
+    previously-capped sleeve back over its limit — so we iterate to convergence
+    (always possible: the uncapped classes — broad/commodity/bond — absorb the
+    overflow). Without this, a gate can silently violate its own cap."""
+    caps = {"crypto": MAX_CRYPTO_SLEEVE, "equity_theme": MAX_THEME_SLEEVE,
+            "equity_single": MAX_SINGLE_STOCK_SLEEVE}
+    w = dict(weights)
+    for _ in range(8):
+        for cls, cap in caps.items():
+            w = cap_sleeve(w, meta, cls, cap)
+        tot = sum(w.values()) or 1.0
+        if all(sum(w[t] for t in w if meta.get(t, {}).get("asset_class") == cls) / tot
+               <= cap + 1e-6 for cls, cap in caps.items()):
+            break
     total = sum(w.values()) or 1.0
     return {t: round(x / total, 4) for t, x in w.items()}
 
