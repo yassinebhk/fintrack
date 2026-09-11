@@ -608,6 +608,21 @@ class OpportunityService:
             opp["risk"] = risk
             opp["expectancy"] = _expectancy_view(by_approach.get(opp.get("approach")))
             opp["horizon"] = _HORIZON_BY_APPROACH.get(opp.get("approach"), "3–6 meses")
+            # Fundamentals (stocks only) — the raw ratios that justify "buena acción".
+            fund = t.get("fundamentals")
+            if fund:
+                opp["fundamentals"] = {
+                    "sector": fund.get("sector"),
+                    "per": fund.get("trailingPE"),
+                    "pb": fund.get("priceToBook"),
+                    "roe": fund.get("returnOnEquity"),
+                    "margin": fund.get("operatingMargins"),
+                    "rev_growth": fund.get("revenueGrowth"),
+                    "earn_growth": fund.get("earningsGrowth"),
+                    "debt_to_equity": fund.get("debtToEquity"),
+                    "div_yield": fund.get("dividendYield"),
+                }
+                opp["fundamental_score"] = t.get("fundamental_score")
 
         def attach_news(opp: dict) -> None:
             refs = []

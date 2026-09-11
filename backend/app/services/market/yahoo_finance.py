@@ -57,6 +57,41 @@ class YahooFinanceService:
             logger.debug("ticker mapping DB lookup failed for {}: {}", ticker, exc)
         return HARDCODED_FALLBACK.get(ticker, ticker)
 
+    FUNDAMENTAL_FIELDS = (
+        "trailingPE", "forwardPE", "priceToBook", "pegRatio",
+        "returnOnEquity", "returnOnAssets", "operatingMargins", "profitMargins",
+        "freeCashflow", "revenueGrowth", "earningsGrowth",
+        "debtToEquity", "currentRatio", "dividendYield", "marketCap",
+        "sector", "industry",
+    )
+
+    async def get_fundamentals(self, ticker: str) -> dict | None:
+        """Fundamental ratios for a STOCK via yfinance `.get_info()`. Best-effort:
+        returns the fields present (partial for banks/REITs — they lack FCF /
+        currentRatio, etc.), or None for non-equities and failures. Network-heavy
+        and slow — meant for the daily GitHub-Actions universe scan, NOT the request
+        hot path. Cached 12h (fundamentals barely move intraday)."""
+        key = f"fund:{ticker.upper()}"
+        if self._fresh(key):
+            return self._cache.get(key)
+
+        def _work() -> dict | None:
+            try:
+                info = yf.Ticker(ticker).get_info()
+            except Exception as exc:
+                logger.debug("fundamentals for {} failed: {}", ticker, exc)
+                return None
+            if not info or info.get("quoteType") != "EQUITY":
+                return None
+            out = {f: info.get(f) for f in self.FUNDAMENTAL_FIELDS if info.get(f) is not None}
+            return out or None
+
+        loop = asyncio.get_event_loop()
+        res = await loop.run_in_executor(self._executor, _work)
+        self._cache[key] = res
+        self._expiry[key] = datetime.now() + timedelta(hours=12)
+        return res
+
     async def _fetch_api(self, ticker: str) -> dict | None:
         mapped = await self._resolve_ticker(ticker)
         url = f"{self.BASE_URL}/v8/finance/chart/{mapped}"

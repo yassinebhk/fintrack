@@ -140,6 +140,11 @@ const CRITERION_LABEL = {
     reversion: 'Reversión a la media',
     sobreventa: 'Sobreventa (RSI)',
     calidad: 'Calidad (Sharpe)',
+    // Fundamentales (solo acciones)
+    calidad_fund: 'Calidad (ROE/márgenes)',
+    crecimiento: 'Crecimiento (ventas/BPA)',
+    valoracion_fund: 'Valoración (PER/PB, sector)',
+    solidez: 'Solidez (deuda)',
 };
 
 function assetLinks(op) {
@@ -193,6 +198,25 @@ function renderDecision(op) {
         ? `<div style="font-size:12.5px; margin-bottom:8px;"><strong>🎯 Edge medible:</strong> ${drivers.join(' · ')} <span class="text-muted">(ver desglose abajo)</span></div>`
         : '';
 
+    // Fundamentales (solo acciones): los ratios reales que justifican la tesis.
+    const fu = op.fundamentals;
+    let fundBlock = '';
+    if (fu) {
+        const pct = v => (v == null ? null : (v * 100).toFixed(0) + '%');
+        const num = v => (v == null ? null : (+v).toFixed(1));
+        const rows = [
+            ['PER', num(fu.per)], ['P/B', num(fu.pb)], ['ROE', pct(fu.roe)],
+            ['Margen', pct(fu.margin)], ['Crec. ventas', pct(fu.rev_growth)],
+            ['Deuda/eq.', num(fu.debt_to_equity)],
+            ['Div.', fu.div_yield == null ? null : (+fu.div_yield).toFixed(1) + '%'],
+        ].filter(([, v]) => v != null);
+        const chips = rows.map(([k, v]) => `<span style="background:rgba(43,40,34,0.05); border-radius:6px; padding:2px 7px; font-size:11.5px; white-space:nowrap;">${k} <strong>${v}</strong></span>`).join(' ');
+        fundBlock = `<div style="margin:6px 0 8px;">
+            <div style="font-size:11px; color:var(--text-secondary); margin-bottom:4px;">🏢 Fundamentales${fu.sector ? ` · <span class="text-muted">${fu.sector}</span>` : ''}</div>
+            <div style="display:flex; gap:4px; flex-wrap:wrap;">${chips}</div>
+        </div>`;
+    }
+
     const tile = (label, value, sub) => `<div style="flex:1; min-width:118px; background:rgba(43,40,34,0.03); border-radius:8px; padding:8px 10px;">
         <div style="font-size:11px; color:var(--text-secondary);">${label}</div>
         <div style="font-size:14px; font-weight:600; margin-top:2px;">${value}</div>
@@ -218,10 +242,11 @@ function renderDecision(op) {
     const horizonTile = op.horizon ? tile('⏳ Horizonte', op.horizon, 'típico de esta estrategia') : '';
 
     const tiles = [riskTile, sizeTile, expTile, horizonTile].filter(Boolean).join('');
-    if (!edgeLine && !tiles) return '';
+    if (!edgeLine && !tiles && !fundBlock) return '';
     return `<div style="margin:10px 0; padding:10px 12px; border:1px solid rgba(43,40,34,0.10); border-radius:10px; background:rgba(43,40,34,0.015);">
         <div style="font-size:12px; color:var(--text-secondary); font-weight:600; margin-bottom:6px;">🧭 Marco de decisión</div>
         ${edgeLine}
+        ${fundBlock}
         <div style="display:flex; gap:8px; flex-wrap:wrap;">${tiles}</div>
         <div style="font-size:10.5px; color:var(--text-tertiary); margin-top:8px; line-height:1.4;">Riesgo y tamaño = estadística sobre precios (el tamaño ignora la correlación con tu cartera). Expectancy = resultado real de esta estrategia <em>después</em> de recomendar (out-of-sample), no una promesa. No es asesoramiento financiero.</div>
     </div>`;

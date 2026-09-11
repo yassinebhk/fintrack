@@ -130,6 +130,115 @@ _VALUE_WEIGHTS = {
     "volatilidad": 0.10,      # prefer lower volatility
 }
 
+# --- Fundamental factors (STOCKS ONLY) --------------------------------------
+# Stocks carry a `fundamentals` dict (from yfinance); ETFs / funds / bonds /
+# crypto do not. We score four judge-groups cross-sectionally AMONG STOCKS —
+# valuation normalized WITHIN sector (a bank's PER isn't comparable to a tech's),
+# the rest globally — and blend them into the price-based theses ONLY for stocks:
+#   value_score    += valoración (barata) + solidez (balance sano)
+#   momentum_score += calidad (ROE/márgenes/FCF) + crecimiento (ventas/BPA)
+# so a fundamentally strong company rises in the very rankings that feed the
+# recommendations, the scorecard and the decision frame — and can be justified.
+_FUND_BLEND = 0.40    # fundamentals' share of a stock's thesis score (price = 0.60)
+_FUND_W = {           # weight of each group WITHIN the fundamental block
+    "valoracion": 0.55, "solidez": 0.45,     # -> value thesis
+    "calidad": 0.60, "crecimiento": 0.40,    # -> momentum thesis
+}
+_MIN_STOCKS_FOR_FUND = 3   # need a real cross-section for z-scores to mean anything
+
+
+def _is_stock(it: dict) -> bool:
+    cat = str(it.get("category", ""))
+    return cat == "acción" or cat.startswith("screener ·")
+
+
+def _zscore_opt(values: list) -> list:
+    """Like _zscore but returns None (not 0.0) for missing values, so callers can
+    average several factor columns while ignoring the fields a given name lacks
+    (e.g. a bank with no freeCashflow) instead of diluting it toward zero."""
+    arr = np.array([v if v is not None else np.nan for v in values], dtype=float)
+    mask = ~np.isnan(arr)
+    if mask.sum() < 2:
+        return [None] * len(values)
+    mu, sd = np.nanmean(arr), np.nanstd(arr)
+    if sd == 0:
+        return [None] * len(values)
+    z = np.clip((arr - mu) / sd, -3, 3)
+    return [float(x) if m else None for x, m in zip(z, mask)]
+
+
+def _sector_zscore(values: list, sectors: list[str]) -> list:
+    """z-score computed WITHIN each sector (for valuation ratios). Names in a
+    sector too small to be meaningful (<3) fall back to the global z-score."""
+    n = len(values)
+    out: list = [None] * n
+    groups: dict[str, list[int]] = {}
+    for i, s in enumerate(sectors):
+        groups.setdefault(s or "—", []).append(i)
+    small: list[int] = []
+    for idxs in groups.values():
+        if len(idxs) >= 3:
+            zs = _zscore_opt([values[i] for i in idxs])
+            for j, i in enumerate(idxs):
+                out[i] = zs[j]
+        else:
+            small += idxs
+    if small:
+        gz = _zscore_opt(values)
+        for i in small:
+            out[i] = gz[i]
+    return out
+
+
+def _avg_present(cols: list[list]) -> list[float]:
+    """Element-wise mean across z-score columns, ignoring None (missing) entries.
+    A position missing in every column scores 0.0 (neutral)."""
+    n = len(cols[0]) if cols else 0
+    out = []
+    for i in range(n):
+        vals = [c[i] for c in cols if c[i] is not None]
+        out.append(float(np.mean(vals)) if vals else 0.0)
+    return out
+
+
+def _fundamental_factors(stocks: list[dict]) -> dict[str, dict]:
+    """Per-stock fundamental group z-scores: valoración (sector-relative, cheaper=
+    better), calidad, crecimiento, solidez. Missing fields are simply skipped."""
+    if len(stocks) < _MIN_STOCKS_FOR_FUND:
+        return {}
+    sectors = [s.get("sector") or "—" for s in stocks]
+    col = lambda field: [(s.get("fundamentals") or {}).get(field) for s in stocks]  # noqa: E731
+    neg = lambda zs: [(-z if z is not None else None) for z in zs]  # noqa: E731
+
+    def fcf_yield(s: dict):
+        f = s.get("fundamentals") or {}
+        fcf, mc = f.get("freeCashflow"), f.get("marketCap")
+        return (fcf / mc) if (fcf is not None and mc) else None
+
+    valoracion = _avg_present([  # sector-relative, lower PER/PB/PEG = cheaper = better
+        neg(_sector_zscore(col("trailingPE"), sectors)),
+        neg(_sector_zscore(col("priceToBook"), sectors)),
+        neg(_sector_zscore(col("pegRatio"), sectors)),
+    ])
+    calidad = _avg_present([  # higher ROE / margin / FCF yield = better business
+        _zscore_opt(col("returnOnEquity")),
+        _zscore_opt(col("operatingMargins")),
+        _zscore_opt([fcf_yield(s) for s in stocks]),
+    ])
+    crecimiento = _avg_present([  # higher sales / earnings growth = better
+        _zscore_opt(col("revenueGrowth")),
+        _zscore_opt(col("earningsGrowth")),
+    ])
+    solidez = _avg_present([  # low debt (neg) + high current ratio = safer
+        neg(_zscore_opt(col("debtToEquity"))),
+        _zscore_opt(col("currentRatio")),
+    ])
+    return {
+        s["ticker"]: {"valoracion": valoracion[i], "calidad": calidad[i],
+                      "crecimiento": crecimiento[i], "solidez": solidez[i]}
+        for i, s in enumerate(stocks)
+    }
+
 
 def _tech_raw(sig: dict) -> float:
     """Compact technical confirmation score from the `ta` signals."""
@@ -185,21 +294,43 @@ def score_universe(items: list[dict]) -> list[dict]:
     else:
         regime, mom_tilt, val_tilt = "neutral", 1.0, 1.0
 
+    # Fundamental judges for the stocks that carry a `fundamentals` dict (blended
+    # into the theses below; ETFs/funds/bonds/crypto are untouched — price-only).
+    fundz = _fundamental_factors([it for it in valid if it.get("fundamentals") and _is_stock(it)])
+
     for i, it in enumerate(valid):
-        mom_parts = {
+        price_mom = {
             "momentum": _MOMENTUM_WEIGHTS["momentum"] * z["momentum"][i],
             "regimen": _MOMENTUM_WEIGHTS["regimen"] * z["regimen"][i],
             "riesgo": _MOMENTUM_WEIGHTS["riesgo"] * z["sharpe"][i],
             "tecnico": _MOMENTUM_WEIGHTS["tecnico"] * z["tecnico"][i],
             "volatilidad": _MOMENTUM_WEIGHTS["volatilidad"] * (-z["ewma_vol"][i]),
         }
-        val_parts = {
+        price_val = {
             "infravaloracion": _VALUE_WEIGHTS["infravaloracion"] * (-z["range"][i]),
             "reversion": _VALUE_WEIGHTS["reversion"] * (-z["mean_rev"][i]),
             "sobreventa": _VALUE_WEIGHTS["sobreventa"] * (-z["rsi"][i]),
             "calidad": _VALUE_WEIGHTS["calidad"] * z["sharpe"][i],
             "volatilidad": _VALUE_WEIGHTS["volatilidad"] * (-z["ewma_vol"][i]),
         }
+
+        fz = fundz.get(it["ticker"])
+        if fz:
+            # Blend: keep price/fundamental parts on the same scale as pure-price
+            # names (weights sum to 1), so a stock's score stays comparable.
+            pw = 1.0 - _FUND_BLEND
+            mom_parts = {k: v * pw for k, v in price_mom.items()}
+            val_parts = {k: v * pw for k, v in price_val.items()}
+            mom_parts["calidad_fund"] = _FUND_BLEND * _FUND_W["calidad"] * fz["calidad"]
+            mom_parts["crecimiento"] = _FUND_BLEND * _FUND_W["crecimiento"] * fz["crecimiento"]
+            val_parts["valoracion_fund"] = _FUND_BLEND * _FUND_W["valoracion"] * fz["valoracion"]
+            val_parts["solidez"] = _FUND_BLEND * _FUND_W["solidez"] * fz["solidez"]
+            it["fundamental_score"] = round(
+                mom_parts["calidad_fund"] + mom_parts["crecimiento"]
+                + val_parts["valoracion_fund"] + val_parts["solidez"], 3)
+        else:
+            mom_parts, val_parts = price_mom, price_val
+
         it["momentum_score"] = round(sum(mom_parts.values()) * mom_tilt, 3)
         it["value_score"] = round(sum(val_parts.values()) * val_tilt, 3)
         it["breakdown"] = {

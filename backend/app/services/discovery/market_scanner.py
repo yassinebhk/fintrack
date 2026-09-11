@@ -36,7 +36,7 @@ class MarketScanner:
 
     async def _analyze_ticker(
         self, ticker: str, name: str, desc: str, sem: asyncio.Semaphore | None = None,
-        fetch_price: bool = True,
+        fetch_price: bool = True, fetch_fundamentals: bool = False,
     ) -> dict | None:
         """Generic per-instrument analysis: returns, 52w range, technical signals
         and quant factors. Used both for the fixed themes and the wide universe.
@@ -87,7 +87,7 @@ class MarketScanner:
             signals = compute_signals(closes)
             factors = compute_factors(closes)
 
-            return {
+            result = {
                 "theme": name,
                 "ticker": ticker,
                 "desc": desc,
@@ -100,6 +100,15 @@ class MarketScanner:
                 "signals": signals,
                 "factors": factors,
             }
+            # Fundamentals only for individual stocks (ETFs/funds/bonds have none).
+            # `desc` carries the category in the universe scan (see scan_universe).
+            if fetch_fundamentals and (desc == "acción" or str(desc).startswith("screener ·")):
+                fund = await self.yahoo.get_fundamentals(ticker)
+                if fund:
+                    result["fundamentals"] = fund
+                    if fund.get("sector"):
+                        result["sector"] = fund["sector"]
+            return result
 
         if sem is not None:
             async with sem:
@@ -152,7 +161,8 @@ class MarketScanner:
         # tripping Yahoo's rate limiting on the runner's shared IP pool.
         sem = asyncio.Semaphore(8)
         tasks = [
-            self._analyze_ticker(tk, info["name"], info.get("cat", "descubierto"), sem, fetch_price=False)
+            self._analyze_ticker(tk, info["name"], info.get("cat", "descubierto"), sem,
+                                 fetch_price=False, fetch_fundamentals=True)
             for tk, info in candidates.items()
             if tk.upper() not in exclude
         ]
@@ -272,9 +282,29 @@ class MarketScanner:
                 return f"{base}: datos parciales{tag}"
             sharpe = f.get("sharpe")
             sharpe_str = f" · Sharpe {sharpe:+.2f}" if sharpe is not None else ""
+            # Fundamentals (stocks only) — so the analyst can justify with real ratios.
+            fu = t.get("fundamentals")
+            fund_str = ""
+            if fu:
+                bits = []
+                if fu.get("trailingPE") is not None:
+                    bits.append(f"PER {fu['trailingPE']:.0f}")
+                if fu.get("returnOnEquity") is not None:
+                    bits.append(f"ROE {fu['returnOnEquity'] * 100:.0f}%")
+                if fu.get("operatingMargins") is not None:
+                    bits.append(f"margen {fu['operatingMargins'] * 100:.0f}%")
+                if fu.get("revenueGrowth") is not None:
+                    bits.append(f"crec.ventas {fu['revenueGrowth'] * 100:.0f}%")
+                if fu.get("debtToEquity") is not None:
+                    bits.append(f"deuda/eq {fu['debtToEquity']:.0f}")
+                fscore = t.get("fundamental_score")
+                if fscore is not None:
+                    bits.append(f"fund_score {fscore:+.2f}")
+                if bits:
+                    fund_str = " · fund: " + ", ".join(bits)
             return (
                 f"{base}: 1m {t['ret_1m']:+.1f}% · 3m {t['ret_3m']:+.1f}% · 1y {t['ret_1y']:+.1f}% · "
-                f"rango52s {t['range_pos_52w']:.0f}%{sharpe_str} · [técnico: {tech}]{tag}"
+                f"rango52s {t['range_pos_52w']:.0f}%{sharpe_str} · [técnico: {tech}]{fund_str}{tag}"
             )
 
         scored = [t for t in themes if t.get("factors")]
@@ -321,6 +351,10 @@ class MarketScanner:
             "(las tres listas: MOMENTUM, VALOR y ACCIONES INDIVIDUALES). Tu trabajo es EXPLICAR los "
             "que encabezan el ranking, no reordenarlos a tu criterio. Si hay una acción individual "
             "genuinamente interesante en la lista de ACCIONES, inclúyela — no dejes que los ETFs/fondos "
-            "acaparen todas las ideas solo por ser mayoría en el universo escaneado."
+            "acaparen todas las ideas solo por ser mayoría en el universo escaneado. Para las ACCIONES, "
+            "usa los datos fundamentales que ves tras 'fund:' (PER, ROE, márgenes, crecimiento, deuda) "
+            "para justificar en 'why_now' por qué el negocio es bueno/barato — no solo el precio. El PER "
+            "está normalizado por sector en el ranking, así que no compares el PER de un banco con el de "
+            "una tecnológica."
         )
         return "\n".join(out)
