@@ -3,7 +3,7 @@
 Provider precedence: Gemini → Groq fallback → static config message.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from pydantic import BaseModel
 
@@ -67,6 +67,10 @@ def _build_portfolio_context(portfolio: dict) -> str:
 @router.post("/chat")
 async def ai_chat(question: AIQuestion, current_user: User = Depends(get_current_user)) -> dict:
     settings = get_settings()
+    # Shared Gemini/Groq free-tier quota — owner-only for now (public signup
+    # means anyone could otherwise burn through it), no per-user LLM budget yet.
+    if not settings.owner_email or current_user.email != settings.owner_email.strip().lower():
+        raise HTTPException(status_code=403, detail="El chat de IA está disponible solo para el propietario por ahora")
     if not settings.has_gemini and not settings.has_groq:
         return {"response": CONFIG_MSG, "model": "none", "tokens_used": 0}
 
