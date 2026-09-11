@@ -23,12 +23,20 @@ _settings = get_settings()
 # requires asyncpg's prepared-statement cache disabled (it errors otherwise).
 # FULL TLS verification against system CAs (CockroachDB Cloud uses a publicly
 # trusted cert → verified) — equivalent to sslmode=verify-full, no CA file to ship.
+# A self-hosted Postgres on localhost (same VM as the app) has no TLS listener
+# at all, so skip the SSL context there — loopback traffic never leaves the host.
 # (SQLite local dev path keeps connect_args empty.)
 _connect_args: dict = {}
 if "asyncpg" in _settings.async_database_url:
-    import ssl as _ssl
+    from urllib.parse import urlparse
 
-    _connect_args = {"ssl": _ssl.create_default_context(), "statement_cache_size": 0}
+    _host = urlparse(_settings.async_database_url).hostname or ""
+    if _host not in {"localhost", "127.0.0.1", "::1"}:
+        import ssl as _ssl
+
+        _connect_args = {"ssl": _ssl.create_default_context(), "statement_cache_size": 0}
+    else:
+        _connect_args = {"statement_cache_size": 0}
 
 engine = create_async_engine(
     _settings.async_database_url,
