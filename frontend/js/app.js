@@ -761,11 +761,12 @@ async function loadDashboard() {
     } catch (error) {
         console.error('Error loading dashboard:', error);
         updateStatus(false);
-        
-        // Show error state
+
         const totalValueEl = document.getElementById('totalValue');
         if (totalValueEl) {
-            totalValueEl.innerHTML = '<span class="value-loading">Error al cargar datos</span>';
+            // A genuinely empty portfolio (200 OK, 0 positions) never reaches this
+            // catch block — this only fires on a real fetch/network/500 error.
+            totalValueEl.innerHTML = '<span class="value-loading">No se pudo conectar con el servidor — reintenta en un momento</span>';
         }
     }
 }
