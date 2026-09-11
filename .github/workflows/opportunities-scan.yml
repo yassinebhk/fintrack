@@ -11,14 +11,21 @@ name: opportunities-scan
 
 on:
   schedule:
-    - cron: "0 5 * * *"    # 07:00 Madrid (CEST) — before the morning view
-    - cron: "0 6 * * *"    # 07:00 Madrid (CET, winter)
+    # GH Actions cron doesn't observe DST, so a single fixed UTC time drifts
+    # between 07:00 (CET, winter) and 08:00 (CEST, summer) Madrid — still
+    # "before the morning view" either way. (Previously had two cron entries
+    # meant to cover both cases, but neither is DST-aware, so it just ran the
+    # — now much heavier — scan twice every single day for no real benefit.)
+    - cron: "0 6 * * *"
   workflow_dispatch: {}
 
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Universe grew from ~185 to potentially several thousand tickers (see
+    # market_scanner.py::_screener_candidates) to make momentum_score/value_score
+    # statistically representative — give it real headroom.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

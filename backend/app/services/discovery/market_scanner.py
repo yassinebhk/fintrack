@@ -145,7 +145,12 @@ class MarketScanner:
         for tk, info in (await self._screener_candidates()).items():
             candidates.setdefault(tk, info)
 
-        sem = asyncio.Semaphore(3)  # low concurrency to cap peak memory on 512MB free tier (also throttles Yahoo)
+        # This now only ever runs on the GitHub-Actions 7GB runner (see
+        # opportunities-scan.yml), not the 512MB Render/VM free tier the original
+        # cap-of-3 was protecting — raised to handle a universe of thousands of
+        # tickers in reasonable time. Still capped (not unbounded) to avoid
+        # tripping Yahoo's rate limiting on the runner's shared IP pool.
+        sem = asyncio.Semaphore(8)
         tasks = [
             self._analyze_ticker(tk, info["name"], info.get("cat", "descubierto"), sem, fetch_price=False)
             for tk, info in candidates.items()
@@ -171,14 +176,36 @@ class MarketScanner:
         """Pull dynamic candidates from Yahoo's predefined screeners (best-effort).
 
         These rotate daily, so they surface names no static list contains. If the
-        installed yfinance lacks screener support we just skip them silently."""
-        # Quality-oriented screens only: surface solid undervalued/growth names, NOT
-        # day-trade pump candidates. (day_gainers / aggressive_small_caps removed on
-        # purpose — they fed speculative micro-caps into the ranking.)
-        screens = {
+        installed yfinance lacks screener support we just skip them silently.
+
+        Pulls Yahoo's max of 250 results per category across the quality-oriented
+        predefined screens (equities AND, since v1.4.0, funds/ETFs) — this is the
+        main lever for making the cross-sectional ranking (momentum_score/
+        value_score) statistically representative of a broad universe instead of
+        just the ~165 hand-curated static tickers. Speculative/pump screens
+        (day_gainers, day_losers, aggressive_small_caps, small_cap_gainers,
+        most_shorted_stocks) are deliberately excluded — same reasoning as before,
+        just extended to the newly-available fund/ETF categories."""
+        # category prefix "screener · " = individual stock (used elsewhere to
+        # guarantee stock representation against the ETF/fund-heavy static list —
+        # keep fund/ETF screens on a DIFFERENT prefix so they aren't miscounted).
+        stock_screens = {
             "undervalued_large_caps": "infravalorada (large cap)",
             "undervalued_growth_stocks": "crecimiento a buen precio (GARP)",
             "growth_technology_stocks": "tecnológica en crecimiento",
+            "most_actives": "más negociada",
+        }
+        fund_screens = {
+            "top_etfs_us": "ETF top EEUU",
+            "top_performing_etfs": "ETF mejor rendimiento",
+            "technology_etfs": "ETF tecnológico",
+            "bond_etfs": "ETF de bonos",
+            "conservative_foreign_funds": "fondo internacional conservador",
+            "high_yield_bond": "bono high yield",
+            "portfolio_anchors": "fondo ancla de cartera",
+            "solid_large_growth_funds": "fondo growth large cap",
+            "solid_midcap_growth_funds": "fondo growth mid cap",
+            "top_mutual_funds": "fondo mutuo top",
         }
 
         def _run() -> dict[str, dict]:
@@ -187,21 +214,26 @@ class MarketScanner:
             screen_fn = getattr(yf, "screen", None)
             if screen_fn is None:
                 return found
-            for key, label in screens.items():
-                try:
-                    res = screen_fn(key, count=10)
-                    quotes = (res or {}).get("quotes", []) if isinstance(res, dict) else []
-                    for q in quotes:
-                        sym = q.get("symbol")
-                        if not sym:
-                            continue
-                        found[sym] = {
-                            "name": q.get("shortName") or q.get("longName") or sym,
-                            "cat": f"screener · {label}",
-                            "region": "EEUU",
-                        }
-                except Exception as exc:
-                    logger.debug("screener {} failed: {}", key, exc)
+
+            def _pull(screens: dict[str, str], prefix: str) -> None:
+                for key, label in screens.items():
+                    try:
+                        res = screen_fn(key, count=250)
+                        quotes = (res or {}).get("quotes", []) if isinstance(res, dict) else []
+                        for q in quotes:
+                            sym = q.get("symbol")
+                            if not sym:
+                                continue
+                            found[sym] = {
+                                "name": q.get("shortName") or q.get("longName") or sym,
+                                "cat": f"{prefix} · {label}",
+                                "region": "EEUU",
+                            }
+                    except Exception as exc:
+                        logger.debug("screener {} failed: {}", key, exc)
+
+            _pull(stock_screens, "screener")
+            _pull(fund_screens, "screener-fondo")
             return found
 
         try:
