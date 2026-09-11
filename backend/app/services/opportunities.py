@@ -273,18 +273,35 @@ class OpportunityService:
         # so a momentum engine doesn't quietly push the user into a bubble top.
         froth = self._froth_guard(themes, opportunities)
 
-        # Surface the top of each objective ranking to the UI (the universe is large).
+        # Surface the top of each objective ranking to the UI (the universe is large,
+        # now thousands of instruments — see market_scanner.py::_screener_candidates).
+        # Target ~40 total: good AND mediocre ideas on purpose, not just the elite
+        # few — the user should be able to judge the full spread, not a pre-filtered
+        # "only the best" slice.
         scored = [t for t in themes if t.get("factors")]
-        top_mom = sorted(scored, key=lambda x: x.get("momentum_score", 0), reverse=True)[:16]
-        top_val = sorted(scored, key=lambda x: x.get("value_score", 0), reverse=True)[:16]
+        top_mom = sorted(scored, key=lambda x: x.get("momentum_score", 0), reverse=True)[:20]
+        top_val = sorted(scored, key=lambda x: x.get("value_score", 0), reverse=True)[:20]
         # Individual stocks are a minority of the scanned universe (mostly ETFs/bond
         # funds/managed funds) — without a guaranteed slice, a regime that favors
         # ETFs can crowd every single stock out of top_mom/top_val even though the
-        # engine scores them identically. Guarantee stock visibility explicitly.
-        is_stock = lambda t: t.get("category") == "acción" or str(t.get("category", "")).startswith("screener")
-        top_stocks = sorted((t for t in scored if is_stock(t)), key=lambda x: x.get("momentum_score", 0), reverse=True)[:12]
+        # engine scores them identically. Guarantee representation per asset type.
+        def _cat_group(t: dict) -> str:
+            cat = str(t.get("category", ""))
+            if cat == "acción" or cat.startswith("screener ·"):
+                return "acción"
+            if cat == "renta fija":
+                return "renta fija"
+            if cat == "materia prima":
+                return "materia prima"
+            return "otro"
+        by_group: dict[str, list[dict]] = {}
+        for t in scored:
+            by_group.setdefault(_cat_group(t), []).append(t)
+        guaranteed: list[dict] = []
+        for group, n in (("acción", 15), ("renta fija", 6), ("materia prima", 5)):
+            guaranteed += sorted(by_group.get(group, []), key=lambda x: x.get("momentum_score", 0), reverse=True)[:n]
         seen, top_themes = set(), []
-        for t in top_mom + top_val + top_stocks:
+        for t in top_mom + top_val + guaranteed:
             if t["ticker"] not in seen:
                 seen.add(t["ticker"])
                 top_themes.append(t)

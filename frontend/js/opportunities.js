@@ -204,9 +204,46 @@ function renderOpportunities(data) {
         const cls = s >= 0 ? 'value-positive' : 'value-negative';
         return `<span class="mono ${cls}">${s >= 0 ? '+' : ''}${s.toFixed(2)}</span>`;
     };
-    const themes = (data.themes || []).map(t => {
+    // Group by asset type so the user can see "de todo" at a glance, and every
+    // row opens the SAME full deep-analysis modal the curated cards use above
+    // (stats breakdown + multi-source news + narrative) — not just the ~7 curated ideas.
+    const oppGroupOf = (cat) => {
+        cat = cat || '';
+        if (cat === 'acción' || cat.startsWith('screener ·')) return '📈 Acciones';
+        if (cat === 'renta fija') return '🏦 Renta fija (bonos)';
+        if (cat === 'materia prima') return '🪙 Materias primas';
+        if (cat === 'fondo gestionado' || cat.startsWith('screener-fondo ·')) return '📁 Fondos';
+        return '📊 ETFs';
+    };
+    const GROUP_ORDER = ['📈 Acciones', '📊 ETFs', '📁 Fondos', '🏦 Renta fija (bonos)', '🪙 Materias primas'];
+    const themeRow = (t) => {
         const r3 = t.ret_3m, cls = (r3 || 0) >= 0 ? 'value-positive' : 'value-negative';
-        return `<tr><td>${t.theme}</td><td class="text-right">${fmtScore(t.momentum_score)}</td><td class="text-right">${fmtScore(t.value_score)}</td><td class="text-right mono ${cls}">${r3 != null ? (r3>=0?'+':'')+r3+'%' : '—'}</td><td class="text-right mono">${t.range_pos_52w != null ? t.range_pos_52w.toFixed(0)+'%' : '—'}</td></tr>`;
+        const safeTicker = (t.ticker + '').replace(/'/g, "&#39;");
+        const safeName = (t.theme + '').replace(/'/g, "&#39;");
+        return `<tr onclick="openDeepAnalysis('${safeTicker}','${safeName}')" style="cursor:pointer;" title="Ver análisis completo">
+            <td>${t.theme} <span class="text-muted mono" style="font-size:11px;">${t.ticker}</span></td>
+            <td class="text-right">${fmtScore(t.momentum_score)}</td>
+            <td class="text-right">${fmtScore(t.value_score)}</td>
+            <td class="text-right mono ${cls}">${r3 != null ? (r3>=0?'+':'')+r3+'%' : '—'}</td>
+            <td class="text-right mono">${t.range_pos_52w != null ? t.range_pos_52w.toFixed(0)+'%' : '—'}</td>
+        </tr>`;
+    };
+    const themesByGroup = {};
+    for (const t of (data.themes || [])) {
+        const g = oppGroupOf(t.category);
+        (themesByGroup[g] = themesByGroup[g] || []).push(t);
+    }
+    const themeGroups = GROUP_ORDER.filter(g => themesByGroup[g] && themesByGroup[g].length).map(g => {
+        const rows = themesByGroup[g].sort((a, b) => (b.momentum_score || 0) - (a.momentum_score || 0)).map(themeRow).join('');
+        return `<div style="margin-bottom:14px;">
+            <strong style="font-size:13px;">${g} <span class="text-muted" style="font-weight:400;">(${themesByGroup[g].length})</span></strong>
+            <div class="table-container" style="margin-top:6px;">
+                <table class="manager-table">
+                    <thead><tr><th>Tema</th><th class="text-right">Score Mom.</th><th class="text-right">Score Valor</th><th class="text-right">3 meses</th><th class="text-right">Rango 52s</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        </div>`;
     }).join('');
 
     const rc = regimeColor[data.market_regime] || '#f59e0b';
@@ -247,13 +284,8 @@ function renderOpportunities(data) {
         ${opps}
         <div class="card" style="margin-top:16px;">
             <h3>📊 Ranking cuantitativo (motor empyrical + ta, datos reales)</h3>
-            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">${data.universe_size ? `Escaneados <strong>${data.universe_size}</strong> instrumentos (ETFs/fondos + screeners de Yahoo), excluyendo lo que ya tienes. ` : ''}Puntuación objetiva por estadística sobre precios, no opinión de la IA. Score Mom. = tendencia + retorno ajustado a riesgo · Score Valor = castigado pero de calidad.</p>
-            <div class="table-container">
-                <table class="manager-table">
-                    <thead><tr><th>Tema</th><th class="text-right">Score Mom.</th><th class="text-right">Score Valor</th><th class="text-right">3 meses</th><th class="text-right">Rango 52s</th></tr></thead>
-                    <tbody>${themes}</tbody>
-                </table>
-            </div>
+            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">${data.universe_size ? `Escaneados <strong>${data.universe_size}</strong> instrumentos (acciones, ETFs, fondos, bonos + screeners de Yahoo), excluyendo lo que ya tienes. ` : ''}Puntuación objetiva por estadística sobre precios, no opinión de la IA. Score Mom. = tendencia + retorno ajustado a riesgo · Score Valor = castigado pero de calidad. <strong>Pincha cualquier fila</strong> para el análisis completo (estadísticas, noticias y narrativa).</p>
+            ${themeGroups}
         </div>
         ${data.disclaimer ? `<p class="text-muted" style="font-size:11px; margin-top:12px;">${data.disclaimer}</p>` : ''}
         <p class="text-muted" style="font-size:11px;">Generado ${data.generated_at ? new Date(data.generated_at).toLocaleString('es-ES') : ''} · modelo ${data.model || ''}</p>
