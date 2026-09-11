@@ -569,7 +569,7 @@ def render_opportunities_telegram(payload: dict) -> str:
 
     if payload.get("disclaimer"):
         parts.append(f"<i>{esc(payload['disclaimer'])}</i>")
-    parts.append('\n🔗 <a href="https://fintrack-front.onrender.com">Ver más en FinTrack</a>')
+    parts.append('\n🔗 <a href="https://fintrack.34-123-238-158.sslip.io">Ver más en FinTrack</a>')
     return "\n".join(parts).strip()
 
 

@@ -767,7 +767,7 @@ en medio                                → NEUTRAL</pre>
         </div>
 
         <h3>Paso a paso, con un ejemplo (fechas inventadas para que se vea claro)</h3>
-        <p>Cada recomendación que ves en Oportunidades se guarda con tres datos: <strong>la fecha</strong>, <strong>su enfoque</strong> (MOMENTUM = "esto está subiendo con fuerza" o VALOR = "esto está barato pero es de calidad" — ver <a href="#algoritmos">Cómo funcionan nuestros algoritmos</a>) y <strong>su convicción</strong> (alta/media/baja). Un proceso automático revisa cada día las recomendaciones antiguas y, si ha pasado suficiente tiempo, calcula <strong>qué rentabilidad habría dado de verdad</strong> esa idea a 1, 3 y 6 meses, comparada con su propio índice de referencia (por ejemplo, un ETF de semiconductores se compara contra el índice de semiconductores, no contra el IBEX). A este informe de resultados reales lo llamamos <em>scorecard</em> ("boletín de notas"), y es público — lo puedes consultar tú mismo entrando a <code>fintrack-front.onrender.com/api/scorecard</code> desde el navegador.</p>
+        <p>Cada recomendación que ves en Oportunidades se guarda con tres datos: <strong>la fecha</strong>, <strong>su enfoque</strong> (MOMENTUM = "esto está subiendo con fuerza" o VALOR = "esto está barato pero es de calidad" — ver <a href="#algoritmos">Cómo funcionan nuestros algoritmos</a>) y <strong>su convicción</strong> (alta/media/baja). Un proceso automático revisa cada día las recomendaciones antiguas y, si ha pasado suficiente tiempo, calcula <strong>qué rentabilidad habría dado de verdad</strong> esa idea a 1, 3 y 6 meses, comparada con su propio índice de referencia (por ejemplo, un ETF de semiconductores se compara contra el índice de semiconductores, no contra el IBEX). A este informe de resultados reales lo llamamos <em>scorecard</em> ("boletín de notas"), y es público — lo puedes consultar tú mismo entrando a <code>fintrack.34-123-238-158.sslip.io/api/scorecard</code> desde el navegador.</p>
 
         <div class="example-box">
             <h4>Ejemplo: imagina que hoy es 1 de octubre</h4>
@@ -924,7 +924,7 @@ alpha (exceso sobre el benchmark) = retorno del ETF − retorno del benchmark
                 <li>Sin una caída (<strong>drawdown</strong>: la peor pérdida desde un máximo) catastrófica que indique que las reglas fallan en momentos duros.</li>
             </ol>
         </div>
-        <p>Mientras falte cualquiera de las cinco, el propio sistema se etiqueta a sí mismo como <strong>"NO apto — sigue en papel"</strong>, con el contador exacto de días que faltan. Nadie decide a ojo cuándo "ya vale" — lo decide siempre la misma regla, y puedes ver su estado real en cualquier momento entrando a <code>fintrack-front.onrender.com/api/systematic/paper/report</code> desde el navegador.</p>
+        <p>Mientras falte cualquiera de las cinco, el propio sistema se etiqueta a sí mismo como <strong>"NO apto — sigue en papel"</strong>, con el contador exacto de días que faltan. Nadie decide a ojo cuándo "ya vale" — lo decide siempre la misma regla, y puedes ver su estado real en cualquier momento entrando a <code>fintrack.34-123-238-158.sslip.io/api/systematic/paper/report</code> desde el navegador.</p>
 
         <h3>🧮 Cómo se calcula el peso de cada activo — ejemplo con números reales</h3>
         <p>La "volatilidad inversa" no es solo una idea, es una fórmula concreta: el peso de cada activo es inversamente proporcional a su volatilidad, y luego se normaliza para que todos los pesos sumen 100%.</p>

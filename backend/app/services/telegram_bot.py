@@ -22,7 +22,7 @@ from app.services.notifications.telegram import TelegramNotifier, html_escape
 from app.services.portfolio import PortfolioService
 
 
-PAGE_URL = "https://fintrack-front.onrender.com"
+PAGE_URL = "https://fintrack.34-123-238-158.sslip.io"
 PAGE_LINK = f'\n\n🔗 <a href="{PAGE_URL}">Ver más en FinTrack</a>'
 
 # Friendly display names so we never show raw ISINs to the user
@@ -284,7 +284,7 @@ class TelegramBotHandler:
             if not sent_any_chart:
                 await self.notifier.send_html(render_opportunities_telegram(payload))
             else:
-                await self.notifier.send_html('🔗 <a href="https://fintrack-front.onrender.com">Ver todo en FinTrack</a>')
+                await self.notifier.send_html(f'🔗 <a href="{PAGE_URL}">Ver todo en FinTrack</a>')
         except Exception as exc:
             logger.error("telegram opportunities failed: {}", exc)
             await self.notifier.send_text("No pude generar las oportunidades ahora mismo, intenta más tarde.")

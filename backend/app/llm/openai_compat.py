@@ -56,7 +56,7 @@ class OpenAICompatClient:
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         # OpenRouter likes these (optional but recommended).
         if "openrouter" in self.base_url:
-            headers["HTTP-Referer"] = "https://fintrack-front.onrender.com"
+            headers["HTTP-Referer"] = "https://fintrack.34-123-238-158.sslip.io"
             headers["X-Title"] = "FinTrack"
 
         try:
