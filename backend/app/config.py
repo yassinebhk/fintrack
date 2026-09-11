@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     session_secret_key: str = ""
     allowed_emails: str = ""  # comma-separated allowlist; empty = nobody can log in
+    public_signup: bool = False  # if true, ANY Google account can log in — allowlist ignored
     owner_email: str = ""  # the original single-tenant owner; used by features not yet
     # generalized per-user (opportunities' "exclude what you hold", alerts, daily briefing,
     # Kraken sync, Telegram) — see Fase 2 plan for making these loop over every user.

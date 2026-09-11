@@ -38,7 +38,7 @@ async def callback(request: Request, session: AsyncSession = Depends(get_session
     if not email or not google_sub:
         raise HTTPException(status_code=400, detail="Google no devolvió email/sub")
 
-    if email not in settings.allowed_emails_set:
+    if not settings.public_signup and email not in settings.allowed_emails_set:
         logger.warning("oauth: rejected email not in allowlist: {}", email)
         raise HTTPException(status_code=403, detail="Este email no tiene acceso a FinTrack")
 
