@@ -57,7 +57,7 @@ pg_dump -Fc "$DB_URL" -f "$BACKUP_DIR/fintrack-$(date +%Y%m%d).pgdump"
 find "$BACKUP_DIR" -name "fintrack-*.pgdump" -mtime +7 -delete
 BACKUP_EOF
 chmod +x "$HOME/backup_db.sh"
-(crontab -l 2>/dev/null | grep -v backup_db.sh; echo "17 3 * * * $HOME/backup_db.sh >> $HOME/backups/backup.log 2>&1") | crontab -
+(crontab -l 2>/dev/null | grep -v backup_db.sh || true; echo "17 3 * * * $HOME/backup_db.sh >> $HOME/backups/backup.log 2>&1") | crontab -
 
 echo "==> 5/9 Entorno virtual + dependencias de FinTrack"
 cd "$BACKEND_DIR"
