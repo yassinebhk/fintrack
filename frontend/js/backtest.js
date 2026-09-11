@@ -195,8 +195,8 @@ function renderBtResults(data) {
             datasets: [{
                 label: 'Equity (€)',
                 data: data.equity_curve.map(p => p.value),
-                borderColor: '#D97757',
-                backgroundColor: 'rgba(217, 119, 87, 0.1)',
+                borderColor: '#2C4A6E',
+                backgroundColor: 'rgba(44, 74, 110, 0.1)',
                 borderWidth: 2,
                 fill: true,
                 tension: 0.2,

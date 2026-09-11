@@ -15,7 +15,7 @@ const CONFIG = {
     API_BASE_URL: API_BASE_URL,
     REFRESH_INTERVAL: 60000, // 1 minute
     // Canvas (Chart.js) can't resolve CSS var() strings — needs real color values.
-    CHART_COLORS: ['#D97757', '#6366f1', '#C99A3E', '#D65B8A', '#8b5cf6', '#4A9B8E'],
+    CHART_COLORS: ['#2C4A6E', '#6366f1', '#C99A3E', '#D65B8A', '#8b5cf6', '#4A9B8E'],
 };
 
 console.log('FinTrack API URL:', CONFIG.API_BASE_URL);
@@ -503,8 +503,8 @@ function createPortfolioChart(history) {
     
     // Calculate gradient
     const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 350);
-    gradient.addColorStop(0, 'rgba(217, 119, 87, 0.3)');
-    gradient.addColorStop(1, 'rgba(217, 119, 87, 0)');
+    gradient.addColorStop(0, 'rgba(44, 74, 110, 0.3)');
+    gradient.addColorStop(1, 'rgba(44, 74, 110, 0)');
     
     charts.portfolio = new Chart(ctx, {
         type: 'line',
@@ -513,14 +513,14 @@ function createPortfolioChart(history) {
             datasets: [{
                 label: 'Valor de Cartera',
                 data: values,
-                borderColor: '#D97757',
+                borderColor: '#2C4A6E',
                 backgroundColor: gradient,
                 borderWidth: 2,
                 fill: true,
                 tension: 0.4,
                 pointRadius: 0,
                 pointHoverRadius: 6,
-                pointHoverBackgroundColor: '#D97757',
+                pointHoverBackgroundColor: '#2C4A6E',
                 pointHoverBorderColor: '#fff',
                 pointHoverBorderWidth: 2
             }]

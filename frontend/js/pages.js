@@ -73,7 +73,7 @@ async function loadLiveDocsStatus() {
                     + `Rentabilidad: <strong>${pct(d.return_pct)}</strong> vs <strong>${pct(d.benchmark_return_pct)}</strong> del benchmark `
                     + `(alpha ${pct(d.alpha_pct)}). Sharpe ${d.sharpe ?? '—'} vs ${d.benchmark_sharpe ?? '—'} del benchmark.<br>`
                     + `PSR: <strong>${Math.round((d.psr ?? 0) * 100)}%</strong> (necesita ≥75%).<br>`
-                    + `Veredicto del propio sistema: <strong style="color:${rd.ready ? '#D97757' : '#C99A3E'};">${rd.verdict ?? '—'}</strong>`;
+                    + `Veredicto del propio sistema: <strong style="color:${rd.ready ? '#2C4A6E' : '#C99A3E'};">${rd.verdict ?? '—'}</strong>`;
             }
         } catch (err) {
             sisEl.innerHTML = 'No se pudo consultar el estado en vivo ahora mismo — inténtalo recargando la página.';
@@ -87,7 +87,7 @@ const pageContent = {
 <div class="learn-content">
     <h1>📚 Guía de Inversión</h1>
 
-    <div style="background:linear-gradient(135deg,rgba(99, 102, 241, 0.13),rgba(217, 119, 87, 0.13)); border:1px solid rgba(99, 102, 241, 0.27); border-radius:10px; padding:14px 18px; margin:12px 0 18px;">
+    <div style="background:linear-gradient(135deg,rgba(99, 102, 241, 0.13),rgba(44, 74, 110, 0.13)); border:1px solid rgba(99, 102, 241, 0.27); border-radius:10px; padding:14px 18px; margin:12px 0 18px;">
         <strong>🧭 Estás en el paso 1 de 3 del recorrido de FinTrack.</strong>
         <p style="margin:8px 0 0; font-size:14px;">Esta guía te enseña <strong>a invertir desde cero</strong>: conceptos, tipos de activos y las métricas que luego verás por toda la app. Cuando la domines, en <em>Documentación</em> verás <strong>cómo FinTrack automatiza todo esto por ti</strong>, y en <em>Polymarket Lab</em>, hacia dónde va el proyecto.</p>
         <p style="margin:8px 0 0; font-size:13px; color:var(--text-secondary);">Recorrido: <strong style="color:var(--accent-primary);">📚 Aprender (estás aquí)</strong> → 📖 Documentación → 🎲 Lab</p>
@@ -383,7 +383,7 @@ const pageContent = {
         <p>Los traspasos entre fondos de inversión (no ETFs) no tributan hasta que retiras el dinero. Esto permite el <strong>diferimiento fiscal</strong>.</p>
     </section>
 
-    <div style="background:rgba(217, 119, 87, 0.08); border:1px solid rgba(217, 119, 87, 0.27); border-radius:10px; padding:16px 18px; margin-top:24px; text-align:center;">
+    <div style="background:rgba(44, 74, 110, 0.08); border:1px solid rgba(44, 74, 110, 0.27); border-radius:10px; padding:16px 18px; margin-top:24px; text-align:center;">
         <strong style="font-size:15px;">✅ Ya entiendes los fundamentos. Siguiente paso →</strong>
         <p style="margin:8px 0 12px; font-size:14px;">Ahora descubre <strong>cómo FinTrack aplica todo esto automáticamente</strong> cada día: cómo lee tu cartera, escanea el mercado y te trae oportunidades explicadas.</p>
         <a href="#" onclick="document.querySelector('[data-page=docs]').click(); return false;" style="display:inline-block; background:var(--accent-primary); color:var(--bg-primary); font-weight:600; padding:8px 18px; border-radius:8px; text-decoration:none;">📖 Ir a Documentación →</a>
@@ -395,7 +395,7 @@ const pageContent = {
 <div class="docs-content">
     <h1>📖 Documentación de FinTrack</h1>
 
-    <div style="background:linear-gradient(135deg,rgba(99, 102, 241, 0.13),rgba(217, 119, 87, 0.13)); border:1px solid rgba(99, 102, 241, 0.27); border-radius:10px; padding:14px 18px; margin:12px 0 18px;">
+    <div style="background:linear-gradient(135deg,rgba(99, 102, 241, 0.13),rgba(44, 74, 110, 0.13)); border:1px solid rgba(99, 102, 241, 0.27); border-radius:10px; padding:14px 18px; margin:12px 0 18px;">
         <strong>🧭 Paso 2 de 3 del recorrido.</strong>
         <p style="margin:8px 0 0; font-size:14px;">Aquí ves <strong>qué es FinTrack, cómo se usa cada pestaña y cómo "piensa"</strong> para descubrir oportunidades. Si te falta base sobre métricas como Sharpe o momentum, repásalas primero en <em>Aprender</em>.</p>
         <p style="margin:8px 0 0; font-size:13px; color:var(--text-secondary);">Recorrido: 📚 Aprender → <strong style="color:var(--accent-primary);">📖 Documentación (estás aquí)</strong> → 🎲 Lab</p>
@@ -1675,7 +1675,7 @@ curl -X DELETE "http://localhost:8000/api/positions/GOOGL"</code></pre>
             <strong>← Volver a Aprender</strong>
             <p style="margin:6px 0 0; font-size:13px; color:var(--text-secondary);">Repasa los fundamentos y las métricas.</p>
         </a>
-        <a href="#" onclick="document.querySelector('[data-page=polymarket]').click(); return false;" style="flex:1; min-width:200px; background:rgba(217, 119, 87, 0.08); border:1px solid rgba(217, 119, 87, 0.27); border-radius:10px; padding:14px 18px; text-decoration:none; color:inherit;">
+        <a href="#" onclick="document.querySelector('[data-page=polymarket]').click(); return false;" style="flex:1; min-width:200px; background:rgba(44, 74, 110, 0.08); border:1px solid rgba(44, 74, 110, 0.27); border-radius:10px; padding:14px 18px; text-decoration:none; color:inherit;">
             <strong>Siguiente: Polymarket Lab →</strong>
             <p style="margin:6px 0 0; font-size:13px; color:var(--text-secondary);">La visión: hacia un asistente autónomo.</p>
         </a>
@@ -1925,8 +1925,8 @@ function initProjectionChart() {
                 datasets: [{
                     label: 'Proyección',
                     data: values,
-                    borderColor: '#D97757',
-                    backgroundColor: 'rgba(217, 119, 87, 0.1)',
+                    borderColor: '#2C4A6E',
+                    backgroundColor: 'rgba(44, 74, 110, 0.1)',
                     fill: true,
                     tension: 0.4
                 }]

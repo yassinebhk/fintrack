@@ -119,7 +119,7 @@ async function updateAssetInfo(ticker, data) {
     const panel = document.getElementById('assetInfoPanel');
     panel.style.display = 'block';
     
-    const assetInfo = ASSET_DISPLAY_NAMES[ticker] || { name: ticker, icon: '📊', color: '#D97757' };
+    const assetInfo = ASSET_DISPLAY_NAMES[ticker] || { name: ticker, icon: '📊', color: '#2C4A6E' };
     
     // Update basic info
     document.getElementById('assetIconLarge').textContent = assetInfo.icon;
@@ -221,9 +221,9 @@ function renderTradingViewChart(data) {
 
     if (currentChartType === 'candles' && hasOHLC) {
         const series = chart.addCandlestickSeries({
-            upColor: '#D97757', downColor: '#C6473C',
-            borderUpColor: '#D97757', borderDownColor: '#C6473C',
-            wickUpColor: '#D97757', wickDownColor: '#C6473C',
+            upColor: '#2C4A6E', downColor: '#C6473C',
+            borderUpColor: '#2C4A6E', borderDownColor: '#C6473C',
+            wickUpColor: '#2C4A6E', wickDownColor: '#C6473C',
         });
         series.setData(history.map(h => ({
             time: h.date,
@@ -235,10 +235,10 @@ function renderTradingViewChart(data) {
         const firstPrice = history[0]?.close ?? history[0]?.price ?? 0;
         const lastPrice = history[history.length - 1]?.close ?? history[history.length - 1]?.price ?? 0;
         const up = lastPrice >= firstPrice;
-        const color = up ? '#D97757' : '#C6473C';
+        const color = up ? '#2C4A6E' : '#C6473C';
         const series = chart.addAreaSeries({
             lineColor: color,
-            topColor: up ? 'rgba(217, 119, 87,0.4)' : 'rgba(198, 71, 60,0.4)',
+            topColor: up ? 'rgba(44, 74, 110,0.4)' : 'rgba(198, 71, 60,0.4)',
             bottomColor: 'rgba(0,0,0,0)',
             lineWidth: 2,
         });
@@ -285,7 +285,7 @@ function renderAssetChart(data) {
     }
 
     const ctx = canvas.getContext('2d');
-    const assetInfo = ASSET_DISPLAY_NAMES[data.ticker] || { color: '#D97757' };
+    const assetInfo = ASSET_DISPLAY_NAMES[data.ticker] || { color: '#2C4A6E' };
     
     // Prepare data
     const labels = data.history.map(h => h.date);
@@ -299,7 +299,7 @@ function renderAssetChart(data) {
     // Determine if price went up or down
     const firstPrice = prices[0];
     const lastPrice = prices[prices.length - 1];
-    const lineColor = lastPrice >= firstPrice ? '#D97757' : '#C6473C';
+    const lineColor = lastPrice >= firstPrice ? '#2C4A6E' : '#C6473C';
     
     assetChart = new Chart(ctx, {
         type: 'line',
@@ -392,7 +392,7 @@ async function loadAssetQuickCards() {
         }
         
         grid.innerHTML = portfolio.positions.map(pos => {
-            const info = ASSET_DISPLAY_NAMES[pos.ticker] || { name: pos.ticker, icon: '📊', color: '#D97757' };
+            const info = ASSET_DISPLAY_NAMES[pos.ticker] || { name: pos.ticker, icon: '📊', color: '#2C4A6E' };
             const changeClass = pos.day_change_pct >= 0 ? 'positive' : 'negative';
             const changeSign = pos.day_change_pct >= 0 ? '+' : '';
             
@@ -602,7 +602,7 @@ async function loadBenchmarkChart() {
             data: {
                 labels,
                 datasets: [
-                    { label: 'Tu cartera', data: portfolioPct, borderColor: '#D97757', backgroundColor: 'transparent', tension: 0.2, pointRadius: 0, borderWidth: 2 },
+                    { label: 'Tu cartera', data: portfolioPct, borderColor: '#2C4A6E', backgroundColor: 'transparent', tension: 0.2, pointRadius: 0, borderWidth: 2 },
                     { label: 'S&P 500', data: spyPct, borderColor: '#746E63', backgroundColor: 'transparent', tension: 0.2, pointRadius: 0, borderWidth: 2, borderDash: [4, 4] },
                 ],
             },
@@ -660,7 +660,7 @@ function renderCorrelationMatrix(correlation) {
     }
     const N = Math.min(8, tickers.length); // top holdings only — an 18x18 grid doesn't fit a small card
     const colorFor = (v) => v >= 0
-        ? `rgba(217, 119, 87, ${Math.min(Math.abs(v), 1) * 0.6})`
+        ? `rgba(44, 74, 110, ${Math.min(Math.abs(v), 1) * 0.6})`
         : `rgba(198, 71, 60, ${Math.min(Math.abs(v), 1) * 0.6})`;
     // Raw ISINs/tickers (IE00BYX5NX33, LYX0F.DE...) mean nothing at a glance —
     // always show the human name here, ticker only as a hover tooltip.

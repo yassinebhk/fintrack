@@ -35,7 +35,7 @@ function showAssetDetail(ticker) {
 }
 
 async function loadAssetDetailHeader(ticker) {
-    const info = ASSET_DISPLAY_NAMES[ticker] || { name: ticker, icon: '📊', color: '#D97757' };
+    const info = ASSET_DISPLAY_NAMES[ticker] || { name: ticker, icon: '📊', color: '#2C4A6E' };
     document.getElementById('assetDetailIcon').textContent = info.icon;
     document.getElementById('assetDetailIcon').style.background = `linear-gradient(135deg, ${info.color}33, ${info.color}11)`;
     document.getElementById('assetDetailIcon').style.color = info.color;
@@ -89,9 +89,9 @@ function renderAssetDetailMarketSeries(chart, history) {
     const hasOHLC = history.length > 0 && history[0].open !== undefined && history[0].high !== undefined;
     if (hasOHLC) {
         const series = chart.addCandlestickSeries({
-            upColor: '#D97757', downColor: '#C6473C',
-            borderUpColor: '#D97757', borderDownColor: '#C6473C',
-            wickUpColor: '#D97757', wickDownColor: '#C6473C',
+            upColor: '#2C4A6E', downColor: '#C6473C',
+            borderUpColor: '#2C4A6E', borderDownColor: '#C6473C',
+            wickUpColor: '#2C4A6E', wickDownColor: '#C6473C',
         });
         series.setData(history.map(h => ({ time: h.date, open: h.open, high: h.high, low: h.low, close: h.close })));
     } else {
@@ -99,8 +99,8 @@ function renderAssetDetailMarketSeries(chart, history) {
         const lastPrice = history[history.length - 1]?.close ?? history[history.length - 1]?.price ?? 0;
         const up = lastPrice >= firstPrice;
         const series = chart.addAreaSeries({
-            lineColor: up ? '#D97757' : '#C6473C',
-            topColor: up ? 'rgba(217, 119, 87,0.4)' : 'rgba(198, 71, 60,0.4)',
+            lineColor: up ? '#2C4A6E' : '#C6473C',
+            topColor: up ? 'rgba(44, 74, 110,0.4)' : 'rgba(198, 71, 60,0.4)',
             bottomColor: 'rgba(0,0,0,0)',
             lineWidth: 2,
         });
@@ -177,7 +177,7 @@ async function loadAssetDetailPositionChart(ticker) {
                 datasets: [
                     {
                         label: 'Valor de tu posición', data: hist.map(h => h.value),
-                        borderColor: '#D97757', backgroundColor: 'rgba(217, 119, 87,0.1)',
+                        borderColor: '#2C4A6E', backgroundColor: 'rgba(44, 74, 110,0.1)',
                         fill: true, tension: 0.2, pointRadius: 0, borderWidth: 2,
                     },
                     {
