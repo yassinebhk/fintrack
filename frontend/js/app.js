@@ -596,7 +596,33 @@ function createDoughnutChart(canvasId, data, legendId) {
     const labels = Object.keys(data);
     const values = labels.map(k => data[k].value || data[k].weight);
     const weights = labels.map(k => data[k].weight);
-    
+
+    // Top category's label + weight, drawn in the donut's hole (Stripe/Mercury-style
+    // "center stat" donut) — makes the chart itself communicate something at a
+    // glance, instead of being purely decorative next to the text legend below.
+    let topIdx = 0;
+    for (let i = 1; i < values.length; i++) if (values[i] > values[topIdx]) topIdx = i;
+    const centerTextPlugin = {
+        id: 'centerText_' + canvasId,
+        afterDraw(c) {
+            const { ctx: c2, chartArea } = c;
+            if (!chartArea) return;
+            const cx = (chartArea.left + chartArea.right) / 2;
+            const cy = (chartArea.top + chartArea.bottom) / 2;
+            c2.save();
+            c2.textAlign = 'center';
+            c2.textBaseline = 'middle';
+            c2.fillStyle = '#2B2822';
+            c2.font = "700 20px 'JetBrains Mono', monospace";
+            c2.fillText(`${Math.round(weights[topIdx])}%`, cx, cy - 8);
+            c2.fillStyle = '#9C9689';
+            c2.font = "600 10px 'Outfit', sans-serif";
+            const topLabel = (labels[topIdx] || '').toString().toUpperCase().slice(0, 14);
+            c2.fillText(topLabel, cx, cy + 12);
+            c2.restore();
+        }
+    };
+
     const chart = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -610,10 +636,11 @@ function createDoughnutChart(canvasId, data, legendId) {
                 hoverBorderWidth: 3
             }]
         },
+        plugins: [centerTextPlugin],
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            cutout: '70%',
+            cutout: '72%',
             plugins: {
                 legend: {
                     display: false
