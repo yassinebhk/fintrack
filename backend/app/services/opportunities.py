@@ -275,10 +275,16 @@ class OpportunityService:
 
         # Surface the top of each objective ranking to the UI (the universe is large).
         scored = [t for t in themes if t.get("factors")]
-        top_mom = sorted(scored, key=lambda x: x.get("momentum_score", 0), reverse=True)[:12]
-        top_val = sorted(scored, key=lambda x: x.get("value_score", 0), reverse=True)[:12]
+        top_mom = sorted(scored, key=lambda x: x.get("momentum_score", 0), reverse=True)[:16]
+        top_val = sorted(scored, key=lambda x: x.get("value_score", 0), reverse=True)[:16]
+        # Individual stocks are a minority of the scanned universe (mostly ETFs/bond
+        # funds/managed funds) — without a guaranteed slice, a regime that favors
+        # ETFs can crowd every single stock out of top_mom/top_val even though the
+        # engine scores them identically. Guarantee stock visibility explicitly.
+        is_stock = lambda t: t.get("category") == "acción" or str(t.get("category", "")).startswith("screener")
+        top_stocks = sorted((t for t in scored if is_stock(t)), key=lambda x: x.get("momentum_score", 0), reverse=True)[:12]
         seen, top_themes = set(), []
-        for t in top_mom + top_val:
+        for t in top_mom + top_val + top_stocks:
             if t["ticker"] not in seen:
                 seen.add(t["ticker"])
                 top_themes.append(t)

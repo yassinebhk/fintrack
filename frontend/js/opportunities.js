@@ -204,7 +204,7 @@ function renderOpportunities(data) {
         const cls = s >= 0 ? 'value-positive' : 'value-negative';
         return `<span class="mono ${cls}">${s >= 0 ? '+' : ''}${s.toFixed(2)}</span>`;
     };
-    const themes = (data.themes || []).slice(0, 10).map(t => {
+    const themes = (data.themes || []).map(t => {
         const r3 = t.ret_3m, cls = (r3 || 0) >= 0 ? 'value-positive' : 'value-negative';
         return `<tr><td>${t.theme}</td><td class="text-right">${fmtScore(t.momentum_score)}</td><td class="text-right">${fmtScore(t.value_score)}</td><td class="text-right mono ${cls}">${r3 != null ? (r3>=0?'+':'')+r3+'%' : '—'}</td><td class="text-right mono">${t.range_pos_52w != null ? t.range_pos_52w.toFixed(0)+'%' : '—'}</td></tr>`;
     }).join('');

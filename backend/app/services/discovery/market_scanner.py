@@ -273,8 +273,22 @@ class MarketScanner:
         )
         out += [line(t, "value_score") for t in by_value[:6]] or ["  (sin datos)"]
         out.append("")
+
+        # Individual stocks are a minority of the scanned universe (mostly ETFs/bond
+        # funds/managed funds), so TOP MOMENTUM/VALOR above can end up all-ETF on a
+        # day where funds simply score higher — not bias, just how the universe is
+        # shaped. Give the analyst a guaranteed look at real stock candidates too.
+        is_stock = lambda t: t.get("category") == "acción" or str(t.get("category", "")).startswith("screener")
+        by_stock = sorted((t for t in scored if is_stock(t)), key=lambda x: x.get("momentum_score", 0), reverse=True)
+        out.append("🏢 TOP ACCIONES INDIVIDUALES (mismo ranking, solo acciones — para que no falten frente a ETFs/fondos):")
+        out += [line(t, "momentum_score") for t in by_stock[:6]] or ["  (sin datos)"]
+        out.append("")
+
         out.append(
-            "Instrucción: elige tus oportunidades SOLO de entre los temas mejor rankeados arriba. "
-            "Tu trabajo es EXPLICAR los que encabezan el ranking, no reordenarlos a tu criterio."
+            "Instrucción: elige tus oportunidades SOLO de entre los temas mejor rankeados arriba "
+            "(las tres listas: MOMENTUM, VALOR y ACCIONES INDIVIDUALES). Tu trabajo es EXPLICAR los "
+            "que encabezan el ranking, no reordenarlos a tu criterio. Si hay una acción individual "
+            "genuinamente interesante en la lista de ACCIONES, inclúyela — no dejes que los ETFs/fondos "
+            "acaparen todas las ideas solo por ser mayoría en el universo escaneado."
         )
         return "\n".join(out)

@@ -131,6 +131,74 @@ UNIVERSE: list[tuple[str, str, str, str]] = [
     ("0P0001824G.L", "Fundsmith Equity", "fondo gestionado", "Global"),
     ("0P0001OCUI.F", "Seilern World Growth", "fondo gestionado", "Global"),
     ("0P0001CTGR.F", "Baelo Patrimonio", "fondo gestionado", "Global"),
+    # --- Acciones individuales ---
+    # A diferencia del resto (ETFs/fondos), aquí sí dependíamos solo de un screener
+    # de yfinance en tiempo de escaneo (best-effort, falla en silencio, EEUU-only,
+    # máx. 30). Se listan explícitamente para que la cobertura de acciones no
+    # dependa de que ese screener funcione ese día.
+    # Tecnología
+    ("AAPL", "Apple", "acción", "EEUU"),
+    ("MSFT", "Microsoft", "acción", "EEUU"),
+    ("GOOGL", "Alphabet", "acción", "EEUU"),
+    ("AMZN", "Amazon", "acción", "EEUU"),
+    ("META", "Meta Platforms", "acción", "EEUU"),
+    ("NVDA", "Nvidia", "acción", "EEUU"),
+    ("AVGO", "Broadcom", "acción", "EEUU"),
+    ("ORCL", "Oracle", "acción", "EEUU"),
+    ("ADBE", "Adobe", "acción", "EEUU"),
+    ("CRM", "Salesforce", "acción", "EEUU"),
+    ("QCOM", "Qualcomm", "acción", "EEUU"),
+    ("INTC", "Intel", "acción", "EEUU"),
+    ("TSM", "TSMC", "acción", "Asia"),
+    ("NFLX", "Netflix", "acción", "EEUU"),
+    # Financieras
+    ("JPM", "JPMorgan Chase", "acción", "EEUU"),
+    ("BAC", "Bank of America", "acción", "EEUU"),
+    ("GS", "Goldman Sachs", "acción", "EEUU"),
+    ("V", "Visa", "acción", "EEUU"),
+    ("MA", "Mastercard", "acción", "EEUU"),
+    ("BRK-B", "Berkshire Hathaway", "acción", "EEUU"),
+    # Salud
+    ("UNH", "UnitedHealth", "acción", "EEUU"),
+    ("JNJ", "Johnson & Johnson", "acción", "EEUU"),
+    ("LLY", "Eli Lilly", "acción", "EEUU"),
+    ("PFE", "Pfizer", "acción", "EEUU"),
+    ("ABBV", "AbbVie", "acción", "EEUU"),
+    ("NVO", "Novo Nordisk", "acción", "Europa"),
+    # Consumo
+    ("WMT", "Walmart", "acción", "EEUU"),
+    ("COST", "Costco", "acción", "EEUU"),
+    ("HD", "Home Depot", "acción", "EEUU"),
+    ("NKE", "Nike", "acción", "EEUU"),
+    ("MCD", "McDonald's", "acción", "EEUU"),
+    ("SBUX", "Starbucks", "acción", "EEUU"),
+    ("PG", "Procter & Gamble", "acción", "EEUU"),
+    ("KO", "Coca-Cola", "acción", "EEUU"),
+    ("PEP", "PepsiCo", "acción", "EEUU"),
+    # Industriales / defensa / energía
+    ("CAT", "Caterpillar", "acción", "EEUU"),
+    ("BA", "Boeing", "acción", "EEUU"),
+    ("GE", "General Electric", "acción", "EEUU"),
+    ("HON", "Honeywell", "acción", "EEUU"),
+    ("LMT", "Lockheed Martin", "acción", "EEUU"),
+    ("RTX", "RTX Corporation", "acción", "EEUU"),
+    ("XOM", "ExxonMobil", "acción", "EEUU"),
+    ("CVX", "Chevron", "acción", "EEUU"),
+    # Autos / disruptivos
+    ("TSLA", "Tesla", "acción", "EEUU"),
+    ("F", "Ford", "acción", "EEUU"),
+    # Europa
+    ("ASML.AS", "ASML", "acción", "Europa"),
+    ("SAP.DE", "SAP", "acción", "Europa"),
+    ("MC.PA", "LVMH", "acción", "Europa"),
+    ("NESN.SW", "Nestlé", "acción", "Europa"),
+    # España
+    ("ITX.MC", "Inditex", "acción", "España"),
+    ("SAN.MC", "Banco Santander", "acción", "España"),
+    ("BBVA.MC", "BBVA", "acción", "España"),
+    ("IBE.MC", "Iberdrola", "acción", "España"),
+    ("TEF.MC", "Telefónica", "acción", "España"),
+    ("REP.MC", "Repsol", "acción", "España"),
 ]
 
 
