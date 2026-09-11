@@ -20,6 +20,7 @@ Pre-registered criteria (ALL must hold — see the .md; do NOT edit them here):
      a down-day must ADD something over plain equity drift.
 """
 import statistics
+import sys
 import urllib.parse
 import urllib.request
 import json
@@ -27,7 +28,10 @@ import time
 
 UA = {"User-Agent": "Mozilla/5.0"}
 NDX = "^NDX"          # Nasdaq-100 index (signal)
-SEMIS = "VVSM.DE"     # pre-registered proxy (VanEck Semiconductor UCITS, EUR)
+# proxy: default = H1's pre-registered VVSM.DE; override via argv for H2
+#   python tools/event_study_h1.py SMH 25   → H2 long-history bear-inclusive test
+SEMIS = sys.argv[1] if len(sys.argv) > 1 else "VVSM.DE"
+SEMIS_YEARS = int(sys.argv[2]) if len(sys.argv) > 2 else 11
 DOWN = -0.005         # Nasdaq day <= -0.5%
 HORIZONS = (3, 4, 5)  # "3-5 sessions"
 HAIRCUT = 0.0015      # 0.15% per-trade round-trip cost/slippage
@@ -174,8 +178,8 @@ def block_bootstrap_edge(series, entry_dates, block=20, iters=3000, seed=1234):
 
 def main():
     print("H1 event study — semis rebound after a Nasdaq down-day\n" + "=" * 55)
-    ndx = fetch(NDX, years=10)
-    semis = fetch(SEMIS, years=11)   # capped at VVSM.DE inception (~Dec 2020) anyway
+    ndx = fetch(NDX, years=max(10, SEMIS_YEARS))
+    semis = fetch(SEMIS, years=SEMIS_YEARS)   # capped at the proxy's inception anyway
     print(f"^NDX closes: {len(ndx)} ({ndx[0][0]}..{ndx[-1][0]})")
     print(f"{SEMIS} closes: {len(semis)} ({semis[0][0]}..{semis[-1][0]})")
 

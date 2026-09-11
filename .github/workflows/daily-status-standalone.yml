@@ -5,8 +5,14 @@ name: daily-status-standalone
 # in the backend, Render, or Neon — so it keeps working during an outage, unlike:
 #   - daily-summary.yml            (needs the Render backend up)
 #   - daily-summary-direct-stopgap (needs the Neon DB up)
-# Single cron (the script is not idempotent, so avoid redundant sends); use the
-# manual "Run workflow" button if a scheduled run is skipped/delayed by GitHub.
+#
+# Reliability: GitHub's scheduled crons are best-effort and are often delayed by
+# hours (or, rarely, skipped). So there are TWO cron times — a primary and a
+# later backup. The script itself is NOT idempotent, so a "guard" step makes the
+# SYSTEM idempotent: a scheduled run skips sending if another run of this same
+# workflow already succeeded today. Result: exactly one message/day even with two
+# crons, and it still goes out if the earlier one was skipped entirely. Manual
+# "Run workflow" (workflow_dispatch) ALWAYS sends (bypasses the guard).
 #
 # Required GitHub Secrets (already used by daily-summary-direct-stopgap.yml):
 #   TELEGRAM_BOT_TOKEN
@@ -14,8 +20,13 @@ name: daily-status-standalone
 
 on:
   schedule:
-    - cron: "15 6 * * 1-5"   # ≈ 08:15 Europe/Madrid (07:15 in winter), Mon–Fri
+    - cron: "15 6 * * 1-5"   # primary  ≈ 08:15 Europe/Madrid (07:15 winter), Mon–Fri
+    - cron: "0 11 * * 1-5"   # backup   ≈ 13:00 Europe/Madrid, in case the primary is skipped/very late
   workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read              # for the guard step's `gh run list`
 
 jobs:
   send:
@@ -26,7 +37,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Skip if today's status already went out (system-level idempotency)
+        id: guard
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          today=$(date -u +%Y-%m-%d)
+          n=$(gh run list --workflow=daily-status-standalone.yml -L 30 \
+                --json databaseId,conclusion,createdAt \
+                --jq "[.[] | select(.conclusion==\"success\" and (.createdAt|startswith(\"$today\")) and (.databaseId != ${{ github.run_id }}))] | length")
+          echo "successful runs already today: ${n:-0}"
+          if [ "${n:-0}" -gt 0 ]; then
+            echo "skip=true"  >> "$GITHUB_OUTPUT"
+            echo "→ already sent today; this run will skip."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Send daily portfolio status to Telegram
+        if: steps.guard.outputs.skip != 'true'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

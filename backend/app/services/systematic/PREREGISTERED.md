@@ -93,3 +93,52 @@ trap — overlap, not edge, did most of the work.
 **Kept as the reference example** of why the block-bootstrap / non-overlap step is
 mandatory before any hypothesis here graduates. To revive H1 it must clear a
 bear-inclusive sample AND a materially larger edge — as a NEW dated entry.
+
+---
+
+## 2026-09-11 · H2 — H1 re-run on a BEAR-INCLUSIVE long-history proxy
+
+**Why.** H1 died on a single-regime sample (VVSM.DE exists only since Dec-2020, a
+pure semis bull). H2 keeps the *exact same hypothesis, threshold, horizon and
+criteria* and changes ONLY the proxy to a long-history US semis ETF whose sample
+spans real bears — **SMH** (~2000+, covers 2008/2018/2022) and **SOXX** (~2001+).
+This is the "new dated entry" the H1 kill-rule requires, not a re-slice of H1.
+
+**Hypothesis / signal / criteria: identical to H1** (≥60 events; mean>0 & 95% CI
+lower>0 after 0.15% haircut; sign replicates OOS both halves; beats the
+unconditional baseline) **PLUS the mandatory robustness gate** — must ALSO survive
+non-overlapping windows AND the block-bootstrap edge CI. Frozen before running.
+Evaluator: `python tools/event_study_h1.py SMH 25` (and `SOXX 25`).
+
+**Kill rule.** Same as H1. If it fails on the bear-inclusive sample, the "semis
+rebound after a Nasdaq down-day" family is dead — no more proxies fished for a pass.
+
+### Result — 2026-09-11 (evaluator: `event_study_h1.py SMH 25` / `SOXX 25`)
+
+Both independent long-history proxies, 2001-2026 (covers the 2008, 2018 and 2022
+bear markets), 1715 events each:
+
+| proxy | cond mean (3-5d, net) | non-overlap (n=789) 95% CI | block-boot edge · P(≤0) | verdict |
+|---|---|---|---|---|
+| **SMH**  | +0.422% (base +0.150%) | +0.322% **[+0.053%, +0.592%]** | +0.272% [+0.128%,+0.424%] · **0.0%** | SURVIVES |
+| **SOXX** | +0.433% (base +0.145%) | +0.318% **[+0.040%, +0.596%]** | +0.288% [+0.136%,+0.443%] · **0.0%** | SURVIVES |
+
+**Verdict: H2 SURVIVES pre-reg AND the overlap correction, on BOTH proxies.**
+Unlike H1 (single 2020-26 bull, died on the correction), the bear-inclusive
+25-year sample shows a ~0.27-0.29pp conditional edge that holds on independent
+windows and replicates across two proxies. This is a real conditional tilt.
+
+**But — honest caveats before anyone gets excited (still NO real money):**
+1. **Small edge** (~0.28pp/event over baseline). Real after the haircut, but thin
+   after Spanish CGT and timing; it's a tilt, not a money printer.
+2. **Instrument mismatch.** The edge is *proven* on SMH/SOXX (long history). The
+   thing Yassine actually buys is **VVSM.DE**, whose own short sample did NOT
+   survive (H1). Same underlying semis index, so it should transfer — but the
+   EUR-listed proxy's edge is inferred, not independently proven.
+3. **One bet.** Single signal (Nasdaq), single sector (semis) — best implemented
+   as a *conditional overlay/timing* on a semis sleeve, not a standalone system.
+
+**Next step (graduation path, not a green light):** run it FORWARD, out-of-sample,
+in the live paper engine and clear the `_readiness()` gate (≥56 days, ≥30 marks,
+beat MSCI World in return & Sharpe, PSR≥0.75, no >25% DD) before ANY real pilot.
+An in-sample survive is necessary, not sufficient.
