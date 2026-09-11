@@ -195,7 +195,7 @@ function renderBtResults(data) {
             datasets: [{
                 label: 'Equity (€)',
                 data: data.equity_curve.map(p => p.value),
-                borderColor: 'var(--accent-primary)',
+                borderColor: '#D97757',
                 backgroundColor: 'rgba(217, 119, 87, 0.1)',
                 borderWidth: 2,
                 fill: true,
@@ -208,8 +208,8 @@ function renderBtResults(data) {
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-                x: { ticks: { maxTicksLimit: 8, color: 'var(--text-tertiary)' }, grid: { display: false } },
-                y: { ticks: { color: 'var(--text-tertiary)', callback: v => v.toLocaleString('es-ES') + ' €' }, grid: { color: 'var(--bg-tertiary)' } },
+                x: { ticks: { maxTicksLimit: 8, color: '#9C9689' }, grid: { display: false } },
+                y: { ticks: { color: '#9C9689', callback: v => v.toLocaleString('es-ES') + ' €' }, grid: { color: '#EFEBE3' } },
             },
         },
     });

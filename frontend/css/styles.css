@@ -308,7 +308,7 @@ body::before {
     justify-content: space-between;
     align-items: center;
     padding: var(--spacing-md) var(--spacing-xl);
-    background: rgba(17, 24, 39, 0.8);
+    background: rgba(247, 245, 241, 0.85);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border-primary);
     position: sticky;
@@ -458,9 +458,9 @@ body::before {
 }
 
 .card-total {
-    background: linear-gradient(135deg, var(--bg-card) 0%, rgba(217, 119, 87, 0.05) 100%);
-    border-color: var(--border-accent);
-    box-shadow: var(--shadow-glow);
+    background: linear-gradient(135deg, var(--bg-card) 0%, rgba(217, 119, 87, 0.06) 100%);
+    border: 1.5px solid rgba(217, 119, 87, 0.5);
+    box-shadow: var(--shadow-md);
 }
 
 .card-label {
@@ -1548,7 +1548,7 @@ body::before {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(10, 14, 23, 0.9);
+    background: rgba(247, 245, 241, 0.92);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1892,7 +1892,7 @@ body::before {
 }
 
 .diagram-box {
-    background: linear-gradient(135deg, var(--bg-tertiary) 0%, #0d1520 100%) !important;
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%) !important;
     border: 2px solid var(--border-secondary) !important;
     border-radius: var(--radius-lg) !important;
     font-size: 11px !important;
@@ -3422,7 +3422,7 @@ button.action-card {
 
 .asset-quick-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-lg);
 }
 
 .quick-card-header {

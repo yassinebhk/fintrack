@@ -14,7 +14,8 @@ const API_BASE_URL = isProduction
 const CONFIG = {
     API_BASE_URL: API_BASE_URL,
     REFRESH_INTERVAL: 60000, // 1 minute
-    CHART_COLORS: ['var(--accent-primary)', 'var(--accent-secondary)', 'var(--warning)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)'],
+    // Canvas (Chart.js) can't resolve CSS var() strings — needs real color values.
+    CHART_COLORS: ['#D97757', '#6366f1', '#C99A3E', '#D65B8A', '#8b5cf6', '#4A9B8E'],
 };
 
 console.log('FinTrack API URL:', CONFIG.API_BASE_URL);
@@ -512,14 +513,14 @@ function createPortfolioChart(history) {
             datasets: [{
                 label: 'Valor de Cartera',
                 data: values,
-                borderColor: 'var(--accent-primary)',
+                borderColor: '#D97757',
                 backgroundColor: gradient,
                 borderWidth: 2,
                 fill: true,
                 tension: 0.4,
                 pointRadius: 0,
                 pointHoverRadius: 6,
-                pointHoverBackgroundColor: 'var(--accent-primary)',
+                pointHoverBackgroundColor: '#D97757',
                 pointHoverBorderColor: '#fff',
                 pointHoverBorderWidth: 2
             }]
@@ -536,10 +537,10 @@ function createPortfolioChart(history) {
                     display: false
                 },
                 tooltip: {
-                    backgroundColor: 'var(--bg-tertiary)',
-                    titleColor: 'var(--text-secondary)',
-                    bodyColor: 'var(--text-primary)',
-                    borderColor: 'var(--border-secondary)',
+                    backgroundColor: '#EFEBE3',
+                    titleColor: '#746E63',
+                    bodyColor: '#2B2822',
+                    borderColor: '#D8D0C0',
                     borderWidth: 1,
                     padding: 12,
                     displayColors: false,
@@ -559,7 +560,7 @@ function createPortfolioChart(history) {
                         display: false
                     },
                     ticks: {
-                        color: 'var(--text-tertiary)',
+                        color: '#9C9689',
                         maxTicksLimit: 8,
                         callback: function(value, index) {
                             const date = new Date(this.getLabelForValue(value));
@@ -569,10 +570,10 @@ function createPortfolioChart(history) {
                 },
                 y: {
                     grid: {
-                        color: 'var(--bg-tertiary)'
+                        color: '#EFEBE3'
                     },
                     ticks: {
-                        color: 'var(--text-tertiary)',
+                        color: '#9C9689',
                         callback: function(value) {
                             return formatCurrency(value, 'EUR');
                         }
@@ -603,9 +604,9 @@ function createDoughnutChart(canvasId, data, legendId) {
             datasets: [{
                 data: values,
                 backgroundColor: CONFIG.CHART_COLORS.slice(0, labels.length),
-                borderColor: 'var(--bg-secondary)',
+                borderColor: '#FFFFFF',
                 borderWidth: 3,
-                hoverBorderColor: 'var(--bg-tertiary)',
+                hoverBorderColor: '#EFEBE3',
                 hoverBorderWidth: 3
             }]
         },
@@ -618,10 +619,10 @@ function createDoughnutChart(canvasId, data, legendId) {
                     display: false
                 },
                 tooltip: {
-                    backgroundColor: 'var(--bg-tertiary)',
-                    titleColor: 'var(--text-secondary)',
-                    bodyColor: 'var(--text-primary)',
-                    borderColor: 'var(--border-secondary)',
+                    backgroundColor: '#EFEBE3',
+                    titleColor: '#746E63',
+                    bodyColor: '#2B2822',
+                    borderColor: '#D8D0C0',
                     borderWidth: 1,
                     padding: 12,
                     callbacks: {

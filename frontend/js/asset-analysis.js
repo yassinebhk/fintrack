@@ -119,7 +119,7 @@ async function updateAssetInfo(ticker, data) {
     const panel = document.getElementById('assetInfoPanel');
     panel.style.display = 'block';
     
-    const assetInfo = ASSET_DISPLAY_NAMES[ticker] || { name: ticker, icon: '📊', color: 'var(--accent-primary)' };
+    const assetInfo = ASSET_DISPLAY_NAMES[ticker] || { name: ticker, icon: '📊', color: '#D97757' };
     
     // Update basic info
     document.getElementById('assetIconLarge').textContent = assetInfo.icon;
@@ -204,14 +204,14 @@ function renderTradingViewChart(data) {
         height: 400,
         layout: {
             background: { color: 'transparent' },
-            textColor: 'var(--text-secondary)',
+            textColor: '#746E63',
         },
         grid: {
             vertLines: { color: 'rgba(30, 41, 59, 0.5)' },
             horzLines: { color: 'rgba(30, 41, 59, 0.5)' },
         },
-        rightPriceScale: { borderColor: 'var(--border-secondary)' },
-        timeScale: { borderColor: 'var(--border-secondary)', timeVisible: false },
+        rightPriceScale: { borderColor: '#D8D0C0' },
+        timeScale: { borderColor: '#D8D0C0', timeVisible: false },
         crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
     });
     tvChart = chart;
@@ -221,9 +221,9 @@ function renderTradingViewChart(data) {
 
     if (currentChartType === 'candles' && hasOHLC) {
         const series = chart.addCandlestickSeries({
-            upColor: 'var(--accent-primary)', downColor: 'var(--negative)',
-            borderUpColor: 'var(--accent-primary)', borderDownColor: 'var(--negative)',
-            wickUpColor: 'var(--accent-primary)', wickDownColor: 'var(--negative)',
+            upColor: '#D97757', downColor: '#C6473C',
+            borderUpColor: '#D97757', borderDownColor: '#C6473C',
+            wickUpColor: '#D97757', wickDownColor: '#C6473C',
         });
         series.setData(history.map(h => ({
             time: h.date,
@@ -235,7 +235,7 @@ function renderTradingViewChart(data) {
         const firstPrice = history[0]?.close ?? history[0]?.price ?? 0;
         const lastPrice = history[history.length - 1]?.close ?? history[history.length - 1]?.price ?? 0;
         const up = lastPrice >= firstPrice;
-        const color = up ? 'var(--accent-primary)' : 'var(--negative)';
+        const color = up ? '#D97757' : '#C6473C';
         const series = chart.addAreaSeries({
             lineColor: color,
             topColor: up ? 'rgba(217, 119, 87,0.4)' : 'rgba(198, 71, 60,0.4)',
@@ -285,7 +285,7 @@ function renderAssetChart(data) {
     }
 
     const ctx = canvas.getContext('2d');
-    const assetInfo = ASSET_DISPLAY_NAMES[data.ticker] || { color: 'var(--accent-primary)' };
+    const assetInfo = ASSET_DISPLAY_NAMES[data.ticker] || { color: '#D97757' };
     
     // Prepare data
     const labels = data.history.map(h => h.date);
@@ -299,7 +299,7 @@ function renderAssetChart(data) {
     // Determine if price went up or down
     const firstPrice = prices[0];
     const lastPrice = prices[prices.length - 1];
-    const lineColor = lastPrice >= firstPrice ? 'var(--accent-primary)' : 'var(--negative)';
+    const lineColor = lastPrice >= firstPrice ? '#D97757' : '#C6473C';
     
     assetChart = new Chart(ctx, {
         type: 'line',
@@ -332,10 +332,10 @@ function renderAssetChart(data) {
                     display: false
                 },
                 tooltip: {
-                    backgroundColor: 'var(--bg-tertiary)',
-                    titleColor: 'var(--text-secondary)',
-                    bodyColor: 'var(--text-primary)',
-                    borderColor: 'var(--border-secondary)',
+                    backgroundColor: '#EFEBE3',
+                    titleColor: '#746E63',
+                    bodyColor: '#2B2822',
+                    borderColor: '#D8D0C0',
                     borderWidth: 1,
                     padding: 12,
                     displayColors: false,
@@ -353,7 +353,7 @@ function renderAssetChart(data) {
                 x: {
                     grid: { display: false },
                     ticks: {
-                        color: 'var(--text-tertiary)',
+                        color: '#9C9689',
                         maxTicksLimit: 8,
                         callback: function(value, index) {
                             const date = this.getLabelForValue(value);
@@ -362,9 +362,9 @@ function renderAssetChart(data) {
                     }
                 },
                 y: {
-                    grid: { color: 'var(--bg-tertiary)' },
+                    grid: { color: '#EFEBE3' },
                     ticks: {
-                        color: 'var(--text-tertiary)',
+                        color: '#9C9689',
                         callback: function(value) {
                             return formatCurrencyLocal(value);
                         }
@@ -392,7 +392,7 @@ async function loadAssetQuickCards() {
         }
         
         grid.innerHTML = portfolio.positions.map(pos => {
-            const info = ASSET_DISPLAY_NAMES[pos.ticker] || { name: pos.ticker, icon: '📊', color: 'var(--accent-primary)' };
+            const info = ASSET_DISPLAY_NAMES[pos.ticker] || { name: pos.ticker, icon: '📊', color: '#D97757' };
             const changeClass = pos.day_change_pct >= 0 ? 'positive' : 'negative';
             const changeSign = pos.day_change_pct >= 0 ? '+' : '';
             
@@ -602,17 +602,17 @@ async function loadBenchmarkChart() {
             data: {
                 labels,
                 datasets: [
-                    { label: 'Tu cartera', data: portfolioPct, borderColor: 'var(--accent-primary)', backgroundColor: 'transparent', tension: 0.2, pointRadius: 0, borderWidth: 2 },
-                    { label: 'S&P 500', data: spyPct, borderColor: 'var(--text-secondary)', backgroundColor: 'transparent', tension: 0.2, pointRadius: 0, borderWidth: 2, borderDash: [4, 4] },
+                    { label: 'Tu cartera', data: portfolioPct, borderColor: '#D97757', backgroundColor: 'transparent', tension: 0.2, pointRadius: 0, borderWidth: 2 },
+                    { label: 'S&P 500', data: spyPct, borderColor: '#746E63', backgroundColor: 'transparent', tension: 0.2, pointRadius: 0, borderWidth: 2, borderDash: [4, 4] },
                 ],
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: true, labels: { color: 'var(--text-secondary)', boxWidth: 12 } } },
+                plugins: { legend: { display: true, labels: { color: '#746E63', boxWidth: 12 } } },
                 scales: {
                     x: { display: false },
-                    y: { ticks: { color: 'var(--text-secondary)', callback: v => `${v.toFixed(0)}%` }, grid: { color: 'rgba(148,163,184,0.1)' } },
+                    y: { ticks: { color: '#746E63', callback: v => `${v.toFixed(0)}%` }, grid: { color: 'rgba(148,163,184,0.1)' } },
                 },
             },
         });

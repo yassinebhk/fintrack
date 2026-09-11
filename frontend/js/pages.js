@@ -73,7 +73,7 @@ async function loadLiveDocsStatus() {
                     + `Rentabilidad: <strong>${pct(d.return_pct)}</strong> vs <strong>${pct(d.benchmark_return_pct)}</strong> del benchmark `
                     + `(alpha ${pct(d.alpha_pct)}). Sharpe ${d.sharpe ?? '—'} vs ${d.benchmark_sharpe ?? '—'} del benchmark.<br>`
                     + `PSR: <strong>${Math.round((d.psr ?? 0) * 100)}%</strong> (necesita ≥75%).<br>`
-                    + `Veredicto del propio sistema: <strong style="color:${rd.ready ? 'var(--accent-primary)' : 'var(--warning)'};">${rd.verdict ?? '—'}</strong>`;
+                    + `Veredicto del propio sistema: <strong style="color:${rd.ready ? '#D97757' : '#C99A3E'};">${rd.verdict ?? '—'}</strong>`;
             }
         } catch (err) {
             sisEl.innerHTML = 'No se pudo consultar el estado en vivo ahora mismo — inténtalo recargando la página.';
@@ -1925,7 +1925,7 @@ function initProjectionChart() {
                 datasets: [{
                     label: 'Proyección',
                     data: values,
-                    borderColor: 'var(--accent-primary)',
+                    borderColor: '#D97757',
                     backgroundColor: 'rgba(217, 119, 87, 0.1)',
                     fill: true,
                     tension: 0.4

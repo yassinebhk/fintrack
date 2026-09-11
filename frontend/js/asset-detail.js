@@ -35,7 +35,7 @@ function showAssetDetail(ticker) {
 }
 
 async function loadAssetDetailHeader(ticker) {
-    const info = ASSET_DISPLAY_NAMES[ticker] || { name: ticker, icon: '📊', color: 'var(--accent-primary)' };
+    const info = ASSET_DISPLAY_NAMES[ticker] || { name: ticker, icon: '📊', color: '#D97757' };
     document.getElementById('assetDetailIcon').textContent = info.icon;
     document.getElementById('assetDetailIcon').style.background = `linear-gradient(135deg, ${info.color}33, ${info.color}11)`;
     document.getElementById('assetDetailIcon').style.color = info.color;
@@ -89,9 +89,9 @@ function renderAssetDetailMarketSeries(chart, history) {
     const hasOHLC = history.length > 0 && history[0].open !== undefined && history[0].high !== undefined;
     if (hasOHLC) {
         const series = chart.addCandlestickSeries({
-            upColor: 'var(--accent-primary)', downColor: 'var(--negative)',
-            borderUpColor: 'var(--accent-primary)', borderDownColor: 'var(--negative)',
-            wickUpColor: 'var(--accent-primary)', wickDownColor: 'var(--negative)',
+            upColor: '#D97757', downColor: '#C6473C',
+            borderUpColor: '#D97757', borderDownColor: '#C6473C',
+            wickUpColor: '#D97757', wickDownColor: '#C6473C',
         });
         series.setData(history.map(h => ({ time: h.date, open: h.open, high: h.high, low: h.low, close: h.close })));
     } else {
@@ -99,7 +99,7 @@ function renderAssetDetailMarketSeries(chart, history) {
         const lastPrice = history[history.length - 1]?.close ?? history[history.length - 1]?.price ?? 0;
         const up = lastPrice >= firstPrice;
         const series = chart.addAreaSeries({
-            lineColor: up ? 'var(--accent-primary)' : 'var(--negative)',
+            lineColor: up ? '#D97757' : '#C6473C',
             topColor: up ? 'rgba(217, 119, 87,0.4)' : 'rgba(198, 71, 60,0.4)',
             bottomColor: 'rgba(0,0,0,0)',
             lineWidth: 2,
@@ -126,10 +126,10 @@ async function loadAssetDetailMarketChart(ticker) {
         const chart = LightweightCharts.createChart(container, {
             width: container.clientWidth,
             height: 400,
-            layout: { background: { color: 'transparent' }, textColor: 'var(--text-secondary)' },
+            layout: { background: { color: 'transparent' }, textColor: '#746E63' },
             grid: { vertLines: { color: 'rgba(30,41,59,0.5)' }, horzLines: { color: 'rgba(30,41,59,0.5)' } },
-            rightPriceScale: { borderColor: 'var(--border-secondary)' },
-            timeScale: { borderColor: 'var(--border-secondary)' },
+            rightPriceScale: { borderColor: '#D8D0C0' },
+            timeScale: { borderColor: '#D8D0C0' },
             crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
         });
         assetDetailTvChart = chart;
@@ -177,12 +177,12 @@ async function loadAssetDetailPositionChart(ticker) {
                 datasets: [
                     {
                         label: 'Valor de tu posición', data: hist.map(h => h.value),
-                        borderColor: 'var(--accent-primary)', backgroundColor: 'rgba(217, 119, 87,0.1)',
+                        borderColor: '#D97757', backgroundColor: 'rgba(217, 119, 87,0.1)',
                         fill: true, tension: 0.2, pointRadius: 0, borderWidth: 2,
                     },
                     {
                         label: 'Coste acumulado (aportado)', data: hist.map(h => h.cost_basis),
-                        borderColor: 'var(--text-secondary)', backgroundColor: 'transparent',
+                        borderColor: '#746E63', backgroundColor: 'transparent',
                         borderDash: [4, 4], tension: 0.2, pointRadius: 0, borderWidth: 2,
                     },
                 ],
@@ -190,10 +190,10 @@ async function loadAssetDetailPositionChart(ticker) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: true, labels: { color: 'var(--text-secondary)', boxWidth: 12 } } },
+                plugins: { legend: { display: true, labels: { color: '#746E63', boxWidth: 12 } } },
                 scales: {
-                    x: { ticks: { maxTicksLimit: 8, color: 'var(--text-tertiary)' }, grid: { display: false } },
-                    y: { ticks: { color: 'var(--text-tertiary)', callback: v => formatCurrency(v) }, grid: { color: 'var(--bg-tertiary)' } },
+                    x: { ticks: { maxTicksLimit: 8, color: '#9C9689' }, grid: { display: false } },
+                    y: { ticks: { color: '#9C9689', callback: v => formatCurrency(v) }, grid: { color: '#EFEBE3' } },
                 },
             },
         });
