@@ -3,6 +3,17 @@
  */
 const OPP_API = (window.API_BASE_URL || 'http://localhost:8000/api');
 let oppLoaded = false;
+let oppLastData = null;
+let oppSort = { key: 'momentum_score', dir: 'desc' };
+
+function oppSetSort(key) {
+    if (oppSort.key === key) {
+        oppSort.dir = oppSort.dir === 'desc' ? 'asc' : 'desc';
+    } else {
+        oppSort = { key, dir: 'desc' };
+    }
+    if (oppLastData) renderOpportunities(oppLastData);
+}
 
 const OPP_THINKING_STEPS = [
     '🧠 La herramienta está pensando…',
@@ -167,6 +178,7 @@ function renderBreakdown(op) {
 }
 
 function renderOpportunities(data) {
+    oppLastData = data;
     const content = document.getElementById('oppContent');
     const convColor = { alta: '#10b981', media: '#f59e0b', baja: '#64748b' };
     const kindIcon = { tema: '🌐', etf: '📊', fondo: '💼', sector: '🏭' };
@@ -233,13 +245,24 @@ function renderOpportunities(data) {
         const g = oppGroupOf(t.category);
         (themesByGroup[g] = themesByGroup[g] || []).push(t);
     }
+    const sortKeyFn = { momentum_score: t => t.momentum_score, value_score: t => t.value_score, ret_3m: t => t.ret_3m, range_pos_52w: t => t.range_pos_52w }[oppSort.key];
+    const sortMul = oppSort.dir === 'asc' ? 1 : -1;
+    const sortThemes = (arr) => arr.slice().sort((a, b) => {
+        const av = sortKeyFn(a), bv = sortKeyFn(b);
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;   // missing values always sink to the bottom
+        if (bv == null) return -1;
+        return (av - bv) * sortMul;
+    });
+    const sortArrow = (key) => oppSort.key === key ? (oppSort.dir === 'desc' ? ' ▼' : ' ▲') : '';
+    const sortableTh = (key, label) => `<th class="text-right" onclick="oppSetSort('${key}')" style="cursor:pointer; user-select:none;" title="Ordenar">${label}${sortArrow(key)}</th>`;
     const themeGroups = GROUP_ORDER.filter(g => themesByGroup[g] && themesByGroup[g].length).map(g => {
-        const rows = themesByGroup[g].sort((a, b) => (b.momentum_score || 0) - (a.momentum_score || 0)).map(themeRow).join('');
+        const rows = sortThemes(themesByGroup[g]).map(themeRow).join('');
         return `<div style="margin-bottom:14px;">
             <strong style="font-size:13px;">${g} <span class="text-muted" style="font-weight:400;">(${themesByGroup[g].length})</span></strong>
             <div class="table-container" style="margin-top:6px;">
                 <table class="manager-table">
-                    <thead><tr><th>Tema</th><th class="text-right">Score Mom.</th><th class="text-right">Score Valor</th><th class="text-right">3 meses</th><th class="text-right">Rango 52s</th></tr></thead>
+                    <thead><tr><th>Tema</th>${sortableTh('momentum_score', 'Score Mom.')}${sortableTh('value_score', 'Score Valor')}${sortableTh('ret_3m', '3 meses')}${sortableTh('range_pos_52w', 'Rango 52s')}</tr></thead>
                     <tbody>${rows}</tbody>
                 </table>
             </div>
