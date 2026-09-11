@@ -49,7 +49,7 @@ async function loadLiveDocsStatus() {
             html += `.<br>A 3 meses (el horizonte que de verdad activa el autoentrenamiento): `
                 + `<strong>${d.horizons?.ret_3m?.return?.n ?? 0}</strong> evaluadas todavía.<br>`;
             html += gatedBuckets.length
-                ? `<strong style="color:#00d4aa;">${gatedBuckets.length} enfoque(s) ya han cruzado el filtro anti-ruido</strong> y están influyendo en la convicción de nuevas ideas.`
+                ? `<strong style="color:var(--accent-primary);">${gatedBuckets.length} enfoque(s) ya han cruzado el filtro anti-ruido</strong> y están influyendo en la convicción de nuevas ideas.`
                 : `El filtro anti-ruido sigue <strong>cerrado</strong> para todos los enfoques — cero influencia real todavía sobre las recomendaciones.`;
             autoEl.innerHTML = html;
         } catch (err) {
@@ -67,13 +67,13 @@ async function loadLiveDocsStatus() {
             if (typeof d.days !== 'number') {
                 // No marks yet at all — a genuinely different (minimal) response shape.
                 sisEl.innerHTML = `Todavía sin histórico que mostrar (${d.status || 'aún no ha empezado a marcar NAV'}). `
-                    + `Veredicto: <strong style="color:#f59e0b;">${rd.verdict || rd.note || '—'}</strong>`;
+                    + `Veredicto: <strong style="color:var(--warning);">${rd.verdict || rd.note || '—'}</strong>`;
             } else {
                 sisEl.innerHTML = `<strong>${d.days}</strong> días en papel (de los 56 mínimos), <strong>${d.marks ?? '—'}</strong> marcas diarias.<br>`
                     + `Rentabilidad: <strong>${pct(d.return_pct)}</strong> vs <strong>${pct(d.benchmark_return_pct)}</strong> del benchmark `
                     + `(alpha ${pct(d.alpha_pct)}). Sharpe ${d.sharpe ?? '—'} vs ${d.benchmark_sharpe ?? '—'} del benchmark.<br>`
                     + `PSR: <strong>${Math.round((d.psr ?? 0) * 100)}%</strong> (necesita ≥75%).<br>`
-                    + `Veredicto del propio sistema: <strong style="color:${rd.ready ? '#00d4aa' : '#f59e0b'};">${rd.verdict ?? '—'}</strong>`;
+                    + `Veredicto del propio sistema: <strong style="color:${rd.ready ? 'var(--accent-primary)' : 'var(--warning)'};">${rd.verdict ?? '—'}</strong>`;
             }
         } catch (err) {
             sisEl.innerHTML = 'No se pudo consultar el estado en vivo ahora mismo — inténtalo recargando la página.';
@@ -87,10 +87,10 @@ const pageContent = {
 <div class="learn-content">
     <h1>📚 Guía de Inversión</h1>
 
-    <div style="background:linear-gradient(135deg,#6366f122,#00d4aa22); border:1px solid #6366f144; border-radius:10px; padding:14px 18px; margin:12px 0 18px;">
+    <div style="background:linear-gradient(135deg,rgba(99, 102, 241, 0.13),rgba(217, 119, 87, 0.13)); border:1px solid rgba(99, 102, 241, 0.27); border-radius:10px; padding:14px 18px; margin:12px 0 18px;">
         <strong>🧭 Estás en el paso 1 de 3 del recorrido de FinTrack.</strong>
         <p style="margin:8px 0 0; font-size:14px;">Esta guía te enseña <strong>a invertir desde cero</strong>: conceptos, tipos de activos y las métricas que luego verás por toda la app. Cuando la domines, en <em>Documentación</em> verás <strong>cómo FinTrack automatiza todo esto por ti</strong>, y en <em>Polymarket Lab</em>, hacia dónde va el proyecto.</p>
-        <p style="margin:8px 0 0; font-size:13px; color:#94a3b8;">Recorrido: <strong style="color:#00d4aa;">📚 Aprender (estás aquí)</strong> → 📖 Documentación → 🎲 Lab</p>
+        <p style="margin:8px 0 0; font-size:13px; color:var(--text-secondary);">Recorrido: <strong style="color:var(--accent-primary);">📚 Aprender (estás aquí)</strong> → 📖 Documentación → 🎲 Lab</p>
     </div>
 
     <div class="table-of-contents">
@@ -383,10 +383,10 @@ const pageContent = {
         <p>Los traspasos entre fondos de inversión (no ETFs) no tributan hasta que retiras el dinero. Esto permite el <strong>diferimiento fiscal</strong>.</p>
     </section>
 
-    <div style="background:#00d4aa14; border:1px solid #00d4aa44; border-radius:10px; padding:16px 18px; margin-top:24px; text-align:center;">
+    <div style="background:rgba(217, 119, 87, 0.08); border:1px solid rgba(217, 119, 87, 0.27); border-radius:10px; padding:16px 18px; margin-top:24px; text-align:center;">
         <strong style="font-size:15px;">✅ Ya entiendes los fundamentos. Siguiente paso →</strong>
         <p style="margin:8px 0 12px; font-size:14px;">Ahora descubre <strong>cómo FinTrack aplica todo esto automáticamente</strong> cada día: cómo lee tu cartera, escanea el mercado y te trae oportunidades explicadas.</p>
-        <a href="#" onclick="document.querySelector('[data-page=docs]').click(); return false;" style="display:inline-block; background:#00d4aa; color:#04121a; font-weight:600; padding:8px 18px; border-radius:8px; text-decoration:none;">📖 Ir a Documentación →</a>
+        <a href="#" onclick="document.querySelector('[data-page=docs]').click(); return false;" style="display:inline-block; background:var(--accent-primary); color:var(--bg-primary); font-weight:600; padding:8px 18px; border-radius:8px; text-decoration:none;">📖 Ir a Documentación →</a>
     </div>
 </div>
     `,
@@ -395,15 +395,15 @@ const pageContent = {
 <div class="docs-content">
     <h1>📖 Documentación de FinTrack</h1>
 
-    <div style="background:linear-gradient(135deg,#6366f122,#00d4aa22); border:1px solid #6366f144; border-radius:10px; padding:14px 18px; margin:12px 0 18px;">
+    <div style="background:linear-gradient(135deg,rgba(99, 102, 241, 0.13),rgba(217, 119, 87, 0.13)); border:1px solid rgba(99, 102, 241, 0.27); border-radius:10px; padding:14px 18px; margin:12px 0 18px;">
         <strong>🧭 Paso 2 de 3 del recorrido.</strong>
         <p style="margin:8px 0 0; font-size:14px;">Aquí ves <strong>qué es FinTrack, cómo se usa cada pestaña y cómo "piensa"</strong> para descubrir oportunidades. Si te falta base sobre métricas como Sharpe o momentum, repásalas primero en <em>Aprender</em>.</p>
-        <p style="margin:8px 0 0; font-size:13px; color:#94a3b8;">Recorrido: 📚 Aprender → <strong style="color:#00d4aa;">📖 Documentación (estás aquí)</strong> → 🎲 Lab</p>
+        <p style="margin:8px 0 0; font-size:13px; color:var(--text-secondary);">Recorrido: 📚 Aprender → <strong style="color:var(--accent-primary);">📖 Documentación (estás aquí)</strong> → 🎲 Lab</p>
     </div>
 
     <div class="table-of-contents">
         <h4>Índice</h4>
-        <p style="font-size:13px; color:#94a3b8; margin:0 0 8px;">Léelo de arriba abajo: va de <em>qué es</em> → <em>cómo se usa</em> → <em>cómo funciona por dentro</em> → <em>detalle técnico</em>. Cada tarjeta lleva una etiqueta de nivel para que sepas qué esperar antes de entrar.</p>
+        <p style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">Léelo de arriba abajo: va de <em>qué es</em> → <em>cómo se usa</em> → <em>cómo funciona por dentro</em> → <em>detalle técnico</em>. Cada tarjeta lleva una etiqueta de nivel para que sepas qué esperar antes de entrar.</p>
         <div class="toc-grid">
             <p class="toc-category-label">Empezar aquí</p>
             <a href="#que-es" class="toc-card">
@@ -531,7 +531,7 @@ const pageContent = {
             <li><strong>Te explica el porqué</strong> de cada idea: tendencia, riesgo, noticias que la respaldan y una gráfica.</li>
             <li><strong>Te avisa</strong> (alertas y resumen diario) y responde tus preguntas por Telegram.</li>
         </ul>
-        <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;"><strong>Importante y honesto:</strong> FinTrack <em>no predice el futuro</em> ni da órdenes de compra. Es análisis educativo para ayudarte a decidir mejor. Tú mandas.</p>
+        <p style="background:rgba(201, 154, 62, 0.09); border-left:3px solid var(--warning); padding:10px 14px; border-radius:6px;"><strong>Importante y honesto:</strong> FinTrack <em>no predice el futuro</em> ni da órdenes de compra. Es análisis educativo para ayudarte a decidir mejor. Tú mandas.</p>
     </section>
 
     <!-- ==================== GUÍA DE USO ==================== -->
@@ -651,7 +651,7 @@ const pageContent = {
     <section id="algoritmos">
         <h2>🔬 Cómo funcionan nuestros algoritmos (teoría + ejemplos)</h2>
         <p>Esta sección explica <strong>la estadística que usamos para ranquear inversiones</strong> — el "porqué" de cada puntuación. Es independiente de <em>cómo está montada la app</em> (eso está más abajo, en <a href="#arquitectura">Referencia técnica</a>). Aquí hablamos de <strong>métodos</strong>, no de servidores.</p>
-        <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;">
+        <p style="background:rgba(201, 154, 62, 0.09); border-left:3px solid var(--warning); padding:10px 14px; border-radius:6px;">
             <strong>Honestidad ante todo:</strong> estos métodos <em>no predicen el precio futuro</em>. Miden tendencia, riesgo y posición relativa sobre datos ya ocurridos, y rankean. Cualquiera que prometa "predecir" el precio con un indicador, miente. Nuestro objetivo es <strong>ranquear con criterio estadístico</strong>, no adivinar.
         </p>
         <p>La idea global: cada activo pasa por <strong>varios "jueces" independientes</strong> (momentum, riesgo, técnico, régimen, volatilidad, reversión). Cada juez emite un voto numérico; los votos se combinan en dos puntuaciones — <strong>MOMENTUM</strong> (lo fuerte que sube con calidad) y <strong>VALOR</strong> (lo castigado pero sano) — y puedes ver el voto de cada juez en el desglose de cada idea. Vamos juez por juez.</p>
@@ -762,7 +762,7 @@ en medio                                → NEUTRAL</pre>
         <p><strong>Empezando desde cero — qué significa "autoentrenar" aquí:</strong> no es que una red neuronal reajuste sus propios números por dentro (eso es lo que mucha gente imagina al oír "IA que aprende", y aquí no funciona así). Es algo más simple y más verificable: el sistema <strong>apunta cada recomendación que hace</strong>, espera a ver <strong>qué pasó de verdad</strong> con el precio después, y usa ese resultado real para ser más o menos "confiado" la próxima vez que proponga algo parecido. Como un alumno que lleva la cuenta de en qué tipo de examen suele fallar más, en vez de cambiar de cerebro.</p>
 
         <div class="info-box" id="liveAutoentrenamientoBox">
-            <strong>📡 Estado real ahora mismo</strong> <span style="font-size:11px; color:#94a3b8;">(se consulta en vivo cada vez que abres esta página — no son cifras fijas)</span>
+            <strong>📡 Estado real ahora mismo</strong> <span style="font-size:11px; color:var(--text-secondary);">(se consulta en vivo cada vez que abres esta página — no son cifras fijas)</span>
             <p id="liveAutoentrenamientoContent" style="margin-top:8px;">Cargando datos reales del scorecard…</p>
         </div>
 
@@ -850,7 +850,7 @@ alpha (exceso sobre el benchmark) = retorno del ETF − retorno del benchmark
             <li><strong>% de aciertos (hit rate)</strong>: de todas las recomendaciones evaluadas, qué porcentaje tuvo retorno positivo (o alpha positiva, según cuál mires). Si de 197 recomendaciones 100 tuvieron retorno &gt;0%, el hit rate es 100/197 ≈ 50,8%.</li>
             <li><strong>Alpha media</strong>: la media aritmética simple del alpha de todas las recomendaciones evaluadas. Si sumas el alpha de las 197 y divides entre 197, te da ese número — puede ser negativo aunque el hit rate esté cerca del 50%, si las pérdidas cuando falla son mayores que las ganancias cuando acierta.</li>
         </ul>
-        <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;"><strong>Por qué miramos ambas cosas y no solo una:</strong> un motor podría acertar el 70% de las veces pero con alpha media negativa, si las pocas veces que falla lo hace estrepitosamente (fallos grandes, aciertos pequeños). O al revés: acertar poco pero con aciertos grandes que compensan. El % de aciertos solo no cuenta toda la historia — por eso el scorecard siempre muestra los dos.</p>
+        <p style="background:rgba(201, 154, 62, 0.09); border-left:3px solid var(--warning); padding:10px 14px; border-radius:6px;"><strong>Por qué miramos ambas cosas y no solo una:</strong> un motor podría acertar el 70% de las veces pero con alpha media negativa, si las pocas veces que falla lo hace estrepitosamente (fallos grandes, aciertos pequeños). O al revés: acertar poco pero con aciertos grandes que compensan. El % de aciertos solo no cuenta toda la historia — por eso el scorecard siempre muestra los dos.</p>
 
         <h3>🔬 La comprobación estadística: ¿es un patrón real o es casualidad?</h3>
         <p>Antes de dejar que un enfoque influya en algo, además de cumplir n≥30 y rango≥90 días, se hace una prueba estadística llamada <strong>test-t de una muestra</strong> (el mismo tipo de test que se usa en investigación científica para saber si un efecto es "real"). En términos sencillos: compara la media de los resultados (por ejemplo, +7% de alpha media) contra cero, teniendo en cuenta cuánto varían esos resultados entre sí (si todos rondan +7% es más convincente que si van de −40% a +50% con esa misma media).</p>
@@ -885,7 +885,7 @@ alpha (exceso sobre el benchmark) = retorno del ETF − retorno del benchmark
         <p>Aparte de Oportunidades (que te <em>sugiere</em> ideas para que decidas tú), hay un segundo sistema completamente distinto corriendo en paralelo: una <strong>cartera con reglas fijas y automáticas</strong> — nadie, ni humano ni IA, decide semana a semana qué comprar; lo decide siempre la misma fórmula — que se reequilibra sola cada semana.</p>
 
         <div class="info-box" id="liveSistematicoBox">
-            <strong>📡 Estado real ahora mismo</strong> <span style="font-size:11px; color:#94a3b8;">(se consulta en vivo cada vez que abres esta página — no son cifras fijas)</span>
+            <strong>📡 Estado real ahora mismo</strong> <span style="font-size:11px; color:var(--text-secondary);">(se consulta en vivo cada vez que abres esta página — no son cifras fijas)</span>
             <p id="liveSistematicoContent" style="margin-top:8px;">Cargando datos reales del motor sistemático…</p>
         </div>
 
@@ -991,7 +991,7 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
             <strong>La IA devuelve</strong>: un párrafo en español explicando qué es el ETF, por qué esos números y esa noticia son relevantes, y los riesgos — pero <strong>usando solo esos datos</strong>, sin inventar ninguno nuevo. Si la IA fallara o no tuviera esos datos, no habría "oportunidad" que mostrar; el ranking numérico (que no depende de la IA) seguiría intacto.</p>
         </div>
         <p><strong>Por qué esta combinación y no otra</strong>: el proyecto funciona con un presupuesto de <strong>0€</strong> — cualquier modelo de pago (incluidos los más conocidos por chat, como GPT o Claude vía API) queda descartado mientras esa restricción siga en pie, por buenos que sean. Gemini y Groq tienen capas gratuitas genuinamente utilizables para este volumen de peticiones.</p>
-        <p style="background:#f59e0b18; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:6px;"><strong>Sobre "modelos nuevos muy fiables" que circulan por redes:</strong> si un modelo predictivo de mercados fuera realmente fiable, barato y de acceso público, dejaría de funcionar en cuanto todo el mundo lo usara — los propios mercados absorben esa ventaja (es la idea de "mercados eficientes"). La investigación académica seria sobre IA aplicada a inversión muestra mejoras modestas e inconsistentes sobre modelos de factores simples, no los resultados extraordinarios que se anuncian en Twitter o YouTube. Por eso la IA aquí tiene un rol acotado a propósito: <strong>redactar y explicar, no decidir ni predecir precio</strong> — esa decisión de diseño no depende de qué modelo de lenguaje esté de moda cada mes.</p>
+        <p style="background:rgba(201, 154, 62, 0.09); border-left:3px solid var(--warning); padding:10px 14px; border-radius:6px;"><strong>Sobre "modelos nuevos muy fiables" que circulan por redes:</strong> si un modelo predictivo de mercados fuera realmente fiable, barato y de acceso público, dejaría de funcionar en cuanto todo el mundo lo usara — los propios mercados absorben esa ventaja (es la idea de "mercados eficientes"). La investigación académica seria sobre IA aplicada a inversión muestra mejoras modestas e inconsistentes sobre modelos de factores simples, no los resultados extraordinarios que se anuncian en Twitter o YouTube. Por eso la IA aquí tiene un rol acotado a propósito: <strong>redactar y explicar, no decidir ni predecir precio</strong> — esa decisión de diseño no depende de qué modelo de lenguaje esté de moda cada mes.</p>
 
         <h3>🏭 Gemini vs. Groq: no son "competidores", son cosas distintas</h3>
         <p>Es una confusión habitual, así que merece una aclaración: <strong>Gemini</strong> es un modelo de IA (creado por Google) — el "cerebro" que redacta el texto. <strong>Groq</strong> no es un modelo, es una empresa de <strong>hardware especializado</strong> (chips propios, no GPUs normales) que ejecuta modelos de otros (como Llama, de Meta) a una velocidad muy superior a la infraestructura habitual. Aquí Groq entra solo como red de seguridad: si Gemini no responde, un modelo distinto corriendo sobre la infraestructura de Groq toma el relevo para que el usuario no se quede sin respuesta.</p>
@@ -1097,9 +1097,9 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
     </section>
 
     <!-- ==================== REFERENCIA TÉCNICA (separador) ==================== -->
-    <div style="margin:32px 0 8px; padding:14px 18px; border-radius:10px; background:#33415522; border:1px dashed #475569;">
+    <div style="margin:32px 0 8px; padding:14px 18px; border-radius:10px; background:rgba(216, 208, 192, 0.13); border:1px dashed var(--text-muted);">
         <strong style="font-size:15px;">🔧 A partir de aquí: Referencia técnica (cómo está montada la app)</strong>
-        <p style="margin:6px 0 0; font-size:13px; color:#94a3b8;">Lo anterior era <em>qué hace y cómo razona</em>. Esta parte es para quien quiera saber <em>cómo está construido</em> por dentro: arquitectura, stack, instalación y API. Si solo quieres usar FinTrack, no necesitas leerla.</p>
+        <p style="margin:6px 0 0; font-size:13px; color:var(--text-secondary);">Lo anterior era <em>qué hace y cómo razona</em>. Esta parte es para quien quiera saber <em>cómo está construido</em> por dentro: arquitectura, stack, instalación y API. Si solo quieres usar FinTrack, no necesitas leerla.</p>
     </div>
 
     <!-- ==================== ARQUITECTURA DEL SISTEMA ==================== -->
@@ -1244,7 +1244,7 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
                     </ul>
                 </div>
                 
-                <div class="tech-card" style="background: var(--bg-secondary); padding: 20px; border-radius: 12px; border-left: 4px solid #46e3b7;">
+                <div class="tech-card" style="background: var(--bg-secondary); padding: 20px; border-radius: 12px; border-left: 4px solid var(--accent-primary);">
                     <h4>☁️ Despliegue</h4>
                     <ul style="margin: 10px 0; padding-left: 20px;">
                         <li><strong>Render.com</strong> - Hosting gratuito</li>
@@ -1671,13 +1671,13 @@ curl -X DELETE "http://localhost:8000/api/positions/GOOGL"</code></pre>
     </section>
 
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:24px;">
-        <a href="#" onclick="document.querySelector('[data-page=learn]').click(); return false;" style="flex:1; min-width:200px; background:#6366f114; border:1px solid #6366f144; border-radius:10px; padding:14px 18px; text-decoration:none; color:inherit;">
+        <a href="#" onclick="document.querySelector('[data-page=learn]').click(); return false;" style="flex:1; min-width:200px; background:rgba(99, 102, 241, 0.08); border:1px solid rgba(99, 102, 241, 0.27); border-radius:10px; padding:14px 18px; text-decoration:none; color:inherit;">
             <strong>← Volver a Aprender</strong>
-            <p style="margin:6px 0 0; font-size:13px; color:#94a3b8;">Repasa los fundamentos y las métricas.</p>
+            <p style="margin:6px 0 0; font-size:13px; color:var(--text-secondary);">Repasa los fundamentos y las métricas.</p>
         </a>
-        <a href="#" onclick="document.querySelector('[data-page=polymarket]').click(); return false;" style="flex:1; min-width:200px; background:#00d4aa14; border:1px solid #00d4aa44; border-radius:10px; padding:14px 18px; text-decoration:none; color:inherit;">
+        <a href="#" onclick="document.querySelector('[data-page=polymarket]').click(); return false;" style="flex:1; min-width:200px; background:rgba(217, 119, 87, 0.08); border:1px solid rgba(217, 119, 87, 0.27); border-radius:10px; padding:14px 18px; text-decoration:none; color:inherit;">
             <strong>Siguiente: Polymarket Lab →</strong>
-            <p style="margin:6px 0 0; font-size:13px; color:#94a3b8;">La visión: hacia un asistente autónomo.</p>
+            <p style="margin:6px 0 0; font-size:13px; color:var(--text-secondary);">La visión: hacia un asistente autónomo.</p>
         </a>
     </div>
 </div>
@@ -1925,8 +1925,8 @@ function initProjectionChart() {
                 datasets: [{
                     label: 'Proyección',
                     data: values,
-                    borderColor: '#00d4aa',
-                    backgroundColor: 'rgba(0, 212, 170, 0.1)',
+                    borderColor: 'var(--accent-primary)',
+                    backgroundColor: 'rgba(217, 119, 87, 0.1)',
                     fill: true,
                     tension: 0.4
                 }]

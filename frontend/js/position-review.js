@@ -5,11 +5,11 @@
 const PR_API = (window.API_BASE_URL || 'http://localhost:8000/api');
 
 const PR_SIGNAL = {
-    ROTAR:    { color: '#ef4444', emoji: '🔴', label: 'Rotar' },
-    REDUCIR:  { color: '#f59e0b', emoji: '🟠', label: 'Reducir' },
+    ROTAR:    { color: 'var(--negative)', emoji: '🔴', label: 'Rotar' },
+    REDUCIR:  { color: 'var(--warning)', emoji: '🟠', label: 'Reducir' },
     VIGILAR:  { color: '#eab308', emoji: '🟡', label: 'Vigilar' },
-    MANTENER: { color: '#10b981', emoji: '🟢', label: 'Mantener' },
-    SIN_DATOS:{ color: '#64748b', emoji: '⚪', label: 'Sin datos' },
+    MANTENER: { color: 'var(--positive)', emoji: '🟢', label: 'Mantener' },
+    SIN_DATOS:{ color: 'var(--text-tertiary)', emoji: '⚪', label: 'Sin datos' },
 };
 
 async function loadPositionReview() {
@@ -42,7 +42,7 @@ function renderPositionReview(data) {
             return `<span style="background:${c.color}22; color:${c.color}; padding:3px 10px; border-radius:12px; font-size:13px;">${c.emoji} ${c.label}: ${n||0}</span>`;
         }).join('')}
     </div>
-    <div style="font-size:13px; margin:0 0 14px; padding:8px 12px; background:rgba(239,68,68,0.08); border-radius:8px;">
+    <div style="font-size:13px; margin:0 0 14px; padding:8px 12px; background:rgba(198, 71, 60,0.08); border-radius:8px;">
         💰 <strong>Dinero que de verdad pide atención</strong> (posiciones materiales a rotar/reducir): <strong>${att.toLocaleString('es-ES',{maximumFractionDigits:0})}€</strong>.
         ${(s.rotar||0) > (s.rotar_material||0) ? `<span class="text-muted"> (${(s.rotar||0)-(s.rotar_material||0)} señal(es) son de importe insignificante — ignóralas.)</span>` : ''}
     </div>`;
@@ -52,7 +52,7 @@ function renderPositionReview(data) {
         const m = r.metrics || {};
         const pnlCls = (r.pnl_pct||0) >= 0 ? 'value-positive' : 'value-negative';
         const metricsRow = m.momentum_pct !== undefined ? `
-            <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:#94a3b8; margin:6px 0;">
+            <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-secondary); margin:6px 0;">
                 <span>Tendencia: <strong>${m.above_sma200 ? 'sobre SMA200 📈' : 'bajo SMA200 📉'}</strong></span>
                 <span>Momentum: <strong class="${(m.momentum_pct||0)>=0?'value-positive':'value-negative'}">${m.momentum_pct>=0?'+':''}${m.momentum_pct}%</strong></span>
                 ${m.rsi!=null?`<span>RSI: <strong>${Math.round(m.rsi)}</strong></span>`:''}
@@ -70,7 +70,7 @@ function renderPositionReview(data) {
             <p class="text-muted" style="font-size:12px; margin:4px 0;">Invertido <strong>${(r.invested_eur||0).toLocaleString('es-ES',{maximumFractionDigits:0})}€</strong> → vale <strong>${(r.value_eur||0).toLocaleString('es-ES',{maximumFractionDigits:0})}€</strong> · P&amp;L <span class="mono ${pnlCls}">${(r.pnl_eur||0)>=0?'+':''}${(r.pnl_eur||0).toLocaleString('es-ES',{maximumFractionDigits:0})}€ (${(r.pnl_pct||0)>=0?'+':''}${r.pnl_pct}%)</span> · peso ${r.weight_pct}%</p>
             ${metricsRow}
             <ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${(r.reasons||[]).map(x=>`<li>${x}</li>`).join('')}</ul>
-            ${r.bias_flag ? `<div style="margin-top:8px; background:#f59e0b18; border:1px solid #f59e0b55; border-radius:8px; padding:8px 12px; font-size:13px;">${r.bias_flag}</div>` : ''}
+            ${r.bias_flag ? `<div style="margin-top:8px; background:rgba(201, 154, 62, 0.09); border:1px solid rgba(201, 154, 62, 0.33); border-radius:8px; padding:8px 12px; font-size:13px;">${r.bias_flag}</div>` : ''}
         </div>`;
     }).join('');
 

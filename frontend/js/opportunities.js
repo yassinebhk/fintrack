@@ -119,7 +119,7 @@ async function loadOpportunities(force = false) {
             scheduleOppPoll();
             const c = document.getElementById('oppContent');
             if (c) c.insertAdjacentHTML('afterbegin',
-                '<div class="alert" style="background:#f59e0b22; border:1px solid #f59e0b55; border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:13px;">⏳ Mostrando el último análisis mientras se genera uno nuevo…</div>');
+                '<div class="alert" style="background:rgba(201, 154, 62, 0.13); border:1px solid rgba(201, 154, 62, 0.33); border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:13px;">⏳ Mostrando el último análisis mientras se genera uno nuevo…</div>');
             endOppLoading();
             return;
         }
@@ -150,8 +150,8 @@ function assetLinks(op) {
     const justetf = `https://www.justetf.com/en/search.html?query=${q}`;
     const isFund = op.kind === 'etf' || op.kind === 'fondo';
     return `<div style="margin:8px 0 2px; font-size:13px;">🔗 <strong>Ver ficha del activo:</strong>
-        <a href="${yahoo}" target="_blank" rel="noopener" style="color:#60a5fa;">precio actual e info (Yahoo Finance)</a>${isFund ? `
-        · <a href="${justetf}" target="_blank" rel="noopener" style="color:#60a5fa;">ISIN y dónde comprar (justETF)</a>` : ''}
+        <a href="${yahoo}" target="_blank" rel="noopener" style="color:var(--info);">precio actual e info (Yahoo Finance)</a>${isFund ? `
+        · <a href="${justetf}" target="_blank" rel="noopener" style="color:var(--info);">ISIN y dónde comprar (justETF)</a>` : ''}
     </div>`;
 }
 
@@ -162,17 +162,17 @@ function renderBreakdown(op) {
     const rows = Object.entries(bd).map(([k, v]) => {
         const pct = Math.round(Math.abs(v) / maxAbs * 100);
         const pos = v >= 0;
-        const barColor = pos ? '#10b981' : '#ef4444';
+        const barColor = pos ? 'var(--positive)' : 'var(--negative)';
         return `<div style="display:flex; align-items:center; gap:8px; margin:3px 0; font-size:12px;">
-            <span style="flex:0 0 150px; color:#94a3b8;">${CRITERION_LABEL[k] || k}</span>
-            <span style="flex:1; background:rgba(255,255,255,0.05); border-radius:4px; height:10px; position:relative;">
+            <span style="flex:0 0 150px; color:var(--text-secondary);">${CRITERION_LABEL[k] || k}</span>
+            <span style="flex:1; background:rgba(43, 40, 34, 0.05); border-radius:4px; height:10px; position:relative;">
                 <span style="position:absolute; left:0; top:0; height:10px; width:${pct}%; background:${barColor}; border-radius:4px;"></span>
             </span>
             <span class="mono" style="flex:0 0 46px; text-align:right; color:${barColor};">${pos ? '+' : ''}${v.toFixed(2)}</span>
         </div>`;
     }).join('');
-    return `<details style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);">
-        <summary style="cursor:pointer; font-size:13px; color:#cbd5e1;">🧮 Por qué lo puntúa así (criterios que convergen)</summary>
+    return `<details style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(43, 40, 34, 0.08);">
+        <summary style="cursor:pointer; font-size:13px; color:var(--text-secondary);">🧮 Por qué lo puntúa así (criterios que convergen)</summary>
         <div style="margin-top:8px;">${rows}</div>
     </details>`;
 }
@@ -180,14 +180,14 @@ function renderBreakdown(op) {
 function renderOpportunities(data) {
     oppLastData = data;
     const content = document.getElementById('oppContent');
-    const convColor = { alta: '#10b981', media: '#f59e0b', baja: '#64748b' };
+    const convColor = { alta: 'var(--positive)', media: 'var(--warning)', baja: 'var(--text-tertiary)' };
     const kindIcon = { tema: '🌐', etf: '📊', fondo: '💼', sector: '🏭' };
-    const regimeColor = { alcista: '#10b981', bajista: '#ef4444', neutral: '#f59e0b' };
+    const regimeColor = { alcista: 'var(--positive)', bajista: 'var(--negative)', neutral: 'var(--warning)' };
 
     const opps = (data.opportunities || []).map(op => {
-        const color = convColor[op.conviction] || '#f59e0b';
+        const color = convColor[op.conviction] || 'var(--warning)';
         const icon = kindIcon[op.kind] || '💡';
-        const apprStyle = op.approach === 'momentum' ? 'background:#ef444422; color:#ef4444;' : 'background:#3b82f622; color:#3b82f6;';
+        const apprStyle = op.approach === 'momentum' ? 'background:rgba(198, 71, 60, 0.13); color:var(--negative);' : 'background:rgba(59, 130, 246, 0.13); color:#3b82f6;';
         const apprLabel = op.approach === 'momentum' ? '🔥 momentum' : (op.approach ? '🧊 ' + op.approach : '');
         return `
         <div class="card" style="margin-bottom:14px; border-left:3px solid ${color};">
@@ -205,9 +205,9 @@ function renderOpportunities(data) {
             <p style="margin:4px 0;"><strong>🎯 Encaje en tu cartera:</strong> ${op.fit}</p>
             ${op.extended ? `<div style="margin:8px 0; background:#a855f718; border:1px solid #a855f755; border-radius:8px; padding:8px 12px; font-size:13px;">${op.extended_note || '🫧 Extendido: alto riesgo de reversión.'}</div>` : ''}
             ${assetLinks(op)}
-            ${op.ticker_or_isin ? `<button onclick="openDeepAnalysis('${(op.ticker_or_isin+'').replace(/'/g,"&#39;")}','${(op.name+'').replace(/'/g,"&#39;")}')" style="margin:8px 0 4px; background:#6366f1; color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer;">🔬 Análisis profesional del activo</button>` : ''}
+            ${op.ticker_or_isin ? `<button onclick="openDeepAnalysis('${(op.ticker_or_isin+'').replace(/'/g,"&#39;")}','${(op.name+'').replace(/'/g,"&#39;")}')" style="margin:8px 0 4px; background:var(--accent-secondary); color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer;">🔬 Análisis profesional del activo</button>` : ''}
             ${renderBreakdown(op)}
-            ${(op.news && op.news.length) ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);"><strong style="font-size:13px;">📰 Noticias que lo respaldan:</strong><ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${op.news.map(n => `<li><a href="${n.url}" target="_blank" rel="noopener" style="color:#60a5fa;">${n.title}</a> <span class="text-muted">(${n.source})</span></li>`).join('')}</ul></div>` : ''}
+            ${(op.news && op.news.length) ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(43, 40, 34, 0.08);"><strong style="font-size:13px;">📰 Noticias que lo respaldan:</strong><ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${op.news.map(n => `<li><a href="${n.url}" target="_blank" rel="noopener" style="color:var(--info);">${n.title}</a> <span class="text-muted">(${n.source})</span></li>`).join('')}</ul></div>` : ''}
         </div>`;
     }).join('');
 
@@ -269,7 +269,7 @@ function renderOpportunities(data) {
         </div>`;
     }).join('');
 
-    const rc = regimeColor[data.market_regime] || '#f59e0b';
+    const rc = regimeColor[data.market_regime] || 'var(--warning)';
     const regimeBanner = data.market_regime ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:${rc}18; border:1px solid ${rc}44; font-size:13px;">📡 <strong>Régimen de mercado:</strong> <span style="color:${rc}; text-transform:uppercase; font-weight:600;">${data.market_regime}</span>${data.market_breadth != null ? ` · ${Math.round(data.market_breadth*100)}% de activos sobre su tendencia de 200 sesiones` : ''}<br><span class="text-muted" style="font-size:11px;">En régimen alcista pesa más el momentum; en bajista, el valor/defensivo.</span></div>` : '';
 
     const t = data.trends || {};
@@ -290,7 +290,7 @@ function renderOpportunities(data) {
 
     const fr = data.froth || {};
     const eu = fr.euphoria_level;
-    const euColor = eu === 'alta' ? '#a855f7' : eu === 'media' ? '#f59e0b' : '#10b981';
+    const euColor = eu === 'alta' ? '#a855f7' : eu === 'media' ? 'var(--warning)' : 'var(--positive)';
     const frothBanner = (eu && (eu !== 'baja' || fr.concentration_warning)) ? `
         <div style="margin-bottom:12px; padding:10px 14px; border-radius:8px; background:${euColor}14; border:1px solid ${euColor}44; font-size:13px;">
             🫧 <strong>Termómetro de euforia:</strong> <span style="color:${euColor}; text-transform:uppercase; font-weight:600;">${eu}</span>

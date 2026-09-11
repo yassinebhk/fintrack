@@ -143,7 +143,7 @@ function calculateDividends() {
 function highlightResult(elementId) {
     const element = document.getElementById(elementId);
     element.style.borderColor = 'var(--accent-primary)';
-    element.style.boxShadow = '0 0 20px rgba(0, 212, 170, 0.2)';
+    element.style.boxShadow = '0 0 20px rgba(217, 119, 87, 0.2)';
     
     setTimeout(() => {
         element.style.borderColor = '';

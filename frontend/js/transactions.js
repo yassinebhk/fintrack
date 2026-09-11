@@ -16,7 +16,7 @@ async function loadTransactions() {
         _txAll = Array.isArray(data) ? data : [];
         renderTransactions();
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:24px; color:#ef4444;">No se pudieron cargar las transacciones: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:24px; color:var(--negative);">No se pudieron cargar las transacciones: ${err.message}</td></tr>`;
     }
 }
 

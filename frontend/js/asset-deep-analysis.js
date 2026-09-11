@@ -12,8 +12,8 @@ function _ensureDeepModal() {
     m.id = 'deepAnalysisModal';
     m.style.cssText = 'position:fixed; inset:0; background:rgba(5,10,20,0.85); z-index:1000; display:none; overflow-y:auto; padding:24px;';
     m.innerHTML = `
-        <div style="max-width:980px; margin:0 auto; background:var(--bg-card,#1e2a3d); border:1px solid var(--border-primary,#2b3a52); border-radius:14px; padding:22px; position:relative;">
-            <button id="deepCloseBtn" style="position:absolute; top:12px; right:14px; background:none; border:none; color:#94a3b8; font-size:24px; cursor:pointer;" title="Cerrar">×</button>
+        <div style="max-width:980px; margin:0 auto; background:var(--bg-card,var(--bg-card)); border:1px solid var(--border-primary,var(--border-primary)); border-radius:14px; padding:22px; position:relative;">
+            <button id="deepCloseBtn" style="position:absolute; top:12px; right:14px; background:none; border:none; color:var(--text-secondary); font-size:24px; cursor:pointer;" title="Cerrar">×</button>
             <div id="deepBody"><div style="text-align:center; padding:40px;"><div class="spinner"></div><p class="text-muted" style="margin-top:14px;">Analizando el activo…</p></div></div>
         </div>`;
     document.body.appendChild(m);
@@ -99,10 +99,10 @@ function _metricsBlock(m) {
     ];
     return groups.map(g => `
         <div style="margin:14px 0;">
-            <h4 style="margin:0 0 8px; font-size:14px; color:#cbd5e1;">${g.title}</h4>
+            <h4 style="margin:0 0 8px; font-size:14px; color:var(--text-secondary);">${g.title}</h4>
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px;">
-                ${g.cells.map(([k, v, cls]) => `<div style="background:rgba(255,255,255,0.03); border-radius:8px; padding:10px 12px;">
-                    <div style="color:#94a3b8; font-size:12px;">${k}</div>
+                ${g.cells.map(([k, v, cls]) => `<div style="background:rgba(43, 40, 34, 0.03); border-radius:8px; padding:10px 12px;">
+                    <div style="color:var(--text-secondary); font-size:12px;">${k}</div>
                     <div class="mono ${cls || ''}" style="font-size:15px; margin-top:2px;">${v}</div>
                 </div>`).join('')}
             </div>
@@ -114,10 +114,10 @@ function _breakdownBars(bd) {
     const maxAbs = Math.max(...Object.values(bd).map(v => Math.abs(v)), 0.01);
     return Object.entries(bd).map(([k, v]) => {
         const pct = Math.round(Math.abs(v) / maxAbs * 100);
-        const c = v >= 0 ? '#10b981' : '#ef4444';
+        const c = v >= 0 ? 'var(--positive)' : 'var(--negative)';
         return `<div style="display:flex; align-items:center; gap:8px; margin:4px 0; font-size:13px;">
-            <span style="flex:0 0 170px; color:#cbd5e1;">${_CRITERION_LABEL[k] || k}</span>
-            <span style="flex:1; background:rgba(255,255,255,0.05); border-radius:4px; height:10px; position:relative;">
+            <span style="flex:0 0 170px; color:var(--text-secondary);">${_CRITERION_LABEL[k] || k}</span>
+            <span style="flex:1; background:rgba(43, 40, 34, 0.05); border-radius:4px; height:10px; position:relative;">
                 <span style="position:absolute; left:0; top:0; height:10px; width:${pct}%; background:${c}; border-radius:4px;"></span>
             </span>
             <span class="mono" style="flex:0 0 56px; text-align:right; color:${c};">${v >= 0 ? '+' : ''}${v.toFixed(2)}</span>
@@ -127,14 +127,14 @@ function _breakdownBars(bd) {
 
 function _newsBlock(news, sentiment, sources) {
     if (!news || !news.length) return '<p class="text-muted" style="font-size:13px;">Sin titulares específicos de este activo en el feed actual.</p>';
-    const sentBar = `<div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">
+    const sentBar = `<div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">
         Sentimiento: 🟢 ${sentiment.bullish || 0} · 🔴 ${sentiment.bearish || 0} · ⚪ ${sentiment.neutral || 0}
         ${sources && sources.length ? ` · Fuentes: ${sources.join(', ')}` : ''}
     </div>`;
     const items = news.slice(0, 10).map(n => {
         const e = _SENT_EMOJI[n.impact] || '⚪';
         const t = (n.title || '').replace(/</g, '&lt;');
-        return `<li style="margin:4px 0;">${e} <a href="${n.url}" target="_blank" rel="noopener" style="color:#60a5fa;">${t}</a> <span class="text-muted" style="font-size:11px;">(${n.source})</span></li>`;
+        return `<li style="margin:4px 0;">${e} <a href="${n.url}" target="_blank" rel="noopener" style="color:var(--info);">${t}</a> <span class="text-muted" style="font-size:11px;">(${n.source})</span></li>`;
     }).join('');
     return sentBar + `<ul style="margin:0; padding-left:20px; font-size:13px;">${items}</ul>`;
 }
@@ -154,8 +154,8 @@ function renderDeepAnalysis(d) {
     <p class="text-muted" style="margin:0 0 12px; font-size:13px;">
         ${[d.category, d.region].filter(Boolean).join(' · ')}
         · Benchmark de comparación: <strong>${benchName}</strong>
-        · <a href="${yh}" target="_blank" rel="noopener" style="color:#60a5fa;">Ficha en Yahoo</a>
-        ${isFund ? ` · <a href="${je}" target="_blank" rel="noopener" style="color:#60a5fa;">justETF (ISIN / dónde comprar)</a>` : ''}
+        · <a href="${yh}" target="_blank" rel="noopener" style="color:var(--info);">Ficha en Yahoo</a>
+        ${isFund ? ` · <a href="${je}" target="_blank" rel="noopener" style="color:var(--info);">justETF (ISIN / dónde comprar)</a>` : ''}
     </p>
 
     <h3 style="margin-top:18px;">📊 Métricas extendidas</h3>
@@ -183,7 +183,7 @@ function renderDeepAnalysis(d) {
 
     ${d.narrative ? `
     <h3 style="margin-top:18px;">🖋️ Nota del analista</h3>
-    <div style="background:rgba(99,102,241,0.08); border-left:3px solid #6366f1; padding:12px 14px; border-radius:6px; font-size:14px; white-space:pre-wrap;">${d.narrative.replace(/</g,'&lt;')}</div>
+    <div style="background:rgba(99,102,241,0.08); border-left:3px solid var(--accent-secondary); padding:12px 14px; border-radius:6px; font-size:14px; white-space:pre-wrap;">${d.narrative.replace(/</g,'&lt;')}</div>
     ` : ''}
 
     <p class="text-muted" style="font-size:11px; margin-top:14px;">Generado ${new Date(d.generated_at).toLocaleString('es-ES')} · Esto es análisis educativo, no recomendación de compra/venta.</p>

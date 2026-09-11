@@ -35,7 +35,7 @@ function showAssetDetail(ticker) {
 }
 
 async function loadAssetDetailHeader(ticker) {
-    const info = ASSET_DISPLAY_NAMES[ticker] || { name: ticker, icon: '📊', color: '#00d4aa' };
+    const info = ASSET_DISPLAY_NAMES[ticker] || { name: ticker, icon: '📊', color: 'var(--accent-primary)' };
     document.getElementById('assetDetailIcon').textContent = info.icon;
     document.getElementById('assetDetailIcon').style.background = `linear-gradient(135deg, ${info.color}33, ${info.color}11)`;
     document.getElementById('assetDetailIcon').style.color = info.color;
@@ -89,9 +89,9 @@ function renderAssetDetailMarketSeries(chart, history) {
     const hasOHLC = history.length > 0 && history[0].open !== undefined && history[0].high !== undefined;
     if (hasOHLC) {
         const series = chart.addCandlestickSeries({
-            upColor: '#00d4aa', downColor: '#ef4444',
-            borderUpColor: '#00d4aa', borderDownColor: '#ef4444',
-            wickUpColor: '#00d4aa', wickDownColor: '#ef4444',
+            upColor: 'var(--accent-primary)', downColor: 'var(--negative)',
+            borderUpColor: 'var(--accent-primary)', borderDownColor: 'var(--negative)',
+            wickUpColor: 'var(--accent-primary)', wickDownColor: 'var(--negative)',
         });
         series.setData(history.map(h => ({ time: h.date, open: h.open, high: h.high, low: h.low, close: h.close })));
     } else {
@@ -99,8 +99,8 @@ function renderAssetDetailMarketSeries(chart, history) {
         const lastPrice = history[history.length - 1]?.close ?? history[history.length - 1]?.price ?? 0;
         const up = lastPrice >= firstPrice;
         const series = chart.addAreaSeries({
-            lineColor: up ? '#00d4aa' : '#ef4444',
-            topColor: up ? 'rgba(0,212,170,0.4)' : 'rgba(239,68,68,0.4)',
+            lineColor: up ? 'var(--accent-primary)' : 'var(--negative)',
+            topColor: up ? 'rgba(217, 119, 87,0.4)' : 'rgba(198, 71, 60,0.4)',
             bottomColor: 'rgba(0,0,0,0)',
             lineWidth: 2,
         });
@@ -126,10 +126,10 @@ async function loadAssetDetailMarketChart(ticker) {
         const chart = LightweightCharts.createChart(container, {
             width: container.clientWidth,
             height: 400,
-            layout: { background: { color: 'transparent' }, textColor: '#94a3b8' },
+            layout: { background: { color: 'transparent' }, textColor: 'var(--text-secondary)' },
             grid: { vertLines: { color: 'rgba(30,41,59,0.5)' }, horzLines: { color: 'rgba(30,41,59,0.5)' } },
-            rightPriceScale: { borderColor: '#334155' },
-            timeScale: { borderColor: '#334155' },
+            rightPriceScale: { borderColor: 'var(--border-secondary)' },
+            timeScale: { borderColor: 'var(--border-secondary)' },
             crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
         });
         assetDetailTvChart = chart;
@@ -177,12 +177,12 @@ async function loadAssetDetailPositionChart(ticker) {
                 datasets: [
                     {
                         label: 'Valor de tu posición', data: hist.map(h => h.value),
-                        borderColor: '#00d4aa', backgroundColor: 'rgba(0,212,170,0.1)',
+                        borderColor: 'var(--accent-primary)', backgroundColor: 'rgba(217, 119, 87,0.1)',
                         fill: true, tension: 0.2, pointRadius: 0, borderWidth: 2,
                     },
                     {
                         label: 'Coste acumulado (aportado)', data: hist.map(h => h.cost_basis),
-                        borderColor: '#94a3b8', backgroundColor: 'transparent',
+                        borderColor: 'var(--text-secondary)', backgroundColor: 'transparent',
                         borderDash: [4, 4], tension: 0.2, pointRadius: 0, borderWidth: 2,
                     },
                 ],
@@ -190,16 +190,16 @@ async function loadAssetDetailPositionChart(ticker) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: true, labels: { color: '#94a3b8', boxWidth: 12 } } },
+                plugins: { legend: { display: true, labels: { color: 'var(--text-secondary)', boxWidth: 12 } } },
                 scales: {
-                    x: { ticks: { maxTicksLimit: 8, color: '#64748b' }, grid: { display: false } },
-                    y: { ticks: { color: '#64748b', callback: v => formatCurrency(v) }, grid: { color: '#1e293b' } },
+                    x: { ticks: { maxTicksLimit: 8, color: 'var(--text-tertiary)' }, grid: { display: false } },
+                    y: { ticks: { color: 'var(--text-tertiary)', callback: v => formatCurrency(v) }, grid: { color: 'var(--bg-tertiary)' } },
                 },
             },
         });
     } catch (err) {
         console.error('asset detail position chart failed:', err);
-        wrapper.innerHTML = '<p class="text-muted" style="padding:20px; color:#ef4444;">No se pudo cargar el histórico de tu posición.</p>';
+        wrapper.innerHTML = '<p class="text-muted" style="padding:20px; color:var(--negative);">No se pudo cargar el histórico de tu posición.</p>';
     }
 }
 
@@ -236,7 +236,7 @@ async function loadAssetDetailTransactions(ticker) {
             </tr>
         `).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding:20px; color:#ef4444;">No se pudieron cargar: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding:20px; color:var(--negative);">No se pudieron cargar: ${err.message}</td></tr>`;
     }
 }
 

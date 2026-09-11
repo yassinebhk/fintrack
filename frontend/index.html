@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260831b">
+    <link rel="stylesheet" href="css/styles.css?v=20260911redesign">
 </head>
 <body>
     <div id="loginGate" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:24px;">
@@ -34,37 +34,31 @@
                     <span class="nav-icon">📊</span>
                     <span class="nav-label">Dashboard</span>
                 </li>
-                <li class="nav-item" data-page="analysis">
-                    <span class="nav-icon">📈</span>
-                    <span class="nav-label">Análisis</span>
+                <li class="nav-item" data-page="portfolio-manager">
+                    <span class="nav-icon">💼</span>
+                    <span class="nav-label">Gestionar Cartera</span>
                 </li>
                 <li class="nav-item" data-page="transactions">
                     <span class="nav-icon">💸</span>
                     <span class="nav-label">Transacciones</span>
                 </li>
+                <li class="nav-item" data-page="analysis">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-label">Análisis</span>
+                </li>
                 <li class="nav-item" data-page="goals">
                     <span class="nav-icon">🎯</span>
                     <span class="nav-label">Objetivos</span>
-                </li>
-                <li class="nav-item" data-page="portfolio-manager">
-                    <span class="nav-icon">💼</span>
-                    <span class="nav-label">Gestionar Cartera</span>
                 </li>
                 <li class="nav-item" data-page="alerts">
                     <span class="nav-icon">🔔</span>
                     <span class="nav-label">Alertas</span>
                 </li>
-                <li class="nav-item" data-page="calculators">
-                    <span class="nav-icon">🧮</span>
-                    <span class="nav-label">Calculadoras</span>
-                </li>
+
+                <li class="nav-section-label"><span>Inteligencia</span></li>
                 <li class="nav-item" data-page="opportunities">
                     <span class="nav-icon">💡</span>
                     <span class="nav-label">Oportunidades</span>
-                </li>
-                <li class="nav-item" data-page="backtest">
-                    <span class="nav-icon">🔬</span>
-                    <span class="nav-label">Backtest Lab</span>
                 </li>
                 <li class="nav-item" data-page="ai-advisor">
                     <span class="nav-icon">🤖</span>
@@ -74,13 +68,25 @@
                     <span class="nav-icon">📰</span>
                     <span class="nav-label">Noticias</span>
                 </li>
+
+                <li class="nav-section-label"><span>Laboratorios</span></li>
+                <li class="nav-item" data-page="daytrading">
+                    <span class="nav-icon">📓</span>
+                    <span class="nav-label">Trading Diario</span>
+                </li>
+                <li class="nav-item" data-page="backtest">
+                    <span class="nav-icon">🔬</span>
+                    <span class="nav-label">Backtest Lab</span>
+                </li>
                 <li class="nav-item" data-page="polymarket">
                     <span class="nav-icon">🎲</span>
                     <span class="nav-label">Polymarket Lab</span>
                 </li>
-                <li class="nav-item" data-page="daytrading">
-                    <span class="nav-icon">📓</span>
-                    <span class="nav-label">Trading Diario</span>
+
+                <li class="nav-section-label"><span>Más</span></li>
+                <li class="nav-item" data-page="calculators">
+                    <span class="nav-icon">🧮</span>
+                    <span class="nav-label">Calculadoras</span>
                 </li>
                 <li class="nav-item" data-page="learn">
                     <span class="nav-icon">📚</span>
@@ -100,9 +106,9 @@
                     <span class="status-dot" id="statusDot"></span>
                     <span id="statusText">Conectando...</span>
                 </div>
-                <div id="userChip" style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12px; color:#888;">
+                <div id="userChip" style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12px; color:var(--text-tertiary);">
                     <span id="userChipName"></span>
-                    <a href="#" id="logoutLink" style="color:#888;">Cerrar sesión</a>
+                    <a href="#" id="logoutLink" style="color:var(--text-tertiary);">Cerrar sesión</a>
                 </div>
             </div>
         </nav>
@@ -1767,20 +1773,20 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="js/app.js?v=20260911c"></script>
-    <script src="js/calculators.js?v=20260530a"></script>
+    <script src="js/app.js?v=20260911d"></script>
+    <script src="js/calculators.js?v=20260911d"></script>
     <script src="js/news.js?v=20260530a"></script>
     <script src="js/portfolio-manager.js?v=20260825a"></script>
     <script src="js/ai-advisor.js?v=20260530a"></script>
-    <script src="js/asset-analysis.js?v=20260825a"></script>
-    <script src="js/backtest.js?v=20260824c"></script>
-    <script src="js/opportunities.js?v=20260911b"></script>
-    <script src="js/asset-deep-analysis.js?v=20260825a"></script>
-    <script src="js/asset-detail.js?v=20260825c"></script>
-    <script src="js/transactions.js?v=20260824c"></script>
-    <script src="js/position-review.js?v=20260530a"></script>
+    <script src="js/asset-analysis.js?v=20260911d"></script>
+    <script src="js/backtest.js?v=20260911d"></script>
+    <script src="js/opportunities.js?v=20260911d"></script>
+    <script src="js/asset-deep-analysis.js?v=20260911d"></script>
+    <script src="js/asset-detail.js?v=20260911d"></script>
+    <script src="js/transactions.js?v=20260911d"></script>
+    <script src="js/position-review.js?v=20260911d"></script>
     <script src="js/polymarket.js?v=20260530a"></script>
     <script src="js/daytrading.js?v=20260903a"></script>
-    <script src="js/pages.js?v=20260911a"></script>
+    <script src="js/pages.js?v=20260911d"></script>
 </body>
 </html>
