@@ -269,6 +269,30 @@ async def _day_trading_mark_job() -> None:
         logger.error("day trading mark job failed: {}", exc)
 
 
+async def _day_trading_auto_job() -> None:
+    """Daily: auto-open at most one new paper day-trade from today's highest-
+    conviction opportunity (quant signals only, see app.services.daytrading.
+    auto_pick — most days should open zero). Telegram note only when a trade
+    is actually opened, to avoid '0 candidates today' spam."""
+    try:
+        from app.services.daytrading import auto_pick
+        res = await auto_pick.pick_and_open()
+        if res.get("opened"):
+            from app.services.notifications.telegram import TelegramNotifier
+            t = res["opened"]
+            html = (
+                "📈 <b>Trading Diario — nueva operación automática</b>\n"
+                f"{t['ticker']} ({t.get('name', '')})\n"
+                f"Entrada: {t['entry_price']:.2f} · Stop: {t['stop_loss']:.2f} · "
+                f"Take-profit: {t['take_profit']:.2f}\n"
+                f"{t['thesis']}"
+            )
+            await TelegramNotifier().send_html(html)
+        logger.info("day trading auto-pick: {}", res)
+    except Exception as exc:
+        logger.error("day trading auto job failed: {}", exc)
+
+
 async def _ipo_spacex_reminder() -> None:
     """One-off heads-up around the SpaceX IPO (12-Jun-2026): how the user's space
     ETF (JEDI) is moving, plus a 'sell the news' caution. Fires on 11 and 12 Jun."""
@@ -443,6 +467,17 @@ def setup_jobs() -> None:
         replace_existing=True, max_instances=1, coalesce=True,
     )
     logger.info("scheduled: day trading paper journal daily mark (22:15) {}", settings.timezone)
+
+    # Auto-pick one high-conviction day trade from today's opportunities scan
+    # (GH Actions lands it ~07:00-08:00 Madrid) — needs no LLM/broker itself.
+    sched.add_job(
+        _day_trading_auto_job,
+        trigger=CronTrigger(hour=8, minute=15, timezone=settings.timezone),
+        id="day_trading_auto_pick",
+        name="Auto-open one high-conviction day trade from today's opportunities",
+        replace_existing=True, max_instances=1, coalesce=True,
+    )
+    logger.info("scheduled: day_trading_auto_pick @ 08:15 {}", settings.timezone)
 
 
 def start_scheduler() -> None:
