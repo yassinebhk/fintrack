@@ -81,9 +81,11 @@ async def send_daily_summary_pinned(force: bool = False) -> dict:
     if not force and prev.get("date") == today:
         return {"skipped": "ya enviado hoy", "date": today}
 
+    from app.auth import get_owner_user_id_cached
     from app.services import allocation
 
-    svc = PortfolioService()
+    owner_id = await get_owner_user_id_cached()
+    svc = PortfolioService(owner_id or 0)
     p = await svc.calculate_portfolio()
     excluded = await get_excluded()
     targets = await allocation.get_targets()

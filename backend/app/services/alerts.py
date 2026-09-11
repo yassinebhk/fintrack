@@ -38,13 +38,22 @@ class AlertsEngine:
     _scanner_singleton = None
 
     def __init__(self) -> None:
-        self.portfolio_service = PortfolioService()
+        # Owner-only until this loops over every user (Fase 2).
+        self._portfolio_service: PortfolioService | None = None
         self.news_service = NewsService()
         self.telegram = TelegramNotifier()
 
+    async def _get_portfolio_service(self) -> PortfolioService:
+        if self._portfolio_service is None:
+            from app.auth import get_owner_user_id_cached
+
+            owner_id = await get_owner_user_id_cached()
+            self._portfolio_service = PortfolioService(owner_id or 0)
+        return self._portfolio_service
+
     async def evaluate(self) -> list[dict]:
         """Run all rules. Returns a list of alert payloads created."""
-        portfolio = await self.portfolio_service.calculate_portfolio()
+        portfolio = await (await self._get_portfolio_service()).calculate_portfolio()
         created: list[dict] = []
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 

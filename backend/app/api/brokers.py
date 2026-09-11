@@ -5,9 +5,11 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
 from app.config import get_settings
 from app.db import get_session
 from app.models.broker_sync import BrokerSync
+from app.models.user import User
 from app.services.brokers import KrakenService, PDFExtractionError, import_pdf
 from app.services.brokers.kraken import KrakenAPIError, KrakenAuthError
 
@@ -17,8 +19,19 @@ ALLOWED_PDF_BROKERS = {"MyInvestor", "TradeRepublic", "Generic"}
 MAX_PDF_SIZE_MB = 10
 
 
+def _require_owner(current_user: User) -> None:
+    """Kraken stays owner-only for now (Fase 1) — friends add crypto manually."""
+    settings = get_settings()
+    if not settings.owner_email or current_user.email != settings.owner_email.strip().lower():
+        raise HTTPException(status_code=403, detail="Kraken solo está disponible para el propietario")
+
+
 @router.post("/kraken/sync")
-async def kraken_sync(session: AsyncSession = Depends(get_session)) -> dict:
+async def kraken_sync(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    _require_owner(current_user)
     settings = get_settings()
     if not settings.has_kraken:
         raise HTTPException(status_code=400, detail="Kraken API key/secret not configured")
@@ -29,7 +42,7 @@ async def kraken_sync(session: AsyncSession = Depends(get_session)) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
-        result = await service.sync_all(session)
+        result = await service.sync_all(session, current_user.id)
     except KrakenAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:
@@ -40,8 +53,9 @@ async def kraken_sync(session: AsyncSession = Depends(get_session)) -> dict:
 
 
 @router.get("/kraken/balance")
-async def kraken_balance() -> dict:
+async def kraken_balance(current_user: User = Depends(get_current_user)) -> dict:
     """Live balances from Kraken, without persisting. Useful for sanity checks."""
+    _require_owner(current_user)
     settings = get_settings()
     if not settings.has_kraken:
         raise HTTPException(status_code=400, detail="Kraken not configured")
@@ -61,6 +75,7 @@ async def pdf_import(
     broker: str = Form(default="Generic", description="MyInvestor | TradeRepublic | Generic"),
     replace_existing: bool = Form(default=True, description="Si true, borra las posiciones previas del broker antes de importar"),
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """Import positions from a broker PDF statement via Gemini Flash-Lite."""
     settings = get_settings()
@@ -85,6 +100,7 @@ async def pdf_import(
             pdf_bytes=content,
             broker=broker,
             session=session,
+            user_id=current_user.id,
             replace_broker_positions=replace_existing,
         )
     except PDFExtractionError as exc:

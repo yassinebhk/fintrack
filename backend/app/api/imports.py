@@ -6,7 +6,9 @@ import pandas as pd
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
 from app.db import get_session
+from app.models.user import User
 from app.repositories import PositionRepository
 
 router = APIRouter(prefix="/api/import", tags=["import"])
@@ -120,6 +122,7 @@ async def import_csv(
     broker: str = Form(default="Manual"),
     merge_existing: bool = Form(default=True),
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     content = await file.read()
     try:
@@ -130,7 +133,7 @@ async def import_csv(
     if processed.empty:
         raise HTTPException(status_code=400, detail="No valid positions found in CSV")
 
-    repo = PositionRepository(session)
+    repo = PositionRepository(session, current_user.id)
 
     if not merge_existing:
         await repo.delete_by_broker(broker)

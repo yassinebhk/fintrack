@@ -1,12 +1,13 @@
 """Per-asset price + history endpoints."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.auth import get_current_user_optional
+from app.models.user import User
 from app.services.market import CoinGeckoService, YahooFinanceService
 from app.services.portfolio import PortfolioService
 
 router = APIRouter(prefix="/api", tags=["asset"])
-_portfolio = PortfolioService()
 _yahoo = YahooFinanceService()
 _coingecko = CoinGeckoService()
 
@@ -30,10 +31,15 @@ async def get_asset_history(
     ticker: str,
     period: str = Query(default="1y", pattern="^(1d|5d|1mo|3mo|6mo|1y|2y|5y|max)$"),
     asset_type: str = Query(default="auto"),
+    current_user: User | None = Depends(get_current_user_optional),
 ) -> dict:
     if asset_type == "auto":
-        positions = await _portfolio.load_positions()
-        pos = positions[positions["ticker"].str.upper() == ticker.upper()]
+        if current_user is not None:
+            positions = await PortfolioService(current_user.id).load_positions()
+            pos = positions[positions["ticker"].str.upper() == ticker.upper()]
+        else:
+            import pandas as pd
+            pos = pd.DataFrame()
         if not pos.empty:
             asset_type = pos.iloc[0]["type"]
         elif ticker.upper() in {"BTC", "ETH", "SOL", "DOGE", "PEPE", "XRP", "ADA"}:

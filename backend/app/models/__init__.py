@@ -12,6 +12,7 @@ from app.models.recommendation import RecommendationTrack
 from app.models.snapshot import Snapshot
 from app.models.ticker_mapping import TickerMapping
 from app.models.transaction import Transaction
+from app.models.user import User
 
 __all__ = [
     "AgentRun",
@@ -26,4 +27,5 @@ __all__ = [
     "Snapshot",
     "TickerMapping",
     "Transaction",
+    "User",
 ]

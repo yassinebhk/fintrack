@@ -2,7 +2,7 @@
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Date, DateTime, Float, Integer, UniqueConstraint
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Index, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -12,6 +12,7 @@ class Snapshot(Base):
     __tablename__ = "snapshots"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     snapshot_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     total_value: Mapped[float] = mapped_column(Float, nullable=False)
@@ -26,5 +27,6 @@ class Snapshot(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("snapshot_date", name="uq_snapshot_date"),
+        UniqueConstraint("user_id", "snapshot_date", name="uq_snapshot_user_date"),
+        Index("ix_snapshot_user_id", "user_id"),
     )

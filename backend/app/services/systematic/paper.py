@@ -29,32 +29,34 @@ MIN_DAYS_READY = 56      # 8 weeks
 MIN_MARKS_READY = 30
 
 
-async def _load() -> dict:
+async def _load(user_id: int) -> dict:
+    key = f"{_KEY}:{user_id}"
     try:
         from sqlalchemy import select
         from app.db import session_scope
         from app.models import JsonCache
         async with session_scope() as s:
-            row = (await s.execute(select(JsonCache).where(JsonCache.key == _KEY))).scalar_one_or_none()
+            row = (await s.execute(select(JsonCache).where(JsonCache.key == key))).scalar_one_or_none()
         return row.payload if row and row.payload else {}
     except Exception as exc:
         logger.warning("systematic paper load failed: {}", exc)
         return {}
 
 
-async def _save(payload: dict) -> None:
+async def _save(user_id: int, payload: dict) -> None:
+    key = f"{_KEY}:{user_id}"
     from app.db import session_scope, upsert_insert
     from app.models import JsonCache
     stmt = upsert_insert()(JsonCache).values(
-        key=_KEY, payload=payload, updated_at=datetime.now(timezone.utc)
+        key=key, payload=payload, updated_at=datetime.now(timezone.utc)
     ).on_conflict_do_update(index_elements=["key"],
                             set_={"payload": payload, "updated_at": datetime.now(timezone.utc)})
     async with session_scope() as s:
         await s.execute(stmt)
 
 
-async def reset() -> dict:
-    await _save({})
+async def reset(user_id: int) -> dict:
+    await _save(user_id, {})
     return {"reset": True}
 
 
@@ -81,7 +83,7 @@ async def _scored_universe(scanner) -> list[dict]:
     return items
 
 
-async def rebalance() -> dict:
+async def rebalance(user_id: int) -> dict:
     """Recompute target weights from current signals and store them."""
     from app.services.discovery.market_scanner import MarketScanner
     scanner = MarketScanner()
@@ -90,7 +92,7 @@ async def rebalance() -> dict:
         return {"error": "universo insuficiente", "scored": len(items)}
 
     meta = buyable_meta()
-    state = await _load()
+    state = await _load(user_id)
     nav_curve = [p["nav"] for p in state.get("marks", [])]
 
     # Regime: breadth = share of universe above its 200d trend.
@@ -134,16 +136,16 @@ async def rebalance() -> dict:
     # NAV continuity: the leg starts at the current NAV (or 100 at inception)
     state["leg_start_nav"] = nav_curve[-1] if nav_curve else 100.0
     state["leg_start_bench_nav"] = state.get("_bench_nav", 100.0)
-    await _save(state)
+    await _save(user_id, state)
     return {"regime": regime, "breadth": round(breadth, 2), "picks": len(weights),
             "holdings": weights, "note": note}
 
 
-async def mark() -> dict:
+async def mark(user_id: int) -> dict:
     """Mark-to-market: append today's NAV (portfolio + benchmark) to the curve."""
     from app.services.discovery.market_scanner import MarketScanner
     scanner = MarketScanner()
-    state = await _load()
+    state = await _load(user_id)
     if not state.get("last_rebalance"):
         return {"error": "sin rebalanceo todavía"}
     holdings = state.get("holdings", {})
@@ -180,7 +182,7 @@ async def mark() -> dict:
     marks.append({"date": today, "nav": round(leg_nav, 4), "bench": round(bench_nav, 4)})
     state["marks"] = marks[-400:]
     state["_bench_nav"] = bench_nav
-    await _save(state)
+    await _save(user_id, state)
     return {"date": today, "nav": round(leg_nav, 2), "bench": round(bench_nav, 2),
             "invested_pct": round(sum(holdings.values()) * 100, 1)}
 
@@ -204,8 +206,8 @@ def _max_dd(navs: list[float]) -> float:
     return mdd
 
 
-async def report() -> dict:
-    state = await _load()
+async def report(user_id: int) -> dict:
+    state = await _load(user_id)
     marks = state.get("marks", [])
     if not marks:
         return {"status": "sin marcas todavía", "holdings": state.get("holdings", {}),

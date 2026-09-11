@@ -102,7 +102,18 @@ class TelegramBotHandler:
     def __init__(self) -> None:
         self.settings = get_settings()
         self.notifier = TelegramNotifier()
-        self.portfolio_service = PortfolioService()
+        # Owner-only bot until Telegram goes per-user (Fase 2).
+        self._portfolio_service: PortfolioService | None = None
+
+    async def _owner_id(self) -> int:
+        from app.auth import get_owner_user_id_cached
+
+        return (await get_owner_user_id_cached()) or 0
+
+    async def _get_portfolio_service(self) -> PortfolioService:
+        if self._portfolio_service is None:
+            self._portfolio_service = PortfolioService(await self._owner_id())
+        return self._portfolio_service
 
     async def handle(self, chat_id: str, text: str) -> None:
         # Authorization: only the configured chat
@@ -599,14 +610,14 @@ class TelegramBotHandler:
         await self.notifier.send_chat_action("upload_photo")
         low = text.lower()
         async with session_scope() as session:
-            positions = await PositionRepository(session).list_all()
+            positions = await PositionRepository(session, await self._owner_id()).list_all()
 
         # Did they mention a specific asset?
         target = self._match_position(text, positions)
         try:
             if target:
                 period_days = 180
-                history = await self.portfolio_service.get_asset_history(
+                history = await (await self._get_portfolio_service()).get_asset_history(
                     target.ticker, target.type, days=period_days
                 )
                 if not history:
@@ -621,7 +632,7 @@ class TelegramBotHandler:
                 await self.notifier.send_photo(url, caption=f"📈 <b>{html_escape(name)}</b>{PAGE_LINK}")
             else:
                 # Portfolio evolution
-                hist = await self.portfolio_service.get_portfolio_history(days=180)
+                hist = await (await self._get_portfolio_service()).get_portfolio_history(days=180)
                 if not hist or len(hist) < 2:
                     await self.notifier.send_html(
                         "Aún no tengo suficiente histórico de tu cartera para una gráfica "
@@ -647,15 +658,16 @@ class TelegramBotHandler:
         from app.services.report_prefs import get_excluded
         from app.services.portfolio_report import build_summary_html
 
-        p = await self.portfolio_service.calculate_portfolio()
+        p = await (await self._get_portfolio_service()).calculate_portfolio()
         excluded = await get_excluded()
         html = build_summary_html(p, excluded) + "\n" + PAGE_LINK
         await self.notifier.send_html(html)
 
     async def _try_contribution(self, text: str) -> bool:
         """Parse and execute a contribution. Returns True if handled."""
+        owner_id = await self._owner_id()
         async with session_scope() as session:
-            positions = await PositionRepository(session).list_all()
+            positions = await PositionRepository(session, owner_id).list_all()
 
         if not positions:
             await self.notifier.send_text("No tienes posiciones en las que aportar todavía.")
@@ -693,14 +705,14 @@ class TelegramBotHandler:
 
         shares_added = amount / price
         async with session_scope() as session:
-            repo = PositionRepository(session)
+            repo = PositionRepository(session, owner_id)
             pos = await repo.get(target.ticker, target.broker)
             old_cost = pos.quantity * pos.avg_price
             pos.quantity += shares_added
             pos.avg_price = (old_cost + amount) / pos.quantity
             await session.flush()
             try:
-                await TransactionRepository(session).add(
+                await TransactionRepository(session, owner_id).add(
                     type="buy", ticker=pos.ticker, quantity=shares_added, price=price,
                     currency=pos.currency, broker=pos.broker,
                     executed_at=datetime.now(timezone.utc),
@@ -763,7 +775,7 @@ class TelegramBotHandler:
 
         # Build rich context: portfolio + weekly change + per-position detail
         try:
-            p = await self.portfolio_service.calculate_portfolio()
+            p = await (await self._get_portfolio_service()).calculate_portfolio()
         except Exception as exc:
             logger.warning("telegram Q&A: portfolio failed: {}", exc)
             await self.notifier.send_text("No pude cargar tu cartera ahora mismo, intenta en un minuto.")
@@ -775,7 +787,7 @@ class TelegramBotHandler:
         weekly_line = ""
         try:
             async with session_scope() as session:
-                snaps = await SnapshotRepository(session).list_last_days(days=8)
+                snaps = await SnapshotRepository(session, await self._owner_id()).list_last_days(days=8)
             if len(snaps) >= 2:
                 wk_ago = snaps[0].total_value
                 now = snaps[-1].total_value

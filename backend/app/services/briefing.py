@@ -139,9 +139,19 @@ def render_briefing_telegram(content: dict, briefing_date=None) -> str:
 
 class BriefingService:
     def __init__(self) -> None:
-        self.portfolio_service = PortfolioService()
+        # Owner-only until this becomes a per-user loop (Fase 2) — see
+        # app.auth.get_owner_user_id_cached.
+        self._portfolio_service: PortfolioService | None = None
         self.news_service = NewsService()
         self.telegram = TelegramNotifier()
+
+    async def _get_portfolio_service(self) -> PortfolioService:
+        if self._portfolio_service is None:
+            from app.auth import get_owner_user_id_cached
+
+            owner_id = await get_owner_user_id_cached()
+            self._portfolio_service = PortfolioService(owner_id or 0)
+        return self._portfolio_service
 
     async def generate_today(self, *, force: bool = False) -> dict:
         """Run agent pipeline, persist result, return content dict."""
@@ -152,7 +162,7 @@ class BriefingService:
             logger.info("briefing for {} already exists; returning cached", today)
             return self._existing_to_dict(existing)
 
-        portfolio = await self.portfolio_service.calculate_portfolio()
+        portfolio = await (await self._get_portfolio_service()).calculate_portfolio()
         news_items = await self.news_service.get_news("all", limit=30)
 
         # Fetch macro data in parallel (best-effort)

@@ -7,6 +7,7 @@ from app.api import (
     alerts,
     asset,
     assets,
+    auth,
     backtest,
     briefings,
     brokers,
@@ -33,6 +34,7 @@ from app.api import (
 
 def build_api_router() -> APIRouter:
     router = APIRouter()
+    router.include_router(auth.router)
     router.include_router(health.router)
     router.include_router(portfolio.router)
     router.include_router(positions.router)

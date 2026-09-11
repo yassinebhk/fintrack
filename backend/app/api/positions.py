@@ -1,4 +1,4 @@
-"""Positions CRUD endpoints."""
+"""Positions CRUD endpoints — scoped to the logged-in user."""
 
 from datetime import datetime, timezone
 
@@ -7,7 +7,9 @@ from loguru import logger
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
 from app.db import get_session
+from app.models.user import User
 from app.repositories import PositionRepository, TransactionRepository
 from app.services.market import CoinGeckoService, YahooFinanceService
 
@@ -51,10 +53,11 @@ async def contribute(
     ticker: str,
     payload: ContributionIn,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """Add money (in EUR) to an existing position. Shares are computed from the
     live price so the user never has to figure out units themselves."""
-    repo = PositionRepository(session)
+    repo = PositionRepository(session, current_user.id)
     ticker = ticker.upper()
     pos = await repo.get(ticker, payload.broker)
     if pos is None:
@@ -77,7 +80,7 @@ async def contribute(
 
     # Record the contribution as a buy transaction for the audit trail
     try:
-        await TransactionRepository(session).add(
+        await TransactionRepository(session, current_user.id).add(
             type="buy",
             ticker=ticker,
             quantity=shares_added,
@@ -114,7 +117,11 @@ class MovementIn(BaseModel):
 
 
 @router.post("/movement")
-async def register_movement(payload: MovementIn, session: AsyncSession = Depends(get_session)) -> dict:
+async def register_movement(
+    payload: MovementIn,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
     """Register a real money movement from the user's broker apps.
 
     - 'aportar' to an existing or NEW asset (creates it). Shares computed from the
@@ -122,8 +129,8 @@ async def register_movement(payload: MovementIn, session: AsyncSession = Depends
     - 'retirar' reduces (or closes) an existing position.
     Date is selectable; defaults to today.
     """
-    repo = PositionRepository(session)
-    tx_repo = TransactionRepository(session)
+    repo = PositionRepository(session, current_user.id)
+    tx_repo = TransactionRepository(session, current_user.id)
     ticker = payload.ticker.upper().strip()
     action = payload.action.lower().strip()
 
@@ -206,8 +213,11 @@ async def register_movement(payload: MovementIn, session: AsyncSession = Depends
 
 
 @router.get("")
-async def list_positions(session: AsyncSession = Depends(get_session)) -> list[dict]:
-    rows = await PositionRepository(session).list_all()
+async def list_positions(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
+    rows = await PositionRepository(session, current_user.id).list_all()
     return [
         {
             "ticker": r.ticker,
@@ -224,8 +234,12 @@ async def list_positions(session: AsyncSession = Depends(get_session)) -> list[d
 
 
 @router.post("")
-async def create_position(payload: PositionIn, session: AsyncSession = Depends(get_session)) -> dict:
-    repo = PositionRepository(session)
+async def create_position(
+    payload: PositionIn,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    repo = PositionRepository(session, current_user.id)
     existing = await repo.get(payload.ticker.upper(), payload.broker)
     if existing is not None:
         raise HTTPException(status_code=400, detail=f"Position {payload.ticker} @ {payload.broker} already exists")
@@ -239,8 +253,9 @@ async def update_position(
     payload: PositionPatch,
     broker: str | None = None,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
-    repo = PositionRepository(session)
+    repo = PositionRepository(session, current_user.id)
     ticker = ticker.upper()
 
     if broker:
@@ -264,8 +279,9 @@ async def delete_position(
     ticker: str,
     broker: str | None = None,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
-    repo = PositionRepository(session)
+    repo = PositionRepository(session, current_user.id)
     ticker = ticker.upper()
     if broker:
         ok = await repo.delete(ticker, broker)

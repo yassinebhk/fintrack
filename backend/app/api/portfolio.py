@@ -1,25 +1,30 @@
-"""Portfolio endpoints."""
+"""Portfolio endpoints — scoped to the logged-in user."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.auth import get_current_user
+from app.models.user import User
 from app.services.portfolio import PortfolioService
 
 router = APIRouter(prefix="/api", tags=["portfolio"])
-_service = PortfolioService()
+
+
+def _get_service(current_user: User = Depends(get_current_user)) -> PortfolioService:
+    return PortfolioService(current_user.id)
 
 
 @router.get("/portfolio")
-async def get_portfolio() -> dict:
+async def get_portfolio(svc: PortfolioService = Depends(_get_service)) -> dict:
     try:
-        return await _service.calculate_portfolio()
+        return await svc.calculate_portfolio()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/portfolio/summary")
-async def get_portfolio_summary() -> dict:
+async def get_portfolio_summary(svc: PortfolioService = Depends(_get_service)) -> dict:
     try:
-        p = await _service.calculate_portfolio()
+        p = await svc.calculate_portfolio()
         return {
             "total_value": p["total_value"],
             "total_cost": p["total_cost"],
@@ -36,36 +41,40 @@ async def get_portfolio_summary() -> dict:
 
 
 @router.get("/portfolio/risk-analysis")
-async def get_risk_analysis() -> dict:
+async def get_risk_analysis(svc: PortfolioService = Depends(_get_service)) -> dict:
     try:
-        return await _service.risk_analysis()
+        return await svc.risk_analysis()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/portfolio/history")
-async def get_portfolio_history(days: int = Query(default=365, ge=1, le=3650)) -> dict:
-    history = await _service.get_portfolio_history(days)
+async def get_portfolio_history(
+    days: int = Query(default=365, ge=1, le=3650), svc: PortfolioService = Depends(_get_service)
+) -> dict:
+    history = await svc.get_portfolio_history(days)
     return {"history": history, "days": days}
 
 
 @router.get("/portfolio/position-history/{ticker}")
-async def get_position_history(ticker: str, days: int = Query(default=365, ge=1, le=3650)) -> dict:
+async def get_position_history(
+    ticker: str, days: int = Query(default=365, ge=1, le=3650), svc: PortfolioService = Depends(_get_service)
+) -> dict:
     try:
-        return await _service.get_position_history(ticker, days)
+        return await svc.get_position_history(ticker, days)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/portfolio/kpis")
-async def get_portfolio_kpis() -> dict:
-    p = await _service.calculate_portfolio()
+async def get_portfolio_kpis(svc: PortfolioService = Depends(_get_service)) -> dict:
+    p = await svc.calculate_portfolio()
     return p["kpis"]
 
 
 @router.get("/distributions")
-async def get_distributions() -> dict:
-    p = await _service.calculate_portfolio()
+async def get_distributions(svc: PortfolioService = Depends(_get_service)) -> dict:
+    p = await svc.calculate_portfolio()
     return {
         "by_type": p["by_type"],
         "by_broker": p["by_broker"],
@@ -74,11 +83,11 @@ async def get_distributions() -> dict:
 
 
 @router.api_route("/refresh", methods=["GET", "POST"])
-async def refresh_data() -> dict:
+async def refresh_data(svc: PortfolioService = Depends(_get_service)) -> dict:
     """Force a portfolio recalculation. Accepts GET (legacy frontend) and POST."""
     from datetime import datetime, timezone
 
-    p = await _service.calculate_portfolio()
+    p = await svc.calculate_portfolio()
     return {
         "message": "Data refreshed",
         "timestamp": datetime.now(timezone.utc).isoformat(),

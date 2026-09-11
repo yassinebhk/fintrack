@@ -19,7 +19,10 @@ _DB_KEY = "opportunities"
 class OpportunityService:
     def __init__(self) -> None:
         self.scanner = MarketScanner()
-        self.portfolio_service = PortfolioService()
+        # Opportunities stays a SHARED feature (not per-user), but "exclude what
+        # you already hold" still needs some portfolio — kept pointed at the
+        # original owner's until this gets a real per-user design (Fase 2).
+        self._portfolio_service: PortfolioService | None = None
         self.news_service = NewsService()
         self._cache: dict | None = None
         self._cache_at: datetime | None = None
@@ -181,12 +184,20 @@ class OpportunityService:
         if self._finalizing is None or self._finalizing.done():
             self._finalizing = asyncio.create_task(_run())
 
+    async def _get_portfolio_service(self) -> PortfolioService:
+        if self._portfolio_service is None:
+            from app.auth import get_owner_user_id_cached
+
+            owner_id = await get_owner_user_id_cached()
+            self._portfolio_service = PortfolioService(owner_id or 0)
+        return self._portfolio_service
+
     async def _generate_locked(self) -> dict:
         themes, crypto = await self._run_scan()
         return await self._finalize(themes, crypto)
 
     async def _finalize(self, themes: list[dict], crypto: list[dict]) -> dict:
-        portfolio = await self.portfolio_service.calculate_portfolio()
+        portfolio = await (await self._get_portfolio_service()).calculate_portfolio()
 
         # Exclude what the user already holds so discoveries are genuinely new.
         held = set()

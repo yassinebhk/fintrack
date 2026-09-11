@@ -3,16 +3,17 @@
 Provider precedence: Gemini → Groq fallback → static config message.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from loguru import logger
 from pydantic import BaseModel
 
+from app.auth import get_current_user
 from app.config import get_settings
 from app.llm import LLMMessage, get_llm_client
+from app.models.user import User
 from app.services.portfolio import PortfolioService
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
-_portfolio = PortfolioService()
 
 AI_SYSTEM_PROMPT = """Eres FinBot, un asesor financiero virtual experto y pedagógico.
 
@@ -64,7 +65,7 @@ def _build_portfolio_context(portfolio: dict) -> str:
 
 
 @router.post("/chat")
-async def ai_chat(question: AIQuestion) -> dict:
+async def ai_chat(question: AIQuestion, current_user: User = Depends(get_current_user)) -> dict:
     settings = get_settings()
     if not settings.has_gemini and not settings.has_groq:
         return {"response": CONFIG_MSG, "model": "none", "tokens_used": 0}
@@ -72,7 +73,7 @@ async def ai_chat(question: AIQuestion) -> dict:
     context = ""
     if question.include_portfolio:
         try:
-            p = await _portfolio.calculate_portfolio()
+            p = await PortfolioService(current_user.id).calculate_portfolio()
             context = _build_portfolio_context(p)
         except Exception as exc:
             logger.warning("could not build portfolio context: {}", exc)

@@ -185,6 +185,7 @@ async def import_pdf(
     pdf_bytes: bytes,
     broker: str,
     session: AsyncSession,
+    user_id: int,
     *,
     replace_broker_positions: bool = True,
 ) -> dict[str, Any]:
@@ -216,7 +217,7 @@ async def import_pdf(
                 "warning": sync_row.error_message,
             }
 
-        repo = PositionRepository(session)
+        repo = PositionRepository(session, user_id)
 
         if replace_broker_positions:
             removed = await repo.delete_by_broker(broker)

@@ -20,8 +20,9 @@ from app.services.market import CoinGeckoService, ExchangeRateService, YahooFina
 
 
 class PortfolioService:
-    def __init__(self, base_currency: str | None = None) -> None:
+    def __init__(self, user_id: int, base_currency: str | None = None) -> None:
         settings = get_settings()
+        self.user_id = user_id
         self.base_currency = (base_currency or settings.base_currency).upper()
         self.yahoo = YahooFinanceService()
         self.coingecko = CoinGeckoService()
@@ -32,7 +33,7 @@ class PortfolioService:
 
     async def load_positions(self) -> pd.DataFrame:
         async with session_scope() as session:
-            repo = PositionRepository(session)
+            repo = PositionRepository(session, self.user_id)
             rows = await repo.list_all()
         if not rows:
             return pd.DataFrame(columns=["ticker", "quantity", "avg_price", "type", "currency", "broker"])
@@ -233,7 +234,7 @@ class PortfolioService:
         daily_change: float,
     ) -> None:
         async with session_scope() as session:
-            await SnapshotRepository(session).upsert_today(
+            await SnapshotRepository(session, self.user_id).upsert_today(
                 snapshot_date=datetime.now().date(),
                 total_value=total_value,
                 total_cost=total_cost,
@@ -243,7 +244,7 @@ class PortfolioService:
 
     async def _kpis(self) -> dict:
         async with session_scope() as session:
-            snaps = await SnapshotRepository(session).list_all()
+            snaps = await SnapshotRepository(session, self.user_id).list_all()
 
         kpis = {
             "cagr": 0.0,
@@ -320,7 +321,7 @@ class PortfolioService:
 
     async def get_portfolio_history(self, days: int = 365) -> list[dict]:
         async with session_scope() as session:
-            rows = await SnapshotRepository(session).list_last_days(days=days)
+            rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)
         return [{"date": r.snapshot_date.strftime("%Y-%m-%d"), "value": float(r.total_value)} for r in rows]
 
     async def get_asset_history(self, ticker: str, asset_type: str, days: int = 365) -> list[dict] | None:
@@ -346,7 +347,7 @@ class PortfolioService:
         against the price history, not the price series itself."""
         ticker_up = ticker.upper()
         async with session_scope() as session:
-            txs = await TransactionRepository(session).list_for_ticker(ticker_up)
+            txs = await TransactionRepository(session, self.user_id).list_for_ticker(ticker_up)
         txs = sorted(txs, key=lambda t: t.executed_at)
 
         positions = await self.load_positions()

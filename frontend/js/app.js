@@ -832,7 +832,58 @@ function handleSort(column) {
 }
 
 // Event Listeners
-document.addEventListener('DOMContentLoaded', () => {
+// Auth gate — every fetch elsewhere in the app already sends the session
+// cookie automatically (same-origin in production), so no other file needs
+// to change. If not logged in, hide the app and show the Google login button.
+let currentUser = null;
+window.currentUser = null;
+
+async function checkAuth() {
+    try {
+        const resp = await fetch(`${CONFIG.API_BASE_URL}/auth/me`, { credentials: 'same-origin' });
+        if (resp.ok) {
+            currentUser = await resp.json();
+            window.currentUser = currentUser;
+            return true;
+        }
+    } catch (e) {
+        console.error('auth check failed', e);
+    }
+    return false;
+}
+
+function showLoginGate() {
+    const gate = document.getElementById('loginGate');
+    const app = document.querySelector('.app');
+    if (gate) gate.style.display = 'flex';
+    if (app) app.style.display = 'none';
+}
+
+function showApp() {
+    const gate = document.getElementById('loginGate');
+    const app = document.querySelector('.app');
+    if (gate) gate.style.display = 'none';
+    if (app) app.style.display = '';
+    const nameEl = document.getElementById('userChipName');
+    if (nameEl && currentUser) nameEl.textContent = currentUser.name || currentUser.email;
+    const logoutLink = document.getElementById('logoutLink');
+    if (logoutLink) {
+        logoutLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'same-origin' });
+            window.location.reload();
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const authed = await checkAuth();
+    if (!authed) {
+        showLoginGate();
+        return;
+    }
+    showApp();
+
     // Initial load
     loadDashboard();
     

@@ -118,7 +118,7 @@ def _thesis(theme: dict, news_items: list[dict], macro: dict) -> str:
     return " ".join(parts)
 
 
-async def pick_and_open() -> dict:
+async def pick_and_open(user_id: int) -> dict:
     """Look at today's cached opportunities; open at most ONE new long paper
     trade for the best-qualifying idea that also survives the real-news veto
     and macro-caution check. Skips entirely (opened=None) if nothing clears
@@ -128,7 +128,7 @@ async def pick_and_open() -> dict:
     if not themes:
         return {"opened": None, "reason": "no opportunities cached yet"}
 
-    open_trades = await journal.list_trades(status="open")
+    open_trades = await journal.list_trades(user_id, status="open")
     open_tickers = {t["ticker"] for t in open_trades}
 
     candidates = sorted(
@@ -161,6 +161,7 @@ async def pick_and_open() -> dict:
             continue
         try:
             trade = await journal.open_trade(
+                user_id=user_id,
                 ticker=ticker,
                 direction="long",
                 thesis=_thesis(theme, news["items"], macro),

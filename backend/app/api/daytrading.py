@@ -1,11 +1,14 @@
 """Day-trading paper journal endpoints. No secret gate — these are direct user
-actions (same criterion as app.api.positions), not admin/cron-triggered jobs."""
+actions (same criterion as app.api.positions), scoped to the logged-in user."""
 
 import asyncio
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
 from pydantic import BaseModel, Field
+
+from app.auth import get_current_user
+from app.models.user import User
 
 router = APIRouter(prefix="/api/daytrading", tags=["daytrading"])
 
@@ -23,10 +26,11 @@ class TradeIn(BaseModel):
 
 
 @router.post("/trades", status_code=201)
-async def open_trade(payload: TradeIn) -> dict:
+async def open_trade(payload: TradeIn, current_user: User = Depends(get_current_user)) -> dict:
     from app.services.daytrading import journal
     try:
         return await journal.open_trade(
+            user_id=current_user.id,
             ticker=payload.ticker,
             direction=payload.direction,
             thesis=payload.thesis,
@@ -42,10 +46,10 @@ async def open_trade(payload: TradeIn) -> dict:
 
 
 @router.post("/trades/{trade_id}/close")
-async def close_trade(trade_id: int) -> dict:
+async def close_trade(trade_id: int, current_user: User = Depends(get_current_user)) -> dict:
     from app.services.daytrading import journal
     try:
-        trade = await journal.close_trade(trade_id, reason="manual")
+        trade = await journal.close_trade(current_user.id, trade_id, reason="manual")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if trade is None:
@@ -54,12 +58,12 @@ async def close_trade(trade_id: int) -> dict:
 
 
 @router.post("/mark")
-async def mark_open_trades() -> dict:
+async def mark_open_trades(current_user: User = Depends(get_current_user)) -> dict:
     from app.services.daytrading import journal
 
     async def _job():
         try:
-            await journal.mark_open_trades()
+            await journal.mark_open_trades(current_user.id)
         except Exception:
             logger.exception("day trading mark failed")
     asyncio.create_task(_job())
@@ -67,13 +71,16 @@ async def mark_open_trades() -> dict:
 
 
 @router.get("/trades")
-async def list_trades(status: str = Query(default="all", pattern="^(open|closed|all)$")) -> dict:
+async def list_trades(
+    status: str = Query(default="all", pattern="^(open|closed|all)$"),
+    current_user: User = Depends(get_current_user),
+) -> dict:
     from app.services.daytrading import journal
-    trades = await journal.list_trades(status)
+    trades = await journal.list_trades(current_user.id, status)
     return {"count": len(trades), "trades": trades}
 
 
 @router.get("/report")
-async def report() -> dict:
+async def report(current_user: User = Depends(get_current_user)) -> dict:
     from app.services.daytrading import journal
-    return await journal.report()
+    return await journal.report(current_user.id)

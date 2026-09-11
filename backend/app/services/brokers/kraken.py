@@ -149,6 +149,7 @@ class KrakenService:
     async def sync_balances(
         self,
         session: AsyncSession,
+        user_id: int,
         broker_label: str = "Kraken",
     ) -> dict[str, Any]:
         """Refresh positions in DB from Kraken's live balance snapshot.
@@ -156,7 +157,7 @@ class KrakenService:
         avg_price stays untouched here (set/refined by sync_trades).
         """
         balances = await self.get_balance()
-        pos_repo = PositionRepository(session)
+        pos_repo = PositionRepository(session, user_id)
         existing = await pos_repo.list_all()
         existing_by_ticker = {p.ticker: p for p in existing if p.broker == broker_label}
 
@@ -196,12 +197,13 @@ class KrakenService:
     async def sync_trades(
         self,
         session: AsyncSession,
+        user_id: int,
         broker_label: str = "Kraken",
         since_unix: float | None = None,
     ) -> dict[str, Any]:
         """Pull trades history and (a) store transactions, (b) recompute weighted avg_price per ticker."""
-        tx_repo = TransactionRepository(session)
-        pos_repo = PositionRepository(session)
+        tx_repo = TransactionRepository(session, user_id)
+        pos_repo = PositionRepository(session, user_id)
 
         trades = await self.get_all_trades(since_unix=since_unix)
         new_txs = 0
@@ -276,14 +278,14 @@ class KrakenService:
 
         return {"trades_imported": new_txs, "avg_prices_recomputed": updated_prices}
 
-    async def sync_all(self, session: AsyncSession, broker_label: str = "Kraken") -> dict[str, Any]:
+    async def sync_all(self, session: AsyncSession, user_id: int, broker_label: str = "Kraken") -> dict[str, Any]:
         """End-to-end sync: log a BrokerSync row, run balance + trades, return summary."""
         row = BrokerSync(broker=broker_label, status="running", started_at=datetime.now(timezone.utc))
         session.add(row)
         await session.flush()
         try:
-            balance_result = await self.sync_balances(session, broker_label)
-            trades_result = await self.sync_trades(session, broker_label)
+            balance_result = await self.sync_balances(session, user_id, broker_label)
+            trades_result = await self.sync_trades(session, user_id, broker_label)
             row.status = "success"
             row.positions_synced = balance_result["updated"]
             row.transactions_synced = trades_result["trades_imported"]

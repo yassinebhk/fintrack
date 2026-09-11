@@ -46,33 +46,35 @@ MAX_EDGE = 0.35              # an edge bigger than this on a LIQUID market = our
 MIN_RESOLVED = 50
 
 
-async def _load() -> dict:
+async def _load(user_id: int) -> dict:
+    key = f"{_KEY}:{user_id}"
     try:
         from sqlalchemy import select
         from app.db import session_scope
         from app.models import JsonCache
         async with session_scope() as s:
-            row = (await s.execute(select(JsonCache).where(JsonCache.key == _KEY))).scalar_one_or_none()
+            row = (await s.execute(select(JsonCache).where(JsonCache.key == key))).scalar_one_or_none()
         return row.payload if row and row.payload else {"bets": []}
     except Exception as exc:
         logger.warning("polymarket lab load failed: {}", exc)
         return {"bets": []}
 
 
-async def _save(payload: dict) -> None:
+async def _save(user_id: int, payload: dict) -> None:
+    key = f"{_KEY}:{user_id}"
     from app.db import session_scope, upsert_insert
     from app.models import JsonCache
     stmt = upsert_insert()(JsonCache).values(
-        key=_KEY, payload=payload, updated_at=datetime.now(timezone.utc)
+        key=key, payload=payload, updated_at=datetime.now(timezone.utc)
     ).on_conflict_do_update(index_elements=["key"],
                             set_={"payload": payload, "updated_at": datetime.now(timezone.utc)})
     async with session_scope() as s:
         await s.execute(stmt)
 
 
-async def reset_ledger() -> dict:
+async def reset_ledger(user_id: int) -> dict:
     """Wipe the paper ledger (e.g. after a model fix invalidated old bets)."""
-    await _save({"bets": []})
+    await _save(user_id, {"bets": []})
     return {"reset": True}
 
 
@@ -167,10 +169,10 @@ async def find_edges(limit: int = 40) -> list[dict]:
     return out
 
 
-async def log_paper_bets(limit: int = 40) -> dict:
+async def log_paper_bets(user_id: int, limit: int = 40) -> dict:
     """Append new paper bets for markets not already open in the ledger."""
     signals = await find_edges(limit=limit)
-    data = await _load()
+    data = await _load(user_id)
     open_ids = {b["market_id"] for b in data.get("bets", []) if b.get("status") == "open"}
     added = 0
     now = datetime.now(timezone.utc).isoformat()
@@ -182,13 +184,13 @@ async def log_paper_bets(limit: int = 40) -> dict:
         open_ids.add(s["market_id"])
         added += 1
     if added:
-        await _save(data)
+        await _save(user_id, data)
     return {"signals": len(signals), "new_bets": added, "open_total": len(open_ids)}
 
 
-async def evaluate() -> dict:
+async def evaluate(user_id: int) -> dict:
     """Resolve matured open bets and compute realized P&L."""
-    data = await _load()
+    data = await _load(user_id)
     client = PolymarketClient()
     resolved_now = 0
     for b in data.get("bets", []):
@@ -214,7 +216,7 @@ async def evaluate() -> dict:
                   "pnl": pnl, "resolved_at": datetime.now(timezone.utc).isoformat()})
         resolved_now += 1
     if resolved_now:
-        await _save(data)
+        await _save(user_id, data)
     return {"resolved_now": resolved_now}
 
 
@@ -224,8 +226,8 @@ def _brier(probs_outcomes: list[tuple]) -> float | None:
     return sum((p - o) ** 2 for p, o in probs_outcomes) / len(probs_outcomes)
 
 
-async def report() -> dict:
-    data = await _load()
+async def report(user_id: int) -> dict:
+    data = await _load(user_id)
     bets = data.get("bets", [])
     resolved = [b for b in bets if b.get("status") == "resolved"]
     open_bets = [b for b in bets if b.get("status") == "open"]
@@ -266,11 +268,11 @@ def _short_label(b: dict) -> str:
     return f"{sym}{arrow}{tgt_s}"[:13]
 
 
-async def telegram_digest() -> str:
+async def telegram_digest(user_id: int) -> str:
     """Self-explanatory, clean HTML digest for Telegram. Defines every term inline."""
     from app.services.notifications.telegram import html_escape
     rep = await report()
-    data = await _load()
+    data = await _load(user_id)
     open_bets = [b for b in data.get("bets", []) if b.get("status") == "open"]
 
     lines = [

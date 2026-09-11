@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, Index, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -12,6 +12,7 @@ class Position(Base):
     __tablename__ = "positions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
 
     ticker: Mapped[str] = mapped_column(String(32), nullable=False)
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
@@ -39,9 +40,10 @@ class Position(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("ticker", "broker", name="uq_position_ticker_broker"),
+        UniqueConstraint("user_id", "ticker", "broker", name="uq_position_user_ticker_broker"),
         Index("ix_position_broker", "broker"),
         Index("ix_position_type", "type"),
+        Index("ix_position_user_id", "user_id"),
     )
 
     def __repr__(self) -> str:

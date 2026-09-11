@@ -55,6 +55,15 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
 
+    # Auth (Google OAuth login, multi-user)
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    session_secret_key: str = ""
+    allowed_emails: str = ""  # comma-separated allowlist; empty = nobody can log in
+    owner_email: str = ""  # the original single-tenant owner; used by features not yet
+    # generalized per-user (opportunities' "exclude what you hold", alerts, daily briefing,
+    # Kraken sync, Telegram) — see Fase 2 plan for making these loop over every user.
+
     # Optional data providers
     fred_api_key: str = ""
     etherscan_api_key: str = ""
@@ -112,6 +121,14 @@ class Settings(BaseSettings):
     @property
     def has_telegram(self) -> bool:
         return bool(self.telegram_bot_token and self.telegram_chat_id)
+
+    @property
+    def has_google_oauth(self) -> bool:
+        return bool(self.google_client_id and self.google_client_secret)
+
+    @property
+    def allowed_emails_set(self) -> set[str]:
+        return {e.strip().lower() for e in self.allowed_emails.split(",") if e.strip()}
 
 
 @lru_cache(maxsize=1)

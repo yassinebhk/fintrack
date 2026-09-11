@@ -188,9 +188,11 @@ async def review_portfolio(force: bool = False) -> dict:
 
 async def _compute_review() -> dict:
     """Per-holding objective keep/trim/rotate signals with explanations + bias flags."""
+    from app.auth import get_owner_user_id_cached
     from app.services.portfolio import PortfolioService
 
-    portfolio = await PortfolioService().calculate_portfolio()
+    owner_id = await get_owner_user_id_cached()
+    portfolio = await PortfolioService(owner_id or 0).calculate_portfolio()
     positions = portfolio.get("positions") or []
     scanner = MarketScanner()
 

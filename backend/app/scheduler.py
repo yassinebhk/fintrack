@@ -25,13 +25,19 @@ _scheduler: AsyncIOScheduler | None = None
 
 
 async def _kraken_sync_job() -> None:
+    """Owner-only (Kraken stays single-owner, per the Fase 1 plan — friends add
+    crypto positions manually for now)."""
     settings = get_settings()
     if not settings.has_kraken:
         return
     try:
+        from app.auth import get_owner_user_id_cached
+        owner_id = await get_owner_user_id_cached()
+        if owner_id is None:
+            return
         svc = KrakenService()
         async with session_scope() as session:
-            result = await svc.sync_all(session)
+            result = await svc.sync_all(session, owner_id)
         logger.info(
             "scheduled kraken sync: balances={} trades={}",
             result["balances"]["updated"],
@@ -166,19 +172,24 @@ async def _monthly_fidelity_contribution_job() -> None:
     that's already covered, regardless of which day it lands on."""
     ticker, broker, eur_amount = "IE00BYX5NX33", "MyInvestor", 100.0
     try:
+        from app.auth import get_owner_user_id_cached
         from app.repositories import PositionRepository, TransactionRepository
         from app.services.market import YahooFinanceService
         from app.services.notifications.telegram import TelegramNotifier
 
+        owner_id = await get_owner_user_id_cached()
+        if owner_id is None:
+            return
+
         async with session_scope() as session:
-            repo = PositionRepository(session)
+            repo = PositionRepository(session, owner_id)
             existing = await repo.get(ticker, broker)
             if existing is None:
                 logger.error("monthly contribution: position {} @ {} not found", ticker, broker)
                 return
 
             now = datetime.now(timezone.utc)
-            this_month_txs = await TransactionRepository(session).list_for_ticker(ticker, broker=broker)
+            this_month_txs = await TransactionRepository(session, owner_id).list_for_ticker(ticker, broker=broker)
             already_done = any(
                 t.type == "buy" and t.executed_at.year == now.year and t.executed_at.month == now.month
                 for t in this_month_txs
@@ -199,7 +210,7 @@ async def _monthly_fidelity_contribution_job() -> None:
             existing.avg_price = (old_cost + eur_amount) / existing.quantity
             new_qty, new_avg = existing.quantity, existing.avg_price
 
-            await TransactionRepository(session).add(
+            await TransactionRepository(session, owner_id).add(
                 type="buy", ticker=ticker, quantity=shares_added, price=price,
                 currency="EUR", broker=broker, executed_at=datetime.now(timezone.utc),
                 notes=f"Aportación mensual {eur_amount:.2f}€ (recurrente día 27, automática)",
@@ -221,38 +232,53 @@ async def _monthly_fidelity_contribution_job() -> None:
 
 async def _polymarket_lab_job() -> None:
     """Daily: log fresh model-vs-market paper bets + resolve matured ones. No real money.
-    Sends the Telegram digest ONLY when something changed (avoids '0 resolved' spam)."""
+    Sends the Telegram digest ONLY when something changed (avoids '0 resolved' spam).
+    Owner-only until this loops over every user (Fase 2)."""
     try:
+        from app.auth import get_owner_user_id_cached
         from app.services.polymarket import lab
-        logged = await lab.log_paper_bets()
-        resolved = await lab.evaluate()
+        owner_id = await get_owner_user_id_cached()
+        if owner_id is None:
+            return
+        logged = await lab.log_paper_bets(owner_id)
+        resolved = await lab.evaluate(owner_id)
         if (logged.get("new_bets") or 0) > 0 or (resolved.get("resolved_now") or 0) > 0:
             from app.services.notifications.telegram import TelegramNotifier
-            await TelegramNotifier().send_html(await lab.telegram_digest())
+            await TelegramNotifier().send_html(await lab.telegram_digest(owner_id))
         logger.info("polymarket lab: {} new, {} resolved", logged.get("new_bets"), resolved.get("resolved_now"))
     except Exception as exc:
         logger.error("polymarket lab job failed: {}", exc)
 
 
 async def _systematic_rebalance_job() -> None:
-    """Weekly: rebalance the systematic paper portfolio, mark it, send the digest."""
+    """Weekly: rebalance the systematic paper portfolio, mark it, send the digest.
+    Owner-only until this loops over every user (Fase 2)."""
     try:
+        from app.auth import get_owner_user_id_cached
         from app.services.systematic import paper
         from app.services.systematic.digest import telegram_digest
         from app.services.notifications.telegram import TelegramNotifier
-        await paper.rebalance()
-        await paper.mark()
-        await TelegramNotifier().send_html(await telegram_digest())
+        owner_id = await get_owner_user_id_cached()
+        if owner_id is None:
+            return
+        await paper.rebalance(owner_id)
+        await paper.mark(owner_id)
+        await TelegramNotifier().send_html(await telegram_digest(owner_id))
         logger.info("systematic: weekly rebalance + digest done")
     except Exception as exc:
         logger.error("systematic rebalance job failed: {}", exc)
 
 
 async def _systematic_mark_job() -> None:
-    """Daily: mark the systematic paper portfolio to market (build the NAV curve)."""
+    """Daily: mark the systematic paper portfolio to market (build the NAV curve).
+    Owner-only until this loops over every user (Fase 2)."""
     try:
+        from app.auth import get_owner_user_id_cached
         from app.services.systematic import paper
-        res = await paper.mark()
+        owner_id = await get_owner_user_id_cached()
+        if owner_id is None:
+            return
+        res = await paper.mark(owner_id)
         logger.info("systematic daily mark: {}", res)
     except Exception as exc:
         logger.error("systematic mark job failed: {}", exc)
@@ -260,10 +286,15 @@ async def _systematic_mark_job() -> None:
 
 async def _day_trading_mark_job() -> None:
     """Daily: close any open paper day-trade whose stop-loss, take-profit, or max
-    hold time was hit."""
+    hold time was hit. Owner-only until Trading Diario loops over every user
+    (Fase 2) — see app.auth.get_owner_user_id_cached."""
     try:
+        from app.auth import get_owner_user_id_cached
         from app.services.daytrading import journal
-        res = await journal.mark_open_trades()
+        owner_id = await get_owner_user_id_cached()
+        if owner_id is None:
+            return
+        res = await journal.mark_open_trades(owner_id)
         logger.info("day trading daily mark: {}", res)
     except Exception as exc:
         logger.error("day trading mark job failed: {}", exc)
@@ -273,10 +304,15 @@ async def _day_trading_auto_job() -> None:
     """Daily: auto-open at most one new paper day-trade from today's highest-
     conviction opportunity (quant signals only, see app.services.daytrading.
     auto_pick — most days should open zero). Telegram note only when a trade
-    is actually opened, to avoid '0 candidates today' spam."""
+    is actually opened, to avoid '0 candidates today' spam. Owner-only until
+    Trading Diario loops over every user (Fase 2)."""
     try:
+        from app.auth import get_owner_user_id_cached
         from app.services.daytrading import auto_pick
-        res = await auto_pick.pick_and_open()
+        owner_id = await get_owner_user_id_cached()
+        if owner_id is None:
+            return
+        res = await auto_pick.pick_and_open(owner_id)
         if res.get("opened"):
             from app.services.notifications.telegram import TelegramNotifier
             t = res["opened"]

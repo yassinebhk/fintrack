@@ -77,6 +77,7 @@ def serialize(trade: DayTrade, live_price: float | None = None) -> dict:
 
 
 async def open_trade(
+    user_id: int,
     ticker: str,
     direction: str,
     thesis: str,
@@ -115,7 +116,7 @@ async def open_trade(
     quantity = stake_eur / price
 
     async with session_scope() as session:
-        repo = DayTradeRepository(session)
+        repo = DayTradeRepository(session, user_id)
         trade = await repo.add(
             ticker=up,
             name=name,
@@ -144,9 +145,9 @@ def _pnl(trade: DayTrade, exit_price: float) -> tuple[float, float]:
     return pnl_eur, pnl_pct
 
 
-async def close_trade(trade_id: int, reason: str = "manual") -> dict | None:
+async def close_trade(user_id: int, trade_id: int, reason: str = "manual") -> dict | None:
     async with session_scope() as session:
-        repo = DayTradeRepository(session)
+        repo = DayTradeRepository(session, user_id)
         trade = await repo.get(trade_id)
         if trade is None or trade.status != "open":
             return None
@@ -172,12 +173,12 @@ async def close_trade(trade_id: int, reason: str = "manual") -> dict | None:
         return serialize(updated) if updated is not None else None
 
 
-async def mark_open_trades() -> dict:
+async def mark_open_trades(user_id: int) -> dict:
     """Daily job: close any open trade whose stop-loss, take-profit, or max hold
     time has been hit. Never lets one bad price fetch kill the whole run."""
     closed = []
     async with session_scope() as session:
-        repo = DayTradeRepository(session)
+        repo = DayTradeRepository(session, user_id)
         open_trades = await repo.list_open()
 
     now = datetime.now(timezone.utc)
@@ -203,16 +204,16 @@ async def mark_open_trades() -> dict:
             if reason is None and (now - opened_at) > timedelta(days=MAX_HOLD_DAYS):
                 reason = "time_exit"
             if reason:
-                await close_trade(trade.id, reason=reason)
+                await close_trade(user_id, trade.id, reason=reason)
                 closed.append({"id": trade.id, "ticker": trade.ticker, "reason": reason})
         except Exception as exc:
             logger.debug("day trading mark: {} failed: {}", trade.ticker, exc)
     return {"checked": len(open_trades), "closed": closed}
 
 
-async def list_trades(status: str = "all") -> list[dict]:
+async def list_trades(user_id: int, status: str = "all") -> list[dict]:
     async with session_scope() as session:
-        repo = DayTradeRepository(session)
+        repo = DayTradeRepository(session, user_id)
         if status == "open":
             trades = await repo.list_open()
         elif status == "closed":
@@ -230,9 +231,9 @@ async def list_trades(status: str = "all") -> list[dict]:
     return [serialize(t, live_prices.get(t.id)) for t in trades]
 
 
-async def report() -> dict:
+async def report(user_id: int) -> dict:
     async with session_scope() as session:
-        repo = DayTradeRepository(session)
+        repo = DayTradeRepository(session, user_id)
         closed = await repo.list_closed()
         open_trades = await repo.list_open()
 

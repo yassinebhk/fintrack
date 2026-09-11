@@ -13,6 +13,11 @@
     <link rel="stylesheet" href="css/styles.css?v=20260831b">
 </head>
 <body>
+    <div id="loginGate" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:24px;">
+        <h1 style="font-size:22px; margin:0;">📊 FinTrack</h1>
+        <p id="loginGateMsg" style="color:#888; max-width:360px; margin:0;">Inicia sesión con tu cuenta de Google para ver tu cartera privada.</p>
+        <a href="/api/auth/login" style="display:inline-flex; align-items:center; gap:8px; background:#4285F4; color:#fff; text-decoration:none; padding:10px 20px; border-radius:8px; font-weight:600;">Iniciar sesión con Google</a>
+    </div>
     <div class="app">
         <!-- Sidebar Navigation -->
         <nav class="sidebar">
@@ -94,6 +99,10 @@
                 <div class="connection-status">
                     <span class="status-dot" id="statusDot"></span>
                     <span id="statusText">Conectando...</span>
+                </div>
+                <div id="userChip" style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12px; color:#888;">
+                    <span id="userChipName"></span>
+                    <a href="#" id="logoutLink" style="color:#888;">Cerrar sesión</a>
                 </div>
             </div>
         </nav>

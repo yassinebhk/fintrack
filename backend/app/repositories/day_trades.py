@@ -1,4 +1,4 @@
-"""CRUD for the day-trading paper journal."""
+"""CRUD for the day-trading paper journal, scoped to a user."""
 
 from datetime import datetime, timezone
 
@@ -9,38 +9,54 @@ from app.models.day_trade import DayTrade
 
 
 class DayTradeRepository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, user_id: int) -> None:
         self.session = session
+        self.user_id = user_id
 
     async def list_open(self) -> list[DayTrade]:
-        stmt = select(DayTrade).where(DayTrade.status == "open").order_by(DayTrade.opened_at.desc())
+        stmt = (
+            select(DayTrade)
+            .where(DayTrade.user_id == self.user_id, DayTrade.status == "open")
+            .order_by(DayTrade.opened_at.desc())
+        )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def list_all(self, limit: int | None = None) -> list[DayTrade]:
-        stmt = select(DayTrade).order_by(DayTrade.opened_at.desc())
+        stmt = (
+            select(DayTrade)
+            .where(DayTrade.user_id == self.user_id)
+            .order_by(DayTrade.opened_at.desc())
+        )
         if limit:
             stmt = stmt.limit(limit)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def list_closed(self) -> list[DayTrade]:
-        stmt = select(DayTrade).where(DayTrade.status == "closed").order_by(DayTrade.closed_at.asc())
+        stmt = (
+            select(DayTrade)
+            .where(DayTrade.user_id == self.user_id, DayTrade.status == "closed")
+            .order_by(DayTrade.closed_at.asc())
+        )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def get(self, trade_id: int) -> DayTrade | None:
-        return await self.session.get(DayTrade, trade_id)
+        stmt = select(DayTrade).where(DayTrade.id == trade_id, DayTrade.user_id == self.user_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def add(self, **values) -> DayTrade:
         values["ticker"] = values["ticker"].upper().strip()
+        values["user_id"] = self.user_id
         obj = DayTrade(**values)
         self.session.add(obj)
         await self.session.flush()
         return obj
 
     async def close(self, trade_id: int, **values) -> DayTrade | None:
-        obj = await self.session.get(DayTrade, trade_id)
+        obj = await self.get(trade_id)
         if obj is None:
             return None
         values.setdefault("status", "closed")

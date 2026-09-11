@@ -55,7 +55,9 @@ async def _send_portfolio_table() -> None:
     from app.services import allocation
     from app.services.portfolio_report import _asset_trends
     try:
-        svc = PortfolioService()
+        from app.auth import get_owner_user_id_cached
+
+        svc = PortfolioService((await get_owner_user_id_cached()) or 0)
         p = await svc.calculate_portfolio()
         excluded = await get_excluded()
         targets = await allocation.get_targets()

@@ -1,4 +1,4 @@
-"""Transaction history endpoints."""
+"""Transaction history endpoints — scoped to the logged-in user."""
 
 from datetime import datetime, timezone
 
@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
 from app.db import get_session
+from app.models.user import User
 from app.repositories import PositionRepository, TransactionRepository
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
@@ -29,8 +31,9 @@ async def list_transactions(
     limit: int = 200,
     ticker: str | None = None,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> list[dict]:
-    repo = TransactionRepository(session)
+    repo = TransactionRepository(session, current_user.id)
     rows = await repo.list_for_ticker(ticker) if ticker else await repo.list_all(limit=limit)
     return [
         {
@@ -51,9 +54,13 @@ async def list_transactions(
 
 
 @router.post("")
-async def add_transaction(payload: TransactionIn, session: AsyncSession = Depends(get_session)) -> dict:
-    tx_repo = TransactionRepository(session)
-    pos_repo = PositionRepository(session)
+async def add_transaction(
+    payload: TransactionIn,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    tx_repo = TransactionRepository(session, current_user.id)
+    pos_repo = PositionRepository(session, current_user.id)
 
     try:
         executed = datetime.fromisoformat(payload.executed_at.replace("Z", "+00:00"))
@@ -103,8 +110,12 @@ async def add_transaction(payload: TransactionIn, session: AsyncSession = Depend
 
 
 @router.delete("/{tx_id}")
-async def delete_transaction(tx_id: int, session: AsyncSession = Depends(get_session)) -> dict:
-    ok = await TransactionRepository(session).delete(tx_id)
+async def delete_transaction(
+    tx_id: int,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    ok = await TransactionRepository(session, current_user.id).delete(tx_id)
     if not ok:
         raise HTTPException(status_code=404, detail=f"Transaction {tx_id} not found")
     return {"message": f"Transaction {tx_id} deleted"}

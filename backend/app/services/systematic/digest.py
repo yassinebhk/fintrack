@@ -6,9 +6,9 @@ from app.services.systematic import paper
 from app.services.systematic.buyable import buyable_meta
 
 
-async def telegram_digest() -> str:
+async def telegram_digest(user_id: int) -> str:
     from app.services.notifications.telegram import html_escape
-    r = await paper.report()
+    r = await paper.report(user_id)
     meta = buyable_meta()
 
     lines = [
