@@ -15,6 +15,42 @@ from app.services.portfolio import PortfolioService
 
 _DB_KEY = "opportunities"
 
+# --- Decision-frame constants (per-idea "invest or not" logic) ---------------
+# Position sizing (inverse-volatility): size each satellite idea so its standalone
+# contribution to annual portfolio volatility (weight * asset_vol) stays within
+# this budget. A real, standard risk-parity method — uses only the annualized vol
+# the quant engine already computes. Correlation is ignored on purpose (stated in
+# the UI), so this is a starting band, not a precise optimum.
+_RISK_BUDGET_VOL = 0.02          # 2% annual vol contribution per idea
+_SIZE_MIN, _SIZE_MAX = 0.01, 0.06  # clamp the suggestion to a sane 1%–6% band
+
+# Typical holding horizon per approach — the window the scorecard also measures.
+_HORIZON_BY_APPROACH = {
+    "momentum": "1–3 meses",
+    "valor": "6–18 meses",
+    "contrarian": "3–12 meses",
+}
+
+
+def _expectancy_view(stats: dict | None) -> dict:
+    """Turn a scorecard approach-bucket into an honest expectancy view. Below the
+    anti-noise gate (scorecard.MIN_N_FEEDBACK / MIN_SPAN_DAYS_FEEDBACK) it reports
+    'validando' with real progress (n/required) — never a fabricated number."""
+    if not stats:
+        return {"status": "sin_datos"}
+    if not stats.get("gated"):
+        return {"status": "validando", "n": stats.get("n", 0),
+                "n_required": stats.get("n_required", 30)}
+    return {
+        "status": "listo",
+        "n": stats.get("n"),
+        "hit_rate_pct": stats.get("hit_rate_pct"),
+        "avg_win_pct": stats.get("avg_win"),
+        "avg_loss_pct": stats.get("avg_loss"),
+        "expectancy_pct": stats.get("expectancy"),
+        "horizon": "3m",
+    }
+
 
 class OpportunityService:
     def __init__(self) -> None:
@@ -278,7 +314,7 @@ class OpportunityService:
             content = {"disclaimer": "Generado automáticamente desde los datos (IA no disponible ahora)."}
         # Enrich each idea with a 6-month trend chart + the headlines that back it +
         # the ensemble score breakdown of the matching instrument.
-        await self._enrich_opportunities(opportunities, news_items, {t["ticker"]: t for t in themes})
+        await self._enrich_opportunities(opportunities, news_items, {t["ticker"]: t for t in themes}, feedback)
 
         # 🫧 Froth guard: flag overheated ideas + thematic concentration + market euphoria,
         # so a momentum engine doesn't quietly push the user into a bubble top.
@@ -521,13 +557,16 @@ class OpportunityService:
         return "\n".join(lines)
 
     async def _enrich_opportunities(
-        self, opportunities: list[dict], news_items: list[dict], by_ticker: dict[str, dict] | None = None
+        self, opportunities: list[dict], news_items: list[dict],
+        by_ticker: dict[str, dict] | None = None, feedback: dict | None = None,
     ) -> None:
-        """Attach a 6-month trend chart_url, supporting news (with links) and the
-        ensemble score breakdown of the matching instrument to each idea."""
+        """Attach a 6-month trend chart_url, supporting news (with links), the
+        ensemble score breakdown, and the per-idea decision frame (quantified risk,
+        inverse-volatility position size, out-of-sample expectancy, horizon)."""
         from app.services.charts import line_chart
 
         by_ticker = by_ticker or {}
+        by_approach = (feedback or {}).get("by_approach") or {}
 
         def attach_scores(opp: dict) -> None:
             tk = (opp.get("ticker_or_isin") or "").strip().upper()
@@ -544,6 +583,31 @@ class OpportunityService:
             bd = (t.get("breakdown") or {}).get(which) or {}
             # sorted by absolute contribution, biggest drivers first
             opp["score_breakdown"] = dict(sorted(bd.items(), key=lambda kv: abs(kv[1]), reverse=True))
+
+        def attach_decision(opp: dict) -> None:
+            """The 4-part decision frame, each field from real data — never invented.
+            Risk/size come from the instrument's price-based factors; expectancy from
+            the engine's own out-of-sample track record (gated), never a promise."""
+            tk = (opp.get("ticker_or_isin") or "").strip().upper()
+            t = by_ticker.get(tk) or {}
+            f = t.get("factors") or {}
+            vol = f.get("volatility")        # annualized, as a fraction (0.30 = 30%)
+            mdd = f.get("max_drawdown")      # negative fraction
+            risk = {
+                "volatility_pct": round(vol * 100, 1) if vol is not None else None,
+                "max_drawdown_pct": round(mdd * 100, 1) if mdd is not None else None,
+                "sharpe": f.get("sharpe"),
+            }
+            # Position sizing = inverse-volatility: size the idea so its standalone
+            # contribution to annual portfolio vol (w * vol) stays within a fixed
+            # risk budget. Ignores correlation on purpose (stated in the UI). A real,
+            # standard method (risk parity), using only vol we already compute.
+            if vol and vol > 0:
+                w = max(_SIZE_MIN, min(_SIZE_MAX, _RISK_BUDGET_VOL / vol))
+                risk["suggested_weight_pct"] = round(w * 100, 1)
+            opp["risk"] = risk
+            opp["expectancy"] = _expectancy_view(by_approach.get(opp.get("approach")))
+            opp["horizon"] = _HORIZON_BY_APPROACH.get(opp.get("approach"), "3–6 meses")
 
         def attach_news(opp: dict) -> None:
             refs = []
@@ -573,6 +637,7 @@ class OpportunityService:
         for opp in opportunities:
             attach_news(opp)
             attach_scores(opp)
+            attach_decision(opp)
         await asyncio.gather(*(attach_chart(o) for o in opportunities))
 
 

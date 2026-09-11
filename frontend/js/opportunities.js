@@ -177,6 +177,56 @@ function renderBreakdown(op) {
     </details>`;
 }
 
+// The per-idea decision frame: the 4 things a serious trader checks before
+// investing — edge, quantified risk + position size, out-of-sample expectancy,
+// and horizon. Every value comes from real data; expectancy is gated and shows
+// "en validación" until the engine's own track record clears the anti-noise gate.
+function renderDecision(op) {
+    const r = op.risk || {};
+    const ex = op.expectancy || {};
+    const bd = op.score_breakdown || {};
+
+    // Edge = the measurable drivers that most support the thesis (names only; the
+    // full numeric contribution lives in the "Por qué lo puntúa así" breakdown).
+    const drivers = Object.entries(bd).filter(([, v]) => v > 0).slice(0, 2).map(([k]) => CRITERION_LABEL[k] || k);
+    const edgeLine = drivers.length
+        ? `<div style="font-size:12.5px; margin-bottom:8px;"><strong>🎯 Edge medible:</strong> ${drivers.join(' · ')} <span class="text-muted">(ver desglose abajo)</span></div>`
+        : '';
+
+    const tile = (label, value, sub) => `<div style="flex:1; min-width:118px; background:rgba(43,40,34,0.03); border-radius:8px; padding:8px 10px;">
+        <div style="font-size:11px; color:var(--text-secondary);">${label}</div>
+        <div style="font-size:14px; font-weight:600; margin-top:2px;">${value}</div>
+        ${sub ? `<div style="font-size:10.5px; color:var(--text-tertiary); margin-top:1px; line-height:1.3;">${sub}</div>` : ''}
+    </div>`;
+
+    const riskTile = (r.volatility_pct != null)
+        ? tile('⚖️ Riesgo', `${r.volatility_pct}% vol.`, r.max_drawdown_pct != null ? `peor caída histórica ${r.max_drawdown_pct}%` : '')
+        : '';
+    const sizeTile = (r.suggested_weight_pct != null)
+        ? tile('📏 Tamaño sugerido', `${r.suggested_weight_pct}%`, 'inverse-vol · ≤2% de vol. a la cartera')
+        : '';
+
+    let expTile = '';
+    if (ex.status === 'listo') {
+        const sg = ex.expectancy_pct >= 0 ? '+' : '';
+        expTile = tile('📊 Expectancy (OOS)', `${sg}${ex.expectancy_pct}% a ${ex.horizon}`,
+            `acierta ${ex.hit_rate_pct}% · gana ${ex.avg_win_pct}% / al fallar ${ex.avg_loss_pct}% · n=${ex.n}`);
+    } else if (ex.status === 'validando') {
+        expTile = tile('📊 Expectancy (OOS)', 'en validación', `n=${ex.n}/${ex.n_required} — muestra insuficiente, aún no fiable`);
+    }
+
+    const horizonTile = op.horizon ? tile('⏳ Horizonte', op.horizon, 'típico de esta estrategia') : '';
+
+    const tiles = [riskTile, sizeTile, expTile, horizonTile].filter(Boolean).join('');
+    if (!edgeLine && !tiles) return '';
+    return `<div style="margin:10px 0; padding:10px 12px; border:1px solid rgba(43,40,34,0.10); border-radius:10px; background:rgba(43,40,34,0.015);">
+        <div style="font-size:12px; color:var(--text-secondary); font-weight:600; margin-bottom:6px;">🧭 Marco de decisión</div>
+        ${edgeLine}
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">${tiles}</div>
+        <div style="font-size:10.5px; color:var(--text-tertiary); margin-top:8px; line-height:1.4;">Riesgo y tamaño = estadística sobre precios (el tamaño ignora la correlación con tu cartera). Expectancy = resultado real de esta estrategia <em>después</em> de recomendar (out-of-sample), no una promesa. No es asesoramiento financiero.</div>
+    </div>`;
+}
+
 function renderOpportunities(data) {
     oppLastData = data;
     const content = document.getElementById('oppContent');
@@ -203,6 +253,7 @@ function renderOpportunities(data) {
             <p style="margin:4px 0;"><strong>📈 Por qué ahora:</strong> ${op.why_now}</p>
             <p style="margin:4px 0;"><strong>⚠️ Riesgos:</strong> ${op.risks}</p>
             <p style="margin:4px 0;"><strong>🎯 Encaje en tu cartera:</strong> ${op.fit}</p>
+            ${renderDecision(op)}
             ${op.extended ? `<div style="margin:8px 0; background:#a855f718; border:1px solid #a855f755; border-radius:8px; padding:8px 12px; font-size:13px;">${op.extended_note || '🫧 Extendido: alto riesgo de reversión.'}</div>` : ''}
             ${assetLinks(op)}
             ${op.ticker_or_isin ? `<button onclick="openDeepAnalysis('${(op.ticker_or_isin+'').replace(/'/g,"&#39;")}','${(op.name+'').replace(/'/g,"&#39;")}')" style="margin:8px 0 4px; background:var(--accent-secondary); color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer;">🔬 Análisis profesional del activo</button>` : ''}

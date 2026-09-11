@@ -752,6 +752,37 @@ en medio                                → NEUTRAL</pre>
         <h3>🔗 De la estadística a la explicación</h3>
         <p>Todo lo anterior produce un <strong>ranking objetivo</strong>. Solo entonces entra la IA (Gemini), y <strong>únicamente para explicar</strong> en lenguaje claro las ideas mejor puntuadas (qué es, por qué ahora, riesgos, encaje). La IA <em>no</em> decide el orden ni inventa tickers. El recorrido completo está en <a href="#el-cerebro">El cerebro: cómo descubre y recomienda</a>.</p>
 
+        <h3>🧭 El marco de decisión de cada oportunidad (las 4 preguntas antes de invertir)</h3>
+        <p>El ranking te dice <em>qué</em> sube o está barato. Pero un inversor serio, antes de poner dinero, se hace <strong>cuatro preguntas más</strong> — y cada oportunidad las responde con datos reales, no con relato. Es el bloque <strong>"🧭 Marco de decisión"</strong> que ves dentro de cada tarjeta de oportunidad.</p>
+
+        <h4>🎯 Edge medible — ¿por qué esta idea y no otra?</h4>
+        <p>El <em>edge</em> ("ventaja") son los <strong>2-3 jueces que más empujan</strong> la tesis de esa idea, sacados directamente del <a href="#algoritmos">ensemble ⑧</a>. En vez de "confía en mí", te dice <em>en qué</em> destaca (por ejemplo <em>Momentum</em> + <em>Riesgo/Sharpe</em>). El desglose numérico completo, juez a juez, está en "🧮 Por qué lo puntúa así" de la propia tarjeta.</p>
+
+        <h4>⚖️ Riesgo — ¿cuánto puede doler?</h4>
+        <p>Dos números, ambos calculados sobre el historial de precios del activo: la <strong>volatilidad anualizada</strong> (cuánto oscila; ver <a href="#metricas">Volatilidad</a>) y la <strong>peor caída histórica</strong> (el <a href="#metricas">máximo drawdown</a>: lo máximo que llegó a perder desde uno de sus picos). Traduce el vago "esto es arriesgado" en cifras concretas que puedes comparar entre ideas.</p>
+
+        <h4>📏 Tamaño sugerido — ¿cuánto comprar?</h4>
+        <p>Un punto de partida calculado por <strong>volatilidad inversa</strong>: cuanto más se mueve un activo, <strong>menos peso</strong> se le sugiere, de modo que ninguna idea aporte más de ~2% de volatilidad a tu cartera (acotado entre un 1% y un 6%). Es el mismo principio que usa el <a href="#motor-sistematico">motor sistemático</a> para repartir capital entre posiciones. <strong>Aviso honesto:</strong> este cálculo ignora la correlación con lo que ya tienes, así que es una <em>orientación</em> de partida, no una orden.</p>
+
+        <h4>📊 Expectancy — ¿esta estrategia gana dinero de media?</h4>
+        <p>Aquí está la idea que separa a los profesionales de los aficionados: <strong>no importa acertar mucho; importa que la ganancia esperada sea positiva</strong>. Se calcula así:</p>
+        <div class="formula-box">
+            <p class="formula">Expectancy = (% acierto × ganancia media) + (% fallo × pérdida media)</p>
+            <p><strong>Ejemplo:</strong> una estrategia que acierta solo el <strong>45%</strong> de las veces, pero cuando acierta gana <strong>+10%</strong> y cuando falla pierde <strong>−4%</strong>:</p>
+            <p class="formula">E = 0,45 × (+10%) + 0,55 × (−4%) = <strong>+2,3%</strong></p>
+            <p>→ <strong>gana dinero de media aunque falle más de la mitad de las veces</strong>, porque sus aciertos son mayores que sus fallos. Eso es exactamente lo que mide este campo (y por qué "acertar mucho" no es la meta).</p>
+        </div>
+        <p>Dos matices, por honestidad:</p>
+        <ul>
+            <li>Es <strong>por estrategia (MOMENTUM / VALOR), no por activo</strong>: mide cómo le ha ido a <em>ese tipo de idea</em> en el pasado, no es una promesa sobre <em>este</em> activo concreto.</li>
+            <li>Es <strong>out-of-sample</strong> (el resultado real <em>después</em> de recomendar, tomado del <a href="#autoentrenamiento">scorecard</a>) y pasa por el <strong>mismo gate anti-ruido</strong>: hasta que no hay ≥30 ideas maduras repartidas en ≥90 días, muestra <strong>"en validación (n/30)"</strong> en lugar de un número que sería puro ruido.</li>
+        </ul>
+
+        <h4>⏳ Horizonte — ¿cuánto hay que esperar?</h4>
+        <p>La ventana típica de cada estrategia: <strong>momentum 1-3 meses</strong> (las tendencias no duran para siempre) y <strong>valor 6-18 meses</strong> (a lo barato le cuesta más tiempo que el mercado lo reconozca). Coincide con los plazos que mide el scorecard, para que compares peras con peras.</p>
+
+        <div class="info-box"><strong>En una frase:</strong> el marco de decisión convierte "esto pinta bien" en "esto oscila un <em>X%</em>, en lo peor llegó a caer un <em>Y%</em>, cabría un <em>Z%</em> de tu cartera, con horizonte <em>W</em>, y su estrategia históricamente tiene esperanza <em>positiva</em> (o <em>en validación</em>)". Ayuda a decidir con criterio — <strong>no es asesoramiento financiero ni garantiza resultados</strong>.</div>
+
         <h3>📚 Lo que NO usamos (a propósito)</h3>
         <p>Deep Learning (LSTM/Transformers) para "predecir precio": muy popular en YouTube, pero la investigación seria (Gu, Kelly &amp; Xiu, 2020) muestra que rara vez bate a métodos simples fuera de muestra y se sobreajusta con facilidad. El consenso (López de Prado) avisa: <strong>el enemigo no es el algoritmo, es el sobreajuste</strong>. Por eso nos quedamos en un núcleo de factores robustos, interpretables y defendibles — y por eso puedes <em>ver</em> el porqué de cada puntuación.</p>
     </section>
@@ -1071,9 +1102,12 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
                 <tr><td><strong>Bollinger %B</strong></td><td>Indicador técnico que sitúa el precio dentro de su banda de volatilidad reciente (cerca del techo o del suelo). Ver <a href="#algoritmos">algoritmos ③</a>.</td></tr>
                 <tr><td><strong>Convicción</strong></td><td>Etiqueta (alta/media/baja) que acompaña cada recomendación, según lo fuerte que sea su puntuación combinada.</td></tr>
                 <tr><td><strong>Drawdown</strong></td><td>La peor caída porcentual desde el punto más alto alcanzado, no desde que empezaste. Mide el "dolor" máximo real.</td></tr>
+                <tr><td><strong>Edge (ventaja)</strong></td><td>Los pocos factores (jueces) que más sostienen la tesis de una idea — el "por qué" en números, no un relato. Aparece en el marco de decisión de cada oportunidad. Ver <a href="#algoritmos">algoritmos 🧭</a>.</td></tr>
                 <tr><td><strong>EWMA (volatilidad)</strong></td><td>Media exponencial que da más peso a los días recientes al calcular el riesgo, para reaccionar antes que una media simple. Ver <a href="#algoritmos">algoritmos ⑤</a>.</td></tr>
+                <tr><td><strong>Expectancy (esperanza matemática)</strong></td><td>Ganancia media esperada de una estrategia = (% acierto × ganancia media) + (% fallo × pérdida media). Puede ser positiva acertando &lt;50% si los aciertos son mayores que los fallos. Es por estrategia y out-of-sample. Ver <a href="#algoritmos">algoritmos 🧭</a>.</td></tr>
                 <tr><td><strong>Gate / semáforo</strong></td><td>El conjunto de condiciones numéricas que hay que cumplir TODAS a la vez antes de confiar en un resultado o pasar a dinero real. Nunca se decide "a ojo".</td></tr>
                 <tr><td><strong>Hit rate</strong></td><td>% de recomendaciones evaluadas que tuvieron retorno (o alpha) positivo. Ver <a href="#autoentrenamiento">Autoentrenamiento</a>.</td></tr>
+                <tr><td><strong>Horizonte</strong></td><td>La ventana de tiempo típica de una estrategia: momentum 1-3 meses, valor 6-18 meses. Coincide con los plazos que mide el scorecard. Ver <a href="#algoritmos">algoritmos 🧭</a>.</td></tr>
                 <tr><td><strong>JSON Schema (salida forzada)</strong></td><td>Estructura fija que se le exige a la IA para responder — si se desvía, la respuesta se descarta automáticamente. Ver <a href="#que-ia-usamos">Qué IA usamos</a>.</td></tr>
                 <tr><td><strong>LLM</strong></td><td><em>Large Language Model</em>: el tipo de IA (Gemini, Groq...) que redacta texto a partir de datos que se le pasan, sin "pensar" como un humano.</td></tr>
                 <tr><td><strong>MACD</strong></td><td>Indicador técnico que detecta cambios de tendencia mediante el cruce de dos medias móviles. Ver <a href="#algoritmos">algoritmos ③</a>.</td></tr>
@@ -1087,6 +1121,7 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
                 <tr><td><strong>Scorecard</strong></td><td>El "boletín de notas" público del motor: qué habría pasado de verdad con cada recomendación pasada. Consultable en <code>/api/scorecard</code>.</td></tr>
                 <tr><td><strong>Sharpe (ratio)</strong></td><td>Retorno obtenido por cada unidad de riesgo (volatilidad) asumida. &gt;1 bueno, &gt;2 muy bueno. Ver <a href="#algoritmos">algoritmos ②</a>.</td></tr>
                 <tr><td><strong>Sortino (ratio)</strong></td><td>Como el Sharpe, pero solo penaliza la volatilidad a la baja (subir a saltos no se considera "malo"). Ver <a href="#algoritmos">algoritmos ②</a>.</td></tr>
+                <tr><td><strong>Tamaño de posición (volatilidad inversa)</strong></td><td>Cuánto peso dar a una idea calculado al revés de su volatilidad: cuanto más se mueve un activo, menos peso, para que cada posición aporte un riesgo parecido. Ignora la correlación, así que es una orientación de partida. Ver <a href="#algoritmos">algoritmos 🧭</a> y <a href="#motor-sistematico">El motor sistemático</a>.</td></tr>
                 <tr><td><strong>Temperatura (de un LLM)</strong></td><td>Parámetro que controla cuánto "improvisa" la IA — cuanto más baja, más ceñida a los datos que se le dan. Ver <a href="#que-ia-usamos">Qué IA usamos</a>.</td></tr>
                 <tr><td><strong>Ticker</strong></td><td>El código corto con el que se identifica un activo en el mercado (p. ej. SOXX, BTC).</td></tr>
                 <tr><td><strong>Valor / Contrarian (tesis)</strong></td><td>La segunda de las dos tesis del motor: activos castigados pero de calidad (baratos y sanos), frente al MOMENTUM.</td></tr>

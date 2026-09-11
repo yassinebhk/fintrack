@@ -219,6 +219,14 @@ def _bucket_stats(rows: list[RecommendationTrack], attr: str) -> dict:
         span_days = (max(dates) - min(dates)).days if n > 1 else 0
         p_value = float(ttest_1samp(vals, 0.0).pvalue) if n >= 5 else None
         gated = n >= MIN_N_FEEDBACK and span_days >= MIN_SPAN_DAYS_FEEDBACK
+        # Trader-style expectancy decomposition. Mathematically E[X] equals the
+        # plain mean, but splitting it into (hit_rate · avg_win) + (loss_rate ·
+        # avg_loss) is what reveals asymmetry — a bucket can win <50% of the time
+        # and still have positive expectancy if avg_win >> |avg_loss|.
+        wins = [v for v in vals if v > 0]
+        losses = [v for v in vals if v < 0]
+        avg_win = round(sum(wins) / len(wins), 2) if wins else 0.0
+        avg_loss = round(sum(losses) / len(losses), 2) if losses else 0.0  # negative
         out[key] = {
             "n": n,
             "n_required": MIN_N_FEEDBACK,
@@ -226,6 +234,9 @@ def _bucket_stats(rows: list[RecommendationTrack], attr: str) -> dict:
             "span_days_required": MIN_SPAN_DAYS_FEEDBACK,
             "median": round(median(vals), 2),
             "hit_rate_pct": round(sum(1 for v in vals if v > 0) / n * 100, 1),
+            "avg_win": avg_win,
+            "avg_loss": avg_loss,
+            "expectancy": round(sum(vals) / n, 2),  # = hit_rate·avg_win + loss_rate·avg_loss
             "p_value": round(p_value, 3) if p_value is not None else None,
             "gated": gated,
             "significant": bool(gated and p_value is not None and p_value < 0.10),
