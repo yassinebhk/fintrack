@@ -268,6 +268,11 @@ class MarketScanner:
 
             _pull(stock_screens, "screener")
             _pull(fund_screens, "screener-fondo")
+            # NOTE: Yahoo's predefined screens are US-centric, and a custom
+            # region-filtered EquityQuery on yfinance 1.4.0 returns few, noisy names
+            # (duplicate cross-listings, broken market-cap filter). International
+            # breadth is added instead via the curated universe (universe.py), which
+            # holds verified Asian/European large caps + regional ETFs.
             return found
 
         try:
