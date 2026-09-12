@@ -123,6 +123,9 @@ class AlertsEngine:
         # Rule 2c: trailing-stop sell signals (track peak, alert on drop from it)
         await self._check_trailing_stops(portfolio, created)
 
+        # Rule 2d: entry-setup signals on watchlist tickers (oversold / pullback)
+        await self._check_watchlist_setups(created)
+
         # Rule 3: drawdown from peak
         kpis = portfolio.get("kpis", {})
         max_dd = kpis.get("max_drawdown", 0)
@@ -276,6 +279,60 @@ class AlertsEngine:
                 await ts.update_peaks_and_save(stops)
             except Exception as exc:
                 logger.debug("trailing stops save failed: {}", exc)
+
+    async def _check_watchlist_setups(self, created: list) -> None:
+        """Entry-setup alerts on watchlist tickers: RSI oversold (<30) or a pullback
+        in an uptrend (above the 200d SMA but RSI<42). Deduped once/day per condition.
+        Signals, not recommendations."""
+        try:
+            from app.auth import get_owner_user_id_cached
+            from app.repositories import WatchlistRepository
+            owner = await get_owner_user_id_cached()
+            if not owner:
+                return
+            async with session_scope() as s:
+                entries = await WatchlistRepository(s, owner).list_all()
+        except Exception as exc:
+            logger.debug("watchlist setups load failed: {}", exc)
+            return
+        if not entries:
+            return
+        from app.services.discovery.technical import compute_signals
+        for e in entries:
+            tk = (e.ticker or "").upper()
+            try:
+                hist = await self._scanner().yahoo.get_history(tk, period="1y")
+                rows = [h for h in (hist or []) if h.get("close")]
+                if len(rows) < 30:
+                    continue
+                sig = compute_signals(
+                    [h["close"] for h in rows], [h.get("high") for h in rows],
+                    [h.get("low") for h in rows], [h.get("volume") for h in rows],
+                ) or {}
+            except Exception as exc:
+                logger.debug("watchlist setup {} failed: {}", tk, exc)
+                continue
+            rsi, above = sig.get("rsi"), sig.get("above_sma200")
+            name = e.name or tk
+            cond = title = body = None
+            if rsi is not None and rsi < 30:
+                cond = "oversold"
+                title = f"🟢 Setup: {tk} en sobreventa (RSI {rsi:.0f})"
+                body = (f"{name}: RSI {rsi:.0f} (<30) — posible rebote. Está en tu watchlist. "
+                        f"(Señal técnica, no recomendación.)")
+            elif above and rsi is not None and rsi < 42:
+                cond = "pullback"
+                title = f"🟢 Setup: {tk} pullback en tendencia alcista"
+                body = (f"{name}: sobre su media de 200 sesiones con RSI {rsi:.0f} — retroceso en "
+                        f"tendencia. En tu watchlist. (Señal técnica, no recomendación.)")
+            if cond:
+                res = await self._maybe_create(
+                    kind="setup", severity="info", title=title, body=body,
+                    payload={"ticker": tk, "rsi": rsi, "above_sma200": above, "setup": cond},
+                    dedupe_key=f"setup:{tk}:{cond}",
+                )
+                if res:
+                    created.append(res)
 
     async def _watchlist_extra(self, held: set[str]) -> dict[str, str]:
         """Plan/watchlist tickers not already in the portfolio. Returns {ticker: label}."""
