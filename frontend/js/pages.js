@@ -2005,7 +2005,11 @@ function initProjectionChart() {
                     legend: { display: false }
                 },
                 scales: {
+                    x: {
+                        title: { display: true, text: 'Años', color: '#8A8275', font: { size: 12, weight: '600' } }
+                    },
                     y: {
+                        title: { display: true, text: 'Valor proyectado (€)', color: '#8A8275', font: { size: 12, weight: '600' } },
                         ticks: {
                             callback: value => value.toLocaleString('es-ES') + ' €'
                         }
@@ -2014,7 +2018,7 @@ function initProjectionChart() {
             }
         });
     }
-    
+
     createProjection();
     
     if (updateBtn) {

@@ -352,6 +352,7 @@ function renderAssetChart(data) {
             },
             scales: {
                 x: {
+                    title: { display: true, text: 'Fecha', color: '#8A8275', font: { size: 12, weight: '600' } },
                     grid: { display: false },
                     ticks: {
                         color: '#9C9689',
@@ -363,6 +364,7 @@ function renderAssetChart(data) {
                     }
                 },
                 y: {
+                    title: { display: true, text: 'Precio', color: '#8A8275', font: { size: 12, weight: '600' } },
                     grid: { color: '#EFEBE3' },
                     ticks: {
                         color: '#9C9689',
@@ -612,8 +614,8 @@ async function loadBenchmarkChart() {
                 maintainAspectRatio: false,
                 plugins: { legend: { display: true, labels: { color: '#746E63', boxWidth: 12 } } },
                 scales: {
-                    x: { display: false },
-                    y: { ticks: { color: '#746E63', callback: v => `${v.toFixed(0)}%` }, grid: { color: 'rgba(148,163,184,0.1)' } },
+                    x: { title: { display: true, text: 'Fecha', color: '#8A8275', font: { size: 12, weight: '600' } }, ticks: { display: false }, grid: { display: false } },
+                    y: { title: { display: true, text: 'Rentabilidad acumulada (%)', color: '#8A8275', font: { size: 12, weight: '600' } }, ticks: { color: '#746E63', callback: v => `${v.toFixed(0)}%` }, grid: { color: 'rgba(148,163,184,0.1)' } },
                 },
             },
         });
@@ -741,8 +743,8 @@ function renderUnderwater(history) {
             maintainAspectRatio: false,
             plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `Drawdown: ${c.parsed.y.toFixed(2)}%` } } },
             scales: {
-                x: { ticks: { maxTicksLimit: 6, color: ADV.muted }, grid: { display: false } },
-                y: { max: 0, ticks: { color: ADV.muted, callback: v => v + '%' }, grid: { color: ADV.grid } },
+                x: { title: { display: true, text: 'Fecha', color: ADV.muted, font: { size: 12, weight: '600' } }, ticks: { maxTicksLimit: 6, color: ADV.muted }, grid: { display: false } },
+                y: { max: 0, title: { display: true, text: 'Caída desde máximo (%)', color: ADV.muted, font: { size: 12, weight: '600' } }, ticks: { color: ADV.muted, callback: v => v + '%' }, grid: { color: ADV.grid } },
             },
         },
     });
@@ -830,8 +832,8 @@ function renderReturnDistribution(history) {
                 subtitle: { display: true, text: `VaR 95% diario: ${var95.toFixed(2)}%`, color: ADV.red, font: { size: 12, weight: 'bold' } },
             },
             scales: {
-                x: { ticks: { maxTicksLimit: 7, color: ADV.muted, callback: function (v) { return this.getLabelForValue(v) + '%'; } }, grid: { display: false } },
-                y: { ticks: { color: ADV.muted }, grid: { color: ADV.grid } },
+                x: { title: { display: true, text: 'Retorno diario (%)', color: ADV.muted, font: { size: 12, weight: '600' } }, ticks: { maxTicksLimit: 7, color: ADV.muted, callback: function (v) { return this.getLabelForValue(v) + '%'; } }, grid: { display: false } },
+                y: { title: { display: true, text: 'Frecuencia (nº de días)', color: ADV.muted, font: { size: 12, weight: '600' } }, ticks: { color: ADV.muted }, grid: { color: ADV.grid } },
             },
         },
     });
@@ -863,9 +865,9 @@ function renderRollingChart(history) {
             maintainAspectRatio: false,
             plugins: { legend: { display: true, labels: { color: ADV.muted, boxWidth: 12, font: { size: 11 } } } },
             scales: {
-                x: { ticks: { maxTicksLimit: 6, color: ADV.muted }, grid: { display: false } },
-                y: { position: 'left', ticks: { color: ADV.red, callback: v => v + '%' }, grid: { color: ADV.grid }, title: { display: true, text: 'Vol', color: ADV.red } },
-                y1: { position: 'right', ticks: { color: ADV.blue }, grid: { display: false }, title: { display: true, text: 'Sharpe', color: ADV.blue } },
+                x: { title: { display: true, text: 'Fecha', color: ADV.muted, font: { size: 12, weight: '600' } }, ticks: { maxTicksLimit: 6, color: ADV.muted }, grid: { display: false } },
+                y: { position: 'left', ticks: { color: ADV.red, callback: v => v + '%' }, grid: { color: ADV.grid }, title: { display: true, text: 'Volatilidad anual (%)', color: ADV.red, font: { size: 12, weight: '600' } } },
+                y1: { position: 'right', ticks: { color: ADV.blue }, grid: { display: false }, title: { display: true, text: 'Sharpe (30d)', color: ADV.blue, font: { size: 12, weight: '600' } } },
             },
         },
     });

@@ -163,23 +163,23 @@
                         </div>
 
                         <div class="card card-kpi">
-                            <div class="kpi-item" title="CAGR = Crecimiento Anual Compuesto. Mide el rendimiento medio anual de tu cartera. Un CAGR del 7-10% es excelente para inversiones a largo plazo.">
-                                <span class="kpi-label">📈 CAGR</span>
+                            <div class="kpi-item">
+                                <span class="kpi-label">📈 CAGR<button type="button" class="info-icon" data-info-key="cagr" aria-label="Qué es esto" onclick="event.stopPropagation()">i</button></span>
                                 <span class="kpi-value" id="cagr">--%</span>
                                 <span class="kpi-help">Rendimiento anual medio</span>
                             </div>
-                            <div class="kpi-item" title="Drawdown = La mayor caída desde el máximo histórico de tu cartera. Por ejemplo, si tu cartera llegó a 1000€ y bajó a 800€, el drawdown es -20%.">
-                                <span class="kpi-label">📉 Max Drawdown</span>
+                            <div class="kpi-item">
+                                <span class="kpi-label">📉 Max Drawdown<button type="button" class="info-icon" data-info-key="max_drawdown" aria-label="Qué es esto" onclick="event.stopPropagation()">i</button></span>
                                 <span class="kpi-value negative" id="maxDrawdown">--%</span>
                                 <span class="kpi-help">Mayor caída desde máximo</span>
                             </div>
-                            <div class="kpi-item" title="Volatilidad = Cuánto sube y baja tu cartera. Mayor volatilidad = más riesgo. Cryptos suelen tener volatilidad alta (>50%), acciones media (15-25%).">
-                                <span class="kpi-label">📊 Volatilidad</span>
+                            <div class="kpi-item">
+                                <span class="kpi-label">📊 Volatilidad<button type="button" class="info-icon" data-info-key="volatilidad" aria-label="Qué es esto" onclick="event.stopPropagation()">i</button></span>
                                 <span class="kpi-value" id="volatility">--%</span>
                                 <span class="kpi-help">Variación del valor</span>
                             </div>
-                            <div class="kpi-item" title="Sharpe Ratio = Rentabilidad ajustada al riesgo. Mayor que 1 = bueno, mayor que 2 = muy bueno. Compara tu rendimiento con el riesgo que tomas.">
-                                <span class="kpi-label">⚖️ Sharpe</span>
+                            <div class="kpi-item">
+                                <span class="kpi-label">⚖️ Sharpe<button type="button" class="info-icon" data-info-key="sharpe" aria-label="Qué es esto" onclick="event.stopPropagation()">i</button></span>
                                 <span class="kpi-value" id="sharpeRatio">--</span>
                                 <span class="kpi-help">Rendimiento vs Riesgo</span>
                             </div>
@@ -1853,21 +1853,22 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="js/app.js?v=20260912spark"></script>
+    <script src="js/info-glossary.js?v=20260912a"></script>
+    <script src="js/app.js?v=20260912axes"></script>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260912blue"></script>
     <script src="js/news.js?v=20260530a"></script>
     <script src="js/portfolio-manager.js?v=20260825a"></script>
     <script src="js/ai-advisor.js?v=20260530a"></script>
-    <script src="js/asset-analysis.js?v=20260912adv"></script>
-    <script src="js/backtest.js?v=20260912blue"></script>
+    <script src="js/asset-analysis.js?v=20260912axes"></script>
+    <script src="js/backtest.js?v=20260912axes"></script>
     <script src="js/opportunities.js?v=20260911d"></script>
     <script src="js/asset-deep-analysis.js?v=20260911d"></script>
-    <script src="js/asset-detail.js?v=20260912blue"></script>
+    <script src="js/asset-detail.js?v=20260912axes"></script>
     <script src="js/transactions.js?v=20260911d"></script>
     <script src="js/position-review.js?v=20260911d"></script>
     <script src="js/polymarket.js?v=20260912a"></script>
     <script src="js/daytrading.js?v=20260903a"></script>
-    <script src="js/pages.js?v=20260912blue"></script>
+    <script src="js/pages.js?v=20260912axes"></script>
 </body>
 </html>

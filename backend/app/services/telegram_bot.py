@@ -641,7 +641,7 @@ class TelegramBotHandler:
                     return
                 labels = [h["date"] for h in hist]
                 values = [h["value"] for h in hist]
-                url = line_chart("Evolución de tu cartera", labels, values)
+                url = line_chart("Evolución de tu cartera", labels, values, y_title="Valor (€)")
                 await self.notifier.send_photo(url, caption=f"📊 <b>Tu cartera</b>{PAGE_LINK}")
         except Exception as exc:
             logger.error("telegram chart failed: {}", exc)

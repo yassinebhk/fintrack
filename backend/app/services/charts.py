@@ -34,19 +34,28 @@ def _hex_alpha(color: str, alpha_hex: str = "1f") -> str:
 
 
 def _chart_url(config: dict, width: int = 720, height: int = 380) -> str:
+    # v=4: QuickChart defaults to Chart.js v2, where our modern config (axis
+    # `scales.*.title`, `ticks.color`, `borderRadius`) is silently ignored. Pin v4.
     c = urllib.parse.quote(json.dumps(config, separators=(",", ":")))
-    return f"{QUICKCHART_BASE}?w={width}&h={height}&devicePixelRatio=2&bkg={urllib.parse.quote(BG)}&c={c}"
+    return f"{QUICKCHART_BASE}?v=4&w={width}&h={height}&devicePixelRatio=2&bkg={urllib.parse.quote(BG)}&c={c}"
 
 
 def _title(text) -> dict:
     return {"display": True, "text": text, "color": INK, "font": {"size": 15, "weight": "600"}}
 
 
-def _scales() -> dict:
-    return {
-        "x": {"ticks": {"color": MUTED, "maxRotation": 0, "font": {"size": 11}}, "grid": {"display": False}},
-        "y": {"ticks": {"color": MUTED, "font": {"size": 11}}, "grid": {"color": GRID}},
-    }
+def _axis_title(text: str) -> dict:
+    return {"display": True, "text": text, "color": MUTED, "font": {"size": 12, "weight": "600"}}
+
+
+def _scales(x_title: str = "Fecha", y_title: str = "") -> dict:
+    x = {"ticks": {"color": MUTED, "maxRotation": 0, "font": {"size": 11}}, "grid": {"display": False}}
+    y = {"ticks": {"color": MUTED, "font": {"size": 11}}, "grid": {"color": GRID}}
+    if x_title:
+        x["title"] = _axis_title(x_title)
+    if y_title:
+        y["title"] = _axis_title(y_title)
+    return {"x": x, "y": y}
 
 
 def _thin(labels: list[str]) -> list[str]:
@@ -56,7 +65,8 @@ def _thin(labels: list[str]) -> list[str]:
     return [lbl if i % step == 0 else "" for i, lbl in enumerate(labels)]
 
 
-def line_chart(title: str, labels: list[str], values: list[float], color: str = ACCENT) -> str:
+def line_chart(title: str, labels: list[str], values: list[float], color: str = ACCENT,
+               x_title: str = "Fecha", y_title: str = "Precio") -> str:
     config = {
         "type": "line",
         "data": {
@@ -74,14 +84,15 @@ def line_chart(title: str, labels: list[str], values: list[float], color: str = 
         },
         "options": {
             "plugins": {"title": _title(title), "legend": {"display": False}},
-            "scales": _scales(),
+            "scales": _scales(x_title, y_title),
         },
     }
     return _chart_url(config)
 
 
 def line_chart_multi(title: str, labels: list[str], datasets: list[dict],
-                     width: int = 720, height: int = 380) -> str:
+                     width: int = 720, height: int = 380,
+                     x_title: str = "Fecha", y_title: str = "") -> str:
     """Multi-series line chart. Each dataset: {name, values, color, dashed?}."""
     cfg_datasets = []
     for ds in datasets:
@@ -106,14 +117,15 @@ def line_chart_multi(title: str, labels: list[str], datasets: list[dict],
                 "title": _title(title),
                 "legend": {"display": True, "labels": {"color": INK, "font": {"size": 11}, "usePointStyle": True, "boxWidth": 8}},
             },
-            "scales": _scales(),
+            "scales": _scales(x_title, y_title),
         },
     }
     return _chart_url(config, width=width, height=height)
 
 
 def area_chart(title: str, labels: list[str], values: list[float], color: str = NEGATIVE,
-               width: int = 720, height: int = 280) -> str:
+               width: int = 720, height: int = 280,
+               x_title: str = "Fecha", y_title: str = "") -> str:
     """Single filled area chart — great for drawdown over time."""
     config = {
         "type": "line",
@@ -124,14 +136,15 @@ def area_chart(title: str, labels: list[str], values: list[float], color: str = 
         }]},
         "options": {
             "plugins": {"title": _title(title), "legend": {"display": False}},
-            "scales": _scales(),
+            "scales": _scales(x_title, y_title),
         },
     }
     return _chart_url(config, width=width, height=height)
 
 
 def bar_chart(title: str, labels: list[str], values: list[float], color: str = ACCENT,
-              width: int = 720, height: int = 280) -> str:
+              width: int = 720, height: int = 280,
+              x_title: str = "", y_title: str = "Frecuencia") -> str:
     """Bar chart — used for the returns histogram."""
     config = {
         "type": "bar",
@@ -140,7 +153,7 @@ def bar_chart(title: str, labels: list[str], values: list[float], color: str = A
         }]},
         "options": {
             "plugins": {"title": _title(title), "legend": {"display": False}},
-            "scales": _scales(),
+            "scales": _scales(x_title, y_title),
         },
     }
     return _chart_url(config, width=width, height=height)

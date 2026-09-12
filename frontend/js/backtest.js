@@ -208,8 +208,8 @@ function renderBtResults(data) {
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-                x: { ticks: { maxTicksLimit: 8, color: '#9C9689' }, grid: { display: false } },
-                y: { ticks: { color: '#9C9689', callback: v => v.toLocaleString('es-ES') + ' €' }, grid: { color: '#EFEBE3' } },
+                x: { title: { display: true, text: 'Fecha', color: '#8A8275', font: { size: 12, weight: '600' } }, ticks: { maxTicksLimit: 8, color: '#9C9689' }, grid: { display: false } },
+                y: { title: { display: true, text: 'Valor de cartera (€)', color: '#8A8275', font: { size: 12, weight: '600' } }, ticks: { color: '#9C9689', callback: v => v.toLocaleString('es-ES') + ' €' }, grid: { color: '#EFEBE3' } },
             },
         },
     });

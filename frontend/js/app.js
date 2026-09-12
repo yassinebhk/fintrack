@@ -604,6 +604,7 @@ function createPortfolioChart(history) {
             },
             scales: {
                 x: {
+                    title: { display: true, text: 'Fecha', color: '#8A8275', font: { size: 12, weight: '600' } },
                     grid: {
                         display: false
                     },
@@ -617,6 +618,7 @@ function createPortfolioChart(history) {
                     }
                 },
                 y: {
+                    title: { display: true, text: 'Valor de cartera (€)', color: '#8A8275', font: { size: 12, weight: '600' } },
                     grid: {
                         color: '#EFEBE3'
                     },
