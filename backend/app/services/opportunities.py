@@ -687,7 +687,7 @@ class OpportunityService:
                 labels = [h["date"] for h in (hist or []) if h.get("close")]
                 if len(closes) >= 20:
                     up = closes[-1] >= closes[0]
-                    color = "#10b981" if up else "#ef4444"
+                    color = "#2C4A6E" if up else "#C6473C"  # app theme: blue up / terracotta down
                     title = f"{opp.get('name', ticker)} · 6 meses"
                     opp["chart_url"] = line_chart(title[:60], labels, closes, color=color)
             except Exception as exc:

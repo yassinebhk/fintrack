@@ -311,9 +311,9 @@ def _build_charts(s: pd.Series, bench: pd.Series | None, bench_name: str, name: 
         f"{name} — precio · SMA50 · SMA200",
         price_labels_ds,
         [
-            {"name": "precio", "values": price_vals_ds, "color": "#10b981", "width": 2},
-            {"name": "SMA50", "values": sma50_vals_ds, "color": "#f59e0b", "dashed": True, "width": 1.5},
-            {"name": "SMA200", "values": sma200_vals_ds, "color": "#ef4444", "dashed": True, "width": 1.5},
+            {"name": "precio", "values": price_vals_ds, "color": "#2C4A6E", "width": 2},
+            {"name": "SMA50", "values": sma50_vals_ds, "color": "#C99A3E", "dashed": True, "width": 1.5},
+            {"name": "SMA200", "values": sma200_vals_ds, "color": "#C6473C", "dashed": True, "width": 1.5},
         ],
     )
 
@@ -323,7 +323,7 @@ def _build_charts(s: pd.Series, bench: pd.Series | None, bench_name: str, name: 
     dd_labels_ds, dd_vals_ds = _downsample(
         [d.strftime("%Y-%m") for d in dd.index], [round(x, 2) for x in dd.values]
     )
-    chart_dd = area_chart("Drawdown histórico (%)", dd_labels_ds, dd_vals_ds, color="#ef4444")
+    chart_dd = area_chart("Drawdown histórico (%)", dd_labels_ds, dd_vals_ds, color="#C6473C")
 
     # Histogram of daily returns in 18 bins between -5% and +5% (cap outliers)
     # — already just 18 bars regardless of history length, no downsampling needed.
@@ -331,7 +331,7 @@ def _build_charts(s: pd.Series, bench: pd.Series | None, bench_name: str, name: 
     bins = np.linspace(-5, 5, 19)
     hist_counts, edges = np.histogram(capped, bins=bins)
     hist_labels = [f"{edges[i]:+.1f}%" for i in range(len(edges) - 1)]
-    chart_hist = bar_chart("Distribución de retornos diarios", hist_labels, hist_counts.tolist(), color="#6366f1")
+    chart_hist = bar_chart("Distribución de retornos diarios", hist_labels, hist_counts.tolist(), color="#2C4A6E")
 
     # Rolling 60d annualized volatility
     rv = rets.rolling(60).std() * np.sqrt(252) * 100
@@ -339,7 +339,7 @@ def _build_charts(s: pd.Series, bench: pd.Series | None, bench_name: str, name: 
     rv_labels_ds, rv_vals_ds = _downsample(
         [d.strftime("%Y-%m") for d in rv.index], [round(x, 2) for x in rv.values]
     )
-    chart_vol = area_chart("Volatilidad rodante 60d (%, anualizada)", rv_labels_ds, rv_vals_ds, color="#f59e0b")
+    chart_vol = area_chart("Volatilidad rodante 60d (%, anualizada)", rv_labels_ds, rv_vals_ds, color="#C99A3E")
 
     # Rolling 60d Sharpe (excess returns), annualized — stability of risk-adjusted return.
     daily_rf = (rf_annual_pct / 100.0) / 252.0
@@ -352,7 +352,7 @@ def _build_charts(s: pd.Series, bench: pd.Series | None, bench_name: str, name: 
             [d.strftime("%Y-%m") for d in rsh.index], [round(x, 2) for x in rsh.values]
         )
         chart_rolling_sharpe = area_chart(
-            "Sharpe rodante 60d (Rf ajustada, anualizado)", rsh_labels_ds, rsh_vals_ds, color="#10b981"
+            "Sharpe rodante 60d (Rf ajustada, anualizado)", rsh_labels_ds, rsh_vals_ds, color="#4A9B8E"
         )
 
     # Relative cumulative performance vs benchmark
@@ -370,7 +370,7 @@ def _build_charts(s: pd.Series, bench: pd.Series | None, bench_name: str, name: 
             chart_rel = line_chart_multi(
                 f"Rendimiento relativo vs {bench_name} (%)",
                 rl_labels_ds,
-                [{"name": f"vs {bench_name}", "values": rl_vals_ds, "color": "#00d4aa"}],
+                [{"name": f"vs {bench_name}", "values": rl_vals_ds, "color": "#2C4A6E"}],
             )
 
     return {
