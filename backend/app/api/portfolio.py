@@ -93,6 +93,15 @@ async def get_portfolio_money_weighted(svc: PortfolioService = Depends(_get_serv
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/portfolio/tax")
+async def get_portfolio_tax(svc: PortfolioService = Depends(_get_service)) -> dict:
+    """FIFO realized gains, estimated Spanish IRPF and tax-loss-harvesting candidates."""
+    try:
+        return await svc.tax_report()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.get("/portfolio/history")
 async def get_portfolio_history(
     days: int = Query(default=365, ge=1, le=3650), svc: PortfolioService = Depends(_get_service)

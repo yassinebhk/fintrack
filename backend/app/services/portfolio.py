@@ -601,6 +601,99 @@ class PortfolioService:
             "current_value_eur": round(float(last.total_value or 0.0), 2),
         }
 
+    @staticmethod
+    def _irpf_savings(base: float) -> float:
+        """Spanish savings-base IRPF on a positive net gain (2024/25 brackets):
+        19% ≤6k, 21% 6k–50k, 23% 50k–200k, 27% 200k–300k, 28% >300k."""
+        widths = [(6000.0, 0.19), (44000.0, 0.21), (150000.0, 0.23), (100000.0, 0.27), (float("inf"), 0.28)]
+        tax, rem = 0.0, max(0.0, base)
+        for width, rate in widths:
+            if rem <= 0:
+                break
+            chunk = min(rem, width)
+            tax += chunk * rate
+            rem -= chunk
+        return tax
+
+    async def tax_report(self) -> dict:
+        """FIFO realized gains/losses from the transaction history, this-year totals,
+        an estimated Spanish IRPF (savings base) on the net gain, and tax-loss-
+        harvesting candidates (current positions in the red). Reconstructed from
+        transactions — no separate lot store. Assumes EUR (does not adjust FX)."""
+        from collections import defaultdict, deque
+
+        async with session_scope() as session:
+            txs = await TransactionRepository(session, self.user_id).list_all()
+        txs = sorted(txs, key=lambda t: t.executed_at)
+
+        lots: dict[str, deque] = defaultdict(deque)   # ticker -> deque([qty, unit_cost])
+        realized: list[dict] = []
+        dividends_by_year: dict[int, float] = defaultdict(float)
+
+        for t in txs:
+            tk = (t.ticker or "").upper()
+            typ = (t.type or "").lower()
+            qty = float(t.quantity or 0.0)
+            price = float(t.price or 0.0)
+            fee = float(t.fee or 0.0)
+            if typ in ("buy", "compra", "aportar") and qty > 0:
+                unit = price + (fee / qty if qty else 0.0)
+                lots[tk].append([qty, unit])
+            elif typ in ("sell", "venta", "retirar") and qty > 0:
+                proceeds = qty * price - fee
+                cost, remaining = 0.0, qty
+                while remaining > 1e-9 and lots[tk]:
+                    lot = lots[tk][0]
+                    take = min(remaining, lot[0])
+                    cost += take * lot[1]
+                    lot[0] -= take
+                    remaining -= take
+                    if lot[0] <= 1e-9:
+                        lots[tk].popleft()
+                realized.append({
+                    "date": t.executed_at.date().isoformat(), "year": t.executed_at.year,
+                    "ticker": tk, "qty": round(qty, 6),
+                    "proceeds": round(proceeds, 2), "cost": round(cost, 2),
+                    "gain": round(proceeds - cost, 2),
+                })
+            elif typ == "dividend":
+                dividends_by_year[t.executed_at.year] += (qty * price) if price else qty
+
+        year = date.today().year
+        realized_ytd = sum(r["gain"] for r in realized if r["year"] == year)
+        realized_total = sum(r["gain"] for r in realized)
+        div_ytd = dividends_by_year.get(year, 0.0)
+        taxable_ytd = realized_ytd + div_ytd
+
+        by_ticker: dict[str, float] = defaultdict(float)
+        for r in realized:
+            if r["year"] == year:
+                by_ticker[r["ticker"]] += r["gain"]
+
+        portfolio = await self.calculate_portfolio()
+        harvest = sorted(
+            [{"ticker": p["ticker"], "name": p.get("name") or p["ticker"],
+              "unrealized_loss_eur": round(p.get("gain_loss") or 0.0, 2)}
+             for p in portfolio.get("positions", []) if (p.get("gain_loss") or 0.0) < 0],
+            key=lambda x: x["unrealized_loss_eur"],
+        )
+        return {
+            "year": year,
+            "realized_ytd_eur": round(realized_ytd, 2),
+            "dividends_ytd_eur": round(div_ytd, 2),
+            "realized_total_eur": round(realized_total, 2),
+            "taxable_ytd_eur": round(taxable_ytd, 2),
+            "estimated_irpf_ytd_eur": round(self._irpf_savings(taxable_ytd), 2),
+            "by_ticker_ytd": sorted(
+                [{"ticker": k, "gain_eur": round(v, 2)} for k, v in by_ticker.items()],
+                key=lambda x: x["gain_eur"]),
+            "recent_sales": sorted(realized, key=lambda r: r["date"], reverse=True)[:15],
+            "harvest_candidates": harvest[:10],
+            "note": ("Estimación FIFO en EUR (no ajusta divisa). Base del ahorro. Las minusvalías "
+                     "compensan plusvalías y el resto se arrastra 4 años. Ojo a la regla de recompra "
+                     "(2 meses). No es asesoramiento fiscal."),
+        }
+
     async def get_portfolio_history(self, days: int = 365) -> list[dict]:
         async with session_scope() as session:
             rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)

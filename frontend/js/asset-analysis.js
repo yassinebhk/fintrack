@@ -26,6 +26,7 @@ function initAssetAnalysis() {
     loadHoldingsCatalysts();
     loadAttribution();
     loadStressTest();
+    loadTaxReport();
 }
 
 /**
@@ -753,6 +754,34 @@ async function loadPortfolioRiskMetrics() {
         ${tile('Alpha anual', d.alpha_annual_pct == null ? '—' : d.alpha_annual_pct + '%', `vs ${d.benchmark}`)}
     </div>
     <p class="text-muted" style="font-size:10.5px; margin:8px 0 0;">Sobre ${d.n_returns} días de retorno reales (excluye días de aportación). Benchmark: ${d.benchmark}.</p>`;
+}
+
+async function loadTaxReport() {
+    const el = document.getElementById('taxContent');
+    if (!el) return;
+    let d;
+    try {
+        const r = await fetch(`${ASSET_API}/portfolio/tax`);
+        if (!r.ok) { el.innerHTML = '<p class="text-muted">No disponible.</p>'; return; }
+        d = await r.json();
+    } catch (e) { el.innerHTML = '<p class="text-muted">No disponible.</p>'; return; }
+    const eur = (v) => (v >= 0 ? '+' : '') + Math.round(v).toLocaleString('es-ES') + ' €';
+    const tile = (label, value, color) => `<div style="background:rgba(43,40,34,0.03); border-radius:8px; padding:10px 12px; min-width:120px; flex:1;">
+        <div style="font-size:11px; color:var(--text-secondary);">${label}</div>
+        <div style="font-size:18px; font-weight:700; margin-top:2px;${color ? `color:${color};` : ''}">${value}</div></div>`;
+    const gl = d.realized_ytd_eur;
+    const tiles = `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        ${tile(`Plusvalías realizadas ${d.year}`, eur(gl), gl >= 0 ? 'var(--positive)' : 'var(--negative)')}
+        ${d.dividends_ytd_eur ? tile(`Dividendos ${d.year}`, eur(d.dividends_ytd_eur)) : ''}
+        ${tile('IRPF estimado', Math.round(d.estimated_irpf_ytd_eur).toLocaleString('es-ES') + ' €')}
+    </div>`;
+    const sales = (d.recent_sales || []).length
+        ? `<div class="table-container"><table class="manager-table"><thead><tr><th>Fecha</th><th>Activo</th><th class="text-right">Ganancia/Pérdida</th></tr></thead><tbody>${d.recent_sales.map(s => `<tr><td class="mono" style="font-size:12px;">${s.date}</td><td>${s.ticker}</td><td class="text-right mono ${s.gain >= 0 ? 'value-positive' : 'value-negative'}">${eur(s.gain)}</td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="text-muted" style="font-size:12px;">Sin ventas registradas — no has realizado plusvalías todavía.</p>';
+    const harvest = (d.harvest_candidates || []).length
+        ? `<div style="margin-top:10px;"><strong style="font-size:13px;">🍂 Para compensar (posiciones en pérdida):</strong><ul style="margin:6px 0 0; padding-left:18px; font-size:12.5px;">${d.harvest_candidates.map(h => `<li>${h.name} <span class="text-muted mono" style="font-size:11px;">${h.ticker}</span>: <span class="value-negative mono">${eur(h.unrealized_loss_eur)}</span></li>`).join('')}</ul></div>`
+        : '';
+    el.innerHTML = tiles + sales + harvest + `<p class="text-muted" style="font-size:10.5px; margin:8px 0 0;">${d.note}</p>`;
 }
 
 async function loadStressTest() {
