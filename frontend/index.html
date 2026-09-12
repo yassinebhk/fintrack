@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260912adv">
+    <link rel="stylesheet" href="css/styles.css?v=20260912info">
 </head>
 <body>
     <div id="loginGate" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:24px;">
@@ -149,7 +149,7 @@
                     <section class="summary-section">
                         <div class="card card-total">
                             <div class="card-header">
-                                <span class="card-label">Valor Total de Cartera</span>
+                                <span class="card-label">Valor Total de Cartera<button type="button" class="info-icon" data-info-key="total_portfolio_value" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                 <span class="card-currency" id="baseCurrency">EUR</span>
                             </div>
                             <div class="card-value" id="totalValue">
@@ -164,22 +164,22 @@
 
                         <div class="card card-kpi">
                             <div class="kpi-item">
-                                <span class="kpi-label">📈 CAGR<button type="button" class="info-icon" data-info-key="cagr" aria-label="Qué es esto" onclick="event.stopPropagation()">i</button></span>
+                                <span class="kpi-label">📈 CAGR<button type="button" class="info-icon" data-info-key="cagr" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                 <span class="kpi-value" id="cagr">--%</span>
                                 <span class="kpi-help">Rendimiento anual medio</span>
                             </div>
                             <div class="kpi-item">
-                                <span class="kpi-label">📉 Max Drawdown<button type="button" class="info-icon" data-info-key="max_drawdown" aria-label="Qué es esto" onclick="event.stopPropagation()">i</button></span>
+                                <span class="kpi-label">📉 Max Drawdown<button type="button" class="info-icon" data-info-key="max_drawdown" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                 <span class="kpi-value negative" id="maxDrawdown">--%</span>
                                 <span class="kpi-help">Mayor caída desde máximo</span>
                             </div>
                             <div class="kpi-item">
-                                <span class="kpi-label">📊 Volatilidad<button type="button" class="info-icon" data-info-key="volatilidad" aria-label="Qué es esto" onclick="event.stopPropagation()">i</button></span>
+                                <span class="kpi-label">📊 Volatilidad<button type="button" class="info-icon" data-info-key="volatilidad" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                 <span class="kpi-value" id="volatility">--%</span>
                                 <span class="kpi-help">Variación del valor</span>
                             </div>
                             <div class="kpi-item">
-                                <span class="kpi-label">⚖️ Sharpe<button type="button" class="info-icon" data-info-key="sharpe" aria-label="Qué es esto" onclick="event.stopPropagation()">i</button></span>
+                                <span class="kpi-label">⚖️ Sharpe<button type="button" class="info-icon" data-info-key="sharpe" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                 <span class="kpi-value" id="sharpeRatio">--</span>
                                 <span class="kpi-help">Rendimiento vs Riesgo</span>
                             </div>
@@ -192,28 +192,28 @@
                             <span class="stat-icon">📈</span>
                             <div class="stat-info">
                                 <span class="stat-value" id="bestPerformer">--</span>
-                                <span class="stat-label">Mejor rendimiento</span>
+                                <span class="stat-label">Mejor rendimiento<button type="button" class="info-icon" data-info-key="best_performer" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                             </div>
                         </div>
                         <div class="stat-card">
                             <span class="stat-icon">📉</span>
                             <div class="stat-info">
                                 <span class="stat-value" id="worstPerformer">--</span>
-                                <span class="stat-label">Peor rendimiento</span>
+                                <span class="stat-label">Peor rendimiento<button type="button" class="info-icon" data-info-key="worst_performer" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                             </div>
                         </div>
                         <div class="stat-card">
                             <span class="stat-icon">💰</span>
                             <div class="stat-info">
                                 <span class="stat-value" id="dividendsYTD">0 €</span>
-                                <span class="stat-label">Dividendos YTD</span>
+                                <span class="stat-label">Dividendos YTD<button type="button" class="info-icon" data-info-key="dividends_ytd" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                             </div>
                         </div>
                         <div class="stat-card">
                             <span class="stat-icon">📊</span>
                             <div class="stat-info">
                                 <span class="stat-value" id="positionsCount">0</span>
-                                <span class="stat-label">Posiciones</span>
+                                <span class="stat-label">Posiciones<button type="button" class="info-icon" data-info-key="positions_count" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                             </div>
                         </div>
                     </section>
@@ -301,15 +301,15 @@
                                             <th data-sort="ticker">Activo ↕</th>
                                             <th data-sort="type">Tipo</th>
                                             <th data-sort="broker">Broker</th>
-                                            <th class="text-right" data-sort="quantity">Cantidad</th>
-                                            <th class="text-right" data-sort="avg_price">Coste/Unidad</th>
-                                            <th class="text-right" data-sort="current_price">Precio Actual</th>
-                                            <th class="text-right">Tendencia</th>
+                                            <th class="text-right" data-sort="quantity">Cantidad<button type="button" class="info-icon" data-info-key="cantidad" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
+                                            <th class="text-right" data-sort="avg_price">Coste/Unidad<button type="button" class="info-icon" data-info-key="coste_unidad" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
+                                            <th class="text-right" data-sort="current_price">Precio Actual<button type="button" class="info-icon" data-info-key="precio_actual" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
+                                            <th class="text-right">Tendencia<button type="button" class="info-icon" data-info-key="trend_spark" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
                                             <th class="text-right" data-sort="market_value">Valor</th>
-                                            <th class="text-right" data-sort="gain_loss">P/L</th>
-                                            <th class="text-right" data-sort="gain_loss_pct">P/L %</th>
-                                            <th class="text-right" data-sort="day_change_pct">Día %</th>
-                                            <th class="text-right" data-sort="weight">Peso</th>
+                                            <th class="text-right" data-sort="gain_loss">P/L<button type="button" class="info-icon" data-info-key="gain_loss" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
+                                            <th class="text-right" data-sort="gain_loss_pct">P/L %<button type="button" class="info-icon" data-info-key="gain_loss_pct" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
+                                            <th class="text-right" data-sort="day_change_pct">Día %<button type="button" class="info-icon" data-info-key="day_change" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
+                                            <th class="text-right" data-sort="weight">Peso<button type="button" class="info-icon" data-info-key="peso_en_tu_cartera" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
                                         </tr>
                                     </thead>
                                     <tbody id="positionsBody">
@@ -369,19 +369,19 @@
                                 </div>
                                 <div class="asset-stats">
                                     <div class="stat-item">
-                                        <span class="stat-label">Tu posición</span>
+                                        <span class="stat-label">Tu posición<button type="button" class="info-icon" data-info-key="tu_posicion" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                         <span class="stat-value" id="assetPosition">-</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="stat-label">Valor actual</span>
+                                        <span class="stat-label">Valor actual<button type="button" class="info-icon" data-info-key="valor_actual" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                         <span class="stat-value" id="assetValue">-</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="stat-label">Ganancia/Pérdida</span>
+                                        <span class="stat-label">Ganancia/Pérdida<button type="button" class="info-icon" data-info-key="ganancia_perdida" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                         <span class="stat-value" id="assetGainLoss">-</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="stat-label">% de tu cartera</span>
+                                        <span class="stat-label">% de tu cartera<button type="button" class="info-icon" data-info-key="peso_en_tu_cartera" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                         <span class="stat-value" id="assetWeight">-</span>
                                     </div>
                                 </div>
@@ -452,7 +452,7 @@
                         </div>
 
                         <div class="card metric-card">
-                            <h4>Correlación de Activos</h4>
+                            <h4>Correlación de Activos<button type="button" class="info-icon" data-info-key="correlacion" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></h4>
                             <div class="correlation-matrix" id="correlationMatrix">
                                 <p class="text-muted">Matriz de correlación basada en rendimientos históricos</p>
                             </div>
@@ -465,27 +465,27 @@
                         <p class="text-muted" style="font-size:13px; margin:0 0 12px;">Los gráficos que miran los profesionales para juzgar riesgo y consistencia. Se calculan con el histórico real de tu cartera.</p>
                         <div class="advanced-grid">
                             <div class="card">
-                                <h4>🌊 Underwater — caída desde máximos</h4>
+                                <h4>🌊 Underwater — caída desde máximos<button type="button" class="info-icon" data-info-key="drawdown_historico" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></h4>
                                 <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">Cuánto está tu cartera por debajo de su mejor momento, en cada fecha. Cuanto más profundo y más tiempo bajo el agua, peor.</p>
                                 <div class="chart-container-sm"><canvas id="underwaterChart"></canvas></div>
                             </div>
                             <div class="card">
-                                <h4>🎯 Riesgo / Retorno (3 meses)</h4>
+                                <h4>🎯 Riesgo / Retorno (3 meses)<button type="button" class="info-icon" data-info-key="riesgo_retorno_scatter" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></h4>
                                 <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">Cada activo: volatilidad (X) vs retorno (Y). Arriba-izquierda es lo ideal (gana mucho, oscila poco); abajo-derecha, lo peor. El tamaño del punto = su peso en cartera.</p>
                                 <div class="chart-container-sm"><canvas id="riskReturnChart"></canvas></div>
                             </div>
                             <div class="card">
-                                <h4>📅 Retornos mensuales</h4>
+                                <h4>📅 Retornos mensuales<button type="button" class="info-icon" data-info-key="retornos_mensuales" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></h4>
                                 <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">El rendimiento de cada mes, en verde/rojo, para ver estacionalidad y rachas de un vistazo.</p>
                                 <div id="monthlyHeatmap"><p class="text-muted">Necesita varios meses de histórico para mostrarse.</p></div>
                             </div>
                             <div class="card">
-                                <h4>📊 Distribución de retornos diarios</h4>
+                                <h4>📊 Distribución de retornos diarios<button type="button" class="info-icon" data-info-key="distribucion_retornos" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></h4>
                                 <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">La "forma" de tu riesgo: con qué frecuencia ganas o pierdes cada día, con el VaR 95% marcado (la pérdida diaria que solo se supera 1 de cada 20 días).</p>
                                 <div class="chart-container-sm"><canvas id="returnDistChart"></canvas></div>
                             </div>
                             <div class="card">
-                                <h4>📈 Volatilidad y Sharpe móviles (30d)</h4>
+                                <h4>📈 Volatilidad y Sharpe móviles (30d)<button type="button" class="info-icon" data-info-key="rolling_vol_sharpe" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></h4>
                                 <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">Cómo evolucionan tu riesgo (volatilidad) y tu retorno ajustado al riesgo (Sharpe) en ventanas de 30 días.</p>
                                 <div class="chart-container-sm"><canvas id="rollingChart"></canvas></div>
                             </div>
@@ -550,7 +550,7 @@
                                     <th>Fecha</th>
                                     <th>Tipo</th>
                                     <th>Activo</th>
-                                    <th class="text-right">Cantidad</th>
+                                    <th class="text-right">Cantidad<button type="button" class="info-icon" data-info-key="cantidad" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
                                     <th class="text-right">Precio</th>
                                     <th class="text-right">Total</th>
                                     <th>Broker</th>
@@ -653,19 +653,19 @@
                                 </div>
                                 <div class="asset-stats">
                                     <div class="stat-item">
-                                        <span class="stat-label">Tu posición</span>
+                                        <span class="stat-label">Tu posición<button type="button" class="info-icon" data-info-key="tu_posicion" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                         <span class="stat-value" id="assetDetailQty">-</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="stat-label">Valor actual</span>
+                                        <span class="stat-label">Valor actual<button type="button" class="info-icon" data-info-key="valor_actual" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                         <span class="stat-value" id="assetDetailValue">-</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="stat-label">Ganancia/Pérdida</span>
+                                        <span class="stat-label">Ganancia/Pérdida<button type="button" class="info-icon" data-info-key="ganancia_perdida" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                         <span class="stat-value" id="assetDetailGainLoss">-</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="stat-label">% de tu cartera</span>
+                                        <span class="stat-label">% de tu cartera<button type="button" class="info-icon" data-info-key="peso_en_tu_cartera" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                         <span class="stat-value" id="assetDetailWeight">-</span>
                                     </div>
                                 </div>
@@ -709,7 +709,7 @@
                                         <tr>
                                             <th>Fecha</th>
                                             <th>Tipo</th>
-                                            <th class="text-right">Cantidad</th>
+                                            <th class="text-right">Cantidad<button type="button" class="info-icon" data-info-key="cantidad" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
                                             <th class="text-right">Precio</th>
                                             <th class="text-right">Total</th>
                                             <th>Broker</th>
@@ -964,8 +964,8 @@
                                         <th>Ticker</th>
                                         <th>Tipo</th>
                                         <th>Broker</th>
-                                        <th class="text-right">Cantidad</th>
-                                        <th class="text-right">Coste/Unidad</th>
+                                        <th class="text-right">Cantidad<button type="button" class="info-icon" data-info-key="cantidad" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
+                                        <th class="text-right">Coste/Unidad<button type="button" class="info-icon" data-info-key="coste_unidad" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
                                         <th class="text-right">Divisa</th>
                                         <th>Acciones</th>
                                     </tr>
@@ -1272,7 +1272,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                     <div class="calculators-grid">
                         <!-- Compound Interest Calculator -->
                         <div class="card calculator-card">
-                            <h4>🔄 Interés Compuesto</h4>
+                            <h4>🔄 Interés Compuesto<button type="button" class="info-icon" data-info-key="interes_compuesto" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></h4>
                             <p class="calc-description">Calcula el crecimiento de tu inversión con el poder del interés compuesto</p>
                             <form id="compoundForm" class="calc-form">
                                 <div class="form-group">
@@ -1315,7 +1315,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                                     <input type="number" id="fire_expenses" value="24000" step="1000">
                                 </div>
                                 <div class="form-group">
-                                    <label>Tasa de retiro segura (%)</label>
+                                    <label>Tasa de retiro segura (%)<button type="button" class="info-icon" data-info-key="swr" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></label>
                                     <input type="number" id="fire_swr" value="4" step="0.1">
                                 </div>
                                 <div class="form-group">
@@ -1330,7 +1330,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                             </form>
                             <div class="calc-result" id="fireResult">
                                 <div class="result-main">
-                                    <span class="result-label">Número FIRE necesario</span>
+                                    <span class="result-label">Número FIRE necesario<button type="button" class="info-icon" data-info-key="fire_number" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                     <span class="result-value">--</span>
                                 </div>
                                 <div class="result-details">
@@ -1342,7 +1342,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
 
                         <!-- DCA Calculator -->
                         <div class="card calculator-card">
-                            <h4>📊 Simulador DCA</h4>
+                            <h4>📊 Simulador DCA<button type="button" class="info-icon" data-info-key="dca_concept" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></h4>
                             <p class="calc-description">Dollar Cost Averaging: inversión periódica automática</p>
                             <form id="dcaForm" class="calc-form">
                                 <div class="form-group">
@@ -1396,7 +1396,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                             </form>
                             <div class="calc-result" id="divResult">
                                 <div class="result-main">
-                                    <span class="result-label">Dividendos anuales (año final)</span>
+                                    <span class="result-label">Dividendos anuales (año final)<button type="button" class="info-icon" data-info-key="dividendos_proyectados" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
                                     <span class="result-value">--</span>
                                 </div>
                                 <div class="result-details">
@@ -1853,7 +1853,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="js/info-glossary.js?v=20260912a"></script>
+    <script src="js/info-glossary.js?v=20260912c"></script>
     <script src="js/app.js?v=20260912axes"></script>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260912blue"></script>
@@ -1861,14 +1861,14 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/portfolio-manager.js?v=20260825a"></script>
     <script src="js/ai-advisor.js?v=20260530a"></script>
     <script src="js/asset-analysis.js?v=20260912axes"></script>
-    <script src="js/backtest.js?v=20260912axes"></script>
-    <script src="js/opportunities.js?v=20260911d"></script>
-    <script src="js/asset-deep-analysis.js?v=20260911d"></script>
+    <script src="js/backtest.js?v=20260912info"></script>
+    <script src="js/opportunities.js?v=20260912info"></script>
+    <script src="js/asset-deep-analysis.js?v=20260912info"></script>
     <script src="js/asset-detail.js?v=20260912axes"></script>
     <script src="js/transactions.js?v=20260911d"></script>
     <script src="js/position-review.js?v=20260911d"></script>
-    <script src="js/polymarket.js?v=20260912a"></script>
-    <script src="js/daytrading.js?v=20260903a"></script>
+    <script src="js/polymarket.js?v=20260912info"></script>
+    <script src="js/daytrading.js?v=20260912info"></script>
     <script src="js/pages.js?v=20260912axes"></script>
 </body>
 </html>

@@ -197,7 +197,7 @@ function renderDecision(op) {
     // full numeric contribution lives in the "Por qué lo puntúa así" breakdown).
     const drivers = Object.entries(bd).filter(([, v]) => v > 0).slice(0, 2).map(([k]) => CRITERION_LABEL[k] || k);
     const edgeLine = drivers.length
-        ? `<div style="font-size:12.5px; margin-bottom:8px;"><strong>🎯 Edge medible:</strong> ${drivers.join(' · ')} <span class="text-muted">(ver desglose abajo)</span></div>`
+        ? `<div style="font-size:12.5px; margin-bottom:8px;"><strong>🎯 Edge medible${infoIcon('edge')}:</strong> ${drivers.join(' · ')} <span class="text-muted">(ver desglose abajo)</span></div>`
         : '';
 
     // Fundamentales (solo acciones): los ratios reales que justifican la tesis.
@@ -207,12 +207,12 @@ function renderDecision(op) {
         const pct = v => (v == null ? null : (v * 100).toFixed(0) + '%');
         const num = v => (v == null ? null : (+v).toFixed(1));
         const rows = [
-            ['PER', num(fu.per)], ['P/B', num(fu.pb)], ['ROE', pct(fu.roe)],
-            ['Margen', pct(fu.margin)], ['Crec. ventas', pct(fu.rev_growth)],
-            ['Deuda/eq.', num(fu.debt_to_equity)],
-            ['Div.', fu.div_yield == null ? null : (+fu.div_yield).toFixed(1) + '%'],
+            ['PER', num(fu.per), 'per'], ['P/B', num(fu.pb), 'pb'], ['ROE', pct(fu.roe), 'roe'],
+            ['Margen', pct(fu.margin), 'margen'], ['Crec. ventas', pct(fu.rev_growth), 'crec_ventas'],
+            ['Deuda/eq.', num(fu.debt_to_equity), 'debt_ratio'],
+            ['Div.', fu.div_yield == null ? null : (+fu.div_yield).toFixed(1) + '%', 'dividend_yield'],
         ].filter(([, v]) => v != null);
-        const chips = rows.map(([k, v]) => `<span style="background:rgba(43,40,34,0.05); border-radius:6px; padding:2px 7px; font-size:11.5px; white-space:nowrap;">${k} <strong>${v}</strong></span>`).join(' ');
+        const chips = rows.map(([k, v, gk]) => `<span style="background:rgba(43,40,34,0.05); border-radius:6px; padding:2px 7px; font-size:11.5px; white-space:nowrap;">${k}${infoIcon(gk)} <strong>${v}</strong></span>`).join(' ');
         fundBlock = `<div style="margin:6px 0 8px;">
             <div style="font-size:11px; color:var(--text-secondary); margin-bottom:4px;">🏢 Fundamentales${fu.sector ? ` · <span class="text-muted">${fu.sector}</span>` : ''}</div>
             <div style="display:flex; gap:4px; flex-wrap:wrap;">${chips}</div>
@@ -224,41 +224,41 @@ function renderDecision(op) {
     let bondBlock = '';
     if (bo) {
         const brows = [
-            ['Yield', bo.yield_pct == null ? null : bo.yield_pct + '%'],
-            ['Yield real', bo.real_yield_pct == null ? null : bo.real_yield_pct + '%'],
-            ['Duración', bo.duration_bucket],
-            ['Sensib. tipos', bo.rate_sensitivity == null ? null : 'β ' + (+bo.rate_sensitivity).toFixed(2)],
+            ['Yield', bo.yield_pct == null ? null : bo.yield_pct + '%', 'yield_bono'],
+            ['Yield real', bo.real_yield_pct == null ? null : bo.real_yield_pct + '%', 'yield_real'],
+            ['Duración', bo.duration_bucket, 'duracion_bono'],
+            ['Sensib. tipos', bo.rate_sensitivity == null ? null : 'β ' + (+bo.rate_sensitivity).toFixed(2), 'sensib_tipos'],
         ].filter(([, v]) => v != null);
-        const bchips = brows.map(([k, v]) => `<span style="background:rgba(43,40,34,0.05); border-radius:6px; padding:2px 7px; font-size:11.5px; white-space:nowrap;">${k} <strong>${v}</strong></span>`).join(' ');
+        const bchips = brows.map(([k, v, gk]) => `<span style="background:rgba(43,40,34,0.05); border-radius:6px; padding:2px 7px; font-size:11.5px; white-space:nowrap;">${k}${infoIcon(gk)} <strong>${v}</strong></span>`).join(' ');
         bondBlock = `<div style="margin:6px 0 8px;">
             <div style="font-size:11px; color:var(--text-secondary); margin-bottom:4px;">🏦 Renta fija</div>
             <div style="display:flex; gap:4px; flex-wrap:wrap;">${bchips}</div>
         </div>`;
     }
 
-    const tile = (label, value, sub) => `<div style="flex:1; min-width:118px; background:rgba(43,40,34,0.03); border-radius:8px; padding:8px 10px;">
-        <div style="font-size:11px; color:var(--text-secondary);">${label}</div>
+    const tile = (label, value, sub, gk) => `<div style="flex:1; min-width:118px; background:rgba(43,40,34,0.03); border-radius:8px; padding:8px 10px;">
+        <div style="font-size:11px; color:var(--text-secondary);">${label}${gk ? infoIcon(gk) : ''}</div>
         <div style="font-size:14px; font-weight:600; margin-top:2px;">${value}</div>
         ${sub ? `<div style="font-size:10.5px; color:var(--text-tertiary); margin-top:1px; line-height:1.3;">${sub}</div>` : ''}
     </div>`;
 
     const riskTile = (r.volatility_pct != null)
-        ? tile('⚖️ Riesgo', `${r.volatility_pct}% vol.`, r.max_drawdown_pct != null ? `peor caída histórica ${r.max_drawdown_pct}%` : '')
+        ? tile('⚖️ Riesgo', `${r.volatility_pct}% vol.`, r.max_drawdown_pct != null ? `peor caída histórica ${r.max_drawdown_pct}%` : '', 'riesgo_score')
         : '';
     const sizeTile = (r.suggested_weight_pct != null)
-        ? tile('📏 Tamaño sugerido', `${r.suggested_weight_pct}%`, 'inverse-vol · ≤2% de vol. a la cartera')
+        ? tile('📏 Tamaño sugerido', `${r.suggested_weight_pct}%`, 'inverse-vol · ≤2% de vol. a la cartera', 'tamano_sugerido')
         : '';
 
     let expTile = '';
     if (ex.status === 'listo') {
         const sg = ex.expectancy_pct >= 0 ? '+' : '';
         expTile = tile('📊 Expectancy (OOS)', `${sg}${ex.expectancy_pct}% a ${ex.horizon}`,
-            `acierta ${ex.hit_rate_pct}% · gana ${ex.avg_win_pct}% / al fallar ${ex.avg_loss_pct}% · n=${ex.n}`);
+            `acierta ${ex.hit_rate_pct}% · gana ${ex.avg_win_pct}% / al fallar ${ex.avg_loss_pct}% · n=${ex.n}`, 'expectancy');
     } else if (ex.status === 'validando') {
-        expTile = tile('📊 Expectancy (OOS)', 'en validación', `n=${ex.n}/${ex.n_required} — muestra insuficiente, aún no fiable`);
+        expTile = tile('📊 Expectancy (OOS)', 'en validación', `n=${ex.n}/${ex.n_required} — muestra insuficiente, aún no fiable`, 'expectancy');
     }
 
-    const horizonTile = op.horizon ? tile('⏳ Horizonte', op.horizon, 'típico de esta estrategia') : '';
+    const horizonTile = op.horizon ? tile('⏳ Horizonte', op.horizon, 'típico de esta estrategia', 'horizonte') : '';
 
     const tiles = [riskTile, sizeTile, expTile, horizonTile].filter(Boolean).join('');
     if (!edgeLine && !tiles && !fundBlock && !bondBlock) return '';

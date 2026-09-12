@@ -165,22 +165,22 @@ function renderBtResults(data) {
 
     document.getElementById('btMetrics').innerHTML = `
         <div class="kpi-item">
-            <span class="kpi-label">💰 Valor final</span>
+            <span class="kpi-label">💰 Valor final${infoIcon('valor_final')}</span>
             <span class="kpi-value">${fmt(m.final_value_eur)} €</span>
             <span class="kpi-help">Sobre ${fmt(m.net_invested_eur)} € invertidos</span>
         </div>
         <div class="kpi-item">
-            <span class="kpi-label">📈 Return total</span>
+            <span class="kpi-label">📈 Return total${infoIcon('return_total')}</span>
             <span class="kpi-value ${m.total_return_pct >= 0 ? 'positive' : 'negative'}">${fmt(m.total_return_pct, true)}%</span>
-            <span class="kpi-help">CAGR ${fmt(m.cagr_pct, true)}%</span>
+            <span class="kpi-help">CAGR ${fmt(m.cagr_pct, true)}%${infoIcon('cagr')}</span>
         </div>
         <div class="kpi-item">
-            <span class="kpi-label">⚖️ Sharpe</span>
+            <span class="kpi-label">⚖️ Sharpe${infoIcon('sharpe')}</span>
             <span class="kpi-value ${m.sharpe_ratio >= 1 ? 'positive' : ''}">${fmt(m.sharpe_ratio)}</span>
-            <span class="kpi-help">Vol ${fmt(m.volatility_pct)}%</span>
+            <span class="kpi-help">Vol ${fmt(m.volatility_pct)}%${infoIcon('volatilidad')}</span>
         </div>
         <div class="kpi-item">
-            <span class="kpi-label">📉 Max DD</span>
+            <span class="kpi-label">📉 Max DD${infoIcon('max_drawdown')}</span>
             <span class="kpi-value negative">${fmt(m.max_drawdown_pct)}%</span>
             <span class="kpi-help">${m.n_trades || 0} trades en ${fmt(m.years_covered)}y</span>
         </div>

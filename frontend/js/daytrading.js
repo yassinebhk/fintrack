@@ -164,12 +164,12 @@ function dtRenderReport(r) {
     const verdictColor = rd.ready ? 'var(--positive)' : 'var(--warning)';
     body.innerHTML = `
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:14px;">
-            <div><div class="text-muted" style="font-size:12px;">Operaciones cerradas</div><div style="font-size:20px; font-weight:700;">${r.n_closed} / 30</div></div>
-            <div><div class="text-muted" style="font-size:12px;">Días de histórico</div><div style="font-size:20px; font-weight:700;">${r.span_days} / 60</div></div>
-            <div><div class="text-muted" style="font-size:12px;">% de aciertos</div><div style="font-size:20px; font-weight:700;">${r.hit_rate_pct}%</div></div>
-            <div><div class="text-muted" style="font-size:12px;">Alpha vs benchmark</div><div style="font-size:20px; font-weight:700;">${dtFmtPct(r.alpha_pct)}</div></div>
-            <div><div class="text-muted" style="font-size:12px;">P&amp;L total (papel)</div><div style="font-size:20px; font-weight:700;">${r.total_pnl_eur}€</div></div>
-            <div><div class="text-muted" style="font-size:12px;">p-valor</div><div style="font-size:20px; font-weight:700;">${r.p_value ?? '—'}</div></div>
+            <div><div class="text-muted" style="font-size:12px;">Operaciones cerradas${infoIcon('operaciones_cerradas')}</div><div style="font-size:20px; font-weight:700;">${r.n_closed} / 30</div></div>
+            <div><div class="text-muted" style="font-size:12px;">Días de histórico${infoIcon('dias_historico')}</div><div style="font-size:20px; font-weight:700;">${r.span_days} / 60</div></div>
+            <div><div class="text-muted" style="font-size:12px;">% de aciertos${infoIcon('hit_rate')}</div><div style="font-size:20px; font-weight:700;">${r.hit_rate_pct}%</div></div>
+            <div><div class="text-muted" style="font-size:12px;">Alpha vs benchmark${infoIcon('alfa_anual')}</div><div style="font-size:20px; font-weight:700;">${dtFmtPct(r.alpha_pct)}</div></div>
+            <div><div class="text-muted" style="font-size:12px;">P&amp;L total (papel)${infoIcon('pnl_acumulado_papel')}</div><div style="font-size:20px; font-weight:700;">${r.total_pnl_eur}€</div></div>
+            <div><div class="text-muted" style="font-size:12px;">p-valor${infoIcon('p_value')}</div><div style="font-size:20px; font-weight:700;">${r.p_value ?? '—'}</div></div>
         </div>
         <div style="background:${verdictColor}22; border:1px solid ${verdictColor}55; border-radius:8px; padding:12px 16px;">
             <strong style="color:${verdictColor};">${dtEsc(rd.verdict)}</strong>

@@ -990,6 +990,102 @@ body::before {
 /* Small inline trend sparkline shown in a table row */
 .row-spark { vertical-align: middle; display: inline-block; }
 
+/* ============================================
+   Info glossary — the "i" next to any metric/chart label
+   ============================================ */
+.info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    width: 15px;
+    height: 15px;
+    margin-left: 5px;
+    padding: 0;
+    border: 1px solid var(--border-secondary);
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    color: var(--text-tertiary);
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-style: italic;
+    font-size: 10px;
+    line-height: 1;
+    cursor: help;
+    flex: none;
+    transition: var(--transition-fast);
+}
+
+.info-icon:hover,
+.info-icon:focus-visible {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: #fff;
+    outline: none;
+}
+
+.info-popover {
+    position: absolute;
+    z-index: 1000;
+    width: min(320px, calc(100vw - 24px));
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    font-family: var(--font-display);
+}
+
+.info-popover-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.info-popover-head strong {
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    color: var(--accent-primary);
+}
+
+.info-popover-close {
+    border: none;
+    background: none;
+    font-size: 1.1rem;
+    line-height: 1;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 2px 4px;
+}
+
+.info-popover-close:hover { color: var(--text-primary); }
+
+.info-popover-body {
+    padding: 10px 12px 12px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.info-popover-body p {
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.info-popover-body p:last-child { margin-bottom: 0; }
+
+.info-popover-label {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent-primary);
+    margin-bottom: 2px;
+}
+
 .broker-name {
     font-size: 0.8rem;
     color: var(--text-secondary);

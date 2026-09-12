@@ -50,59 +50,67 @@ const _CRITERION_LABEL = {
     infravaloracion: 'Infravaloración', reversion: 'Reversión a la media',
     sobreventa: 'Sobreventa (RSI)', calidad: 'Calidad (Sharpe)',
 };
+const _CRITERION_GLOSSARY_KEY = {
+    momentum: 'momentum_criterio', regimen: 'regimen_200d', riesgo: 'riesgo_score',
+    tecnico: 'tecnico_rsi_macd', volatilidad: 'volatilidad',
+    infravaloracion: 'infravaloracion_criterio', reversion: 'reversion_media',
+    sobreventa: 'tecnico_rsi_macd', calidad: 'riesgo_score',
+};
 const _SENT_EMOJI = { bullish: '🟢', bearish: '🔴', neutral: '⚪' };
 
 function _fmt(n, d = 2) { return n == null || isNaN(n) ? '—' : (Number(n)).toFixed(d); }
 function _signedCls(n) { return n == null ? '' : (n >= 0 ? 'value-positive' : 'value-negative'); }
 function _signedFmt(n, d = 2) { return n == null ? '—' : (n >= 0 ? '+' : '') + Number(n).toFixed(d); }
 
+function _gi(key) { return (typeof infoIcon === 'function' ? infoIcon(key) : ''); }
+
 function _metricsBlock(m) {
     const groups = [
         {title: 'Rentabilidad y riesgo', cells: [
             ['Precio', _fmt(m.last_price, 4)],
-            ['CAGR', _signedFmt(m.cagr_pct) + '%', _signedCls(m.cagr_pct)],
-            ['Volatilidad anual', _fmt(m.volatility_pct) + '%'],
-            [`Sharpe (Rf ${_fmt(m.rf_annual_pct)}%)`, _signedFmt(m.sharpe), _signedCls(m.sharpe)],
-            ['Sortino', _signedFmt(m.sortino), _signedCls(m.sortino)],
-            ['Calmar', _fmt(m.calmar)],
-            ['Años cubiertos', _fmt(m.years_covered)],
+            ['CAGR', _signedFmt(m.cagr_pct) + '%', _signedCls(m.cagr_pct), 'cagr'],
+            ['Volatilidad anual', _fmt(m.volatility_pct) + '%', '', 'volatilidad'],
+            [`Sharpe (Rf ${_fmt(m.rf_annual_pct)}%)`, _signedFmt(m.sharpe), _signedCls(m.sharpe), 'sharpe'],
+            ['Sortino', _signedFmt(m.sortino), _signedCls(m.sortino), 'sortino'],
+            ['Calmar', _fmt(m.calmar), '', 'calmar'],
+            ['Años cubiertos', _fmt(m.years_covered), '', 'anos_cubiertos'],
         ]},
         {title: 'Drawdown', cells: [
-            ['Máx. drawdown', _signedFmt(m.max_drawdown_pct) + '%' + (m.max_drawdown_date ? ` <span class="text-muted" style="font-size:11px;">(${m.max_drawdown_date})</span>` : ''), 'value-negative'],
-            ['Duración máx. (días)', m.max_drawdown_days == null ? '—' : m.max_drawdown_days],
-            ['Duración media (días)', m.avg_drawdown_days == null ? '—' : m.avg_drawdown_days],
+            ['Máx. drawdown', _signedFmt(m.max_drawdown_pct) + '%' + (m.max_drawdown_date ? ` <span class="text-muted" style="font-size:11px;">(${m.max_drawdown_date})</span>` : ''), 'value-negative', 'max_drawdown'],
+            ['Duración máx. (días)', m.max_drawdown_days == null ? '—' : m.max_drawdown_days, '', 'drawdown_duracion_max'],
+            ['Duración media (días)', m.avg_drawdown_days == null ? '—' : m.avg_drawdown_days, '', 'drawdown_duracion_media'],
         ]},
         {title: 'Riesgo de cola (histórico)', cells: [
-            ['VaR 95% diario', _fmt(m.var_95_pct) + '%'],
-            ['VaR 99% diario', _fmt(m.var_99_pct) + '%'],
-            ['CVaR 95% (ES)', m.cvar_95_pct == null ? '—' : _fmt(m.cvar_95_pct) + '%'],
-            ['CVaR 99% (ES)', m.cvar_99_pct == null ? '—' : _fmt(m.cvar_99_pct) + '%'],
+            ['VaR 95% diario', _fmt(m.var_95_pct) + '%', '', 'var95'],
+            ['VaR 99% diario', _fmt(m.var_99_pct) + '%', '', 'var99'],
+            ['CVaR 95% (ES)', m.cvar_95_pct == null ? '—' : _fmt(m.cvar_95_pct) + '%', '', 'cvar95'],
+            ['CVaR 99% (ES)', m.cvar_99_pct == null ? '—' : _fmt(m.cvar_99_pct) + '%', '', 'cvar99'],
         ]},
         {title: 'Distribución de retornos', cells: [
-            ['Asimetría (skew)', _signedFmt(m.skewness)],
-            ['Curtosis exceso', _signedFmt(m.excess_kurtosis)],
-            ['Jarque-Bera (p)', m.jarque_bera_p == null ? '—' : _fmt(m.jarque_bera_p, 4) + (m.jarque_bera_p < 0.05 ? ' · no-normal' : ' · ≈normal')],
-            ['PSR (prob. Sharpe > 0)', m.psr_pct == null ? '—' : _fmt(m.psr_pct, 1) + '%'],
+            ['Asimetría (skew)', _signedFmt(m.skewness), '', 'skewness'],
+            ['Curtosis exceso', _signedFmt(m.excess_kurtosis), '', 'excess_kurtosis'],
+            ['Jarque-Bera (p)', m.jarque_bera_p == null ? '—' : _fmt(m.jarque_bera_p, 4) + (m.jarque_bera_p < 0.05 ? ' · no-normal' : ' · ≈normal'), '', 'jarque_bera'],
+            ['PSR (prob. Sharpe > 0)', m.psr_pct == null ? '—' : _fmt(m.psr_pct, 1) + '%', '', 'psr'],
         ]},
         {title: `Frente al benchmark`, cells: [
-            ['Beta', m.beta == null ? '—' : _fmt(m.beta)],
-            ['Alfa anual', m.alpha_annual_pct == null ? '—' : _signedFmt(m.alpha_annual_pct) + '%', _signedCls(m.alpha_annual_pct)],
-            ['t-stat alfa', m.alpha_t_stat == null ? '—' : _signedFmt(m.alpha_t_stat) + (m.alpha_p_value != null ? ` <span class="text-muted" style="font-size:11px;">(p=${_fmt(m.alpha_p_value, 4)})</span>` : '')],
-            ['Correlación', m.correlation == null ? '—' : _fmt(m.correlation)],
-            ['R²', m.r_squared_pct == null ? '—' : _fmt(m.r_squared_pct, 1) + '%'],
-            ['Information Ratio', m.information_ratio == null ? '—' : _signedFmt(m.information_ratio), _signedCls(m.information_ratio)],
-            ['Tracking error', m.tracking_error_pct == null ? '—' : _fmt(m.tracking_error_pct) + '%'],
-            ['Treynor', m.treynor_pct == null ? '— <span class="text-muted" style="font-size:11px;">(β muy bajo)</span>' : _signedFmt(m.treynor_pct) + '%'],
-            ['Up-capture', m.up_capture_pct == null ? '—' : _fmt(m.up_capture_pct, 1) + '%'],
-            ['Down-capture', m.down_capture_pct == null ? '—' : _fmt(m.down_capture_pct, 1) + '%'],
+            ['Beta', m.beta == null ? '—' : _fmt(m.beta), '', 'beta'],
+            ['Alfa anual', m.alpha_annual_pct == null ? '—' : _signedFmt(m.alpha_annual_pct) + '%', _signedCls(m.alpha_annual_pct), 'alfa_anual'],
+            ['t-stat alfa', m.alpha_t_stat == null ? '—' : _signedFmt(m.alpha_t_stat) + (m.alpha_p_value != null ? ` <span class="text-muted" style="font-size:11px;">(p=${_fmt(m.alpha_p_value, 4)})</span>` : ''), '', 'alpha_t_stat'],
+            ['Correlación', m.correlation == null ? '—' : _fmt(m.correlation), '', 'correlacion'],
+            ['R²', m.r_squared_pct == null ? '—' : _fmt(m.r_squared_pct, 1) + '%', '', 'r_squared'],
+            ['Information Ratio', m.information_ratio == null ? '—' : _signedFmt(m.information_ratio), _signedCls(m.information_ratio), 'information_ratio'],
+            ['Tracking error', m.tracking_error_pct == null ? '—' : _fmt(m.tracking_error_pct) + '%', '', 'tracking_error'],
+            ['Treynor', m.treynor_pct == null ? '— <span class="text-muted" style="font-size:11px;">(β muy bajo)</span>' : _signedFmt(m.treynor_pct) + '%', '', 'treynor'],
+            ['Up-capture', m.up_capture_pct == null ? '—' : _fmt(m.up_capture_pct, 1) + '%', '', 'up_capture'],
+            ['Down-capture', m.down_capture_pct == null ? '—' : _fmt(m.down_capture_pct, 1) + '%', '', 'down_capture'],
         ]},
     ];
     return groups.map(g => `
         <div style="margin:14px 0;">
             <h4 style="margin:0 0 8px; font-size:14px; color:var(--text-secondary);">${g.title}</h4>
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px;">
-                ${g.cells.map(([k, v, cls]) => `<div style="background:rgba(43, 40, 34, 0.03); border-radius:8px; padding:10px 12px;">
-                    <div style="color:var(--text-secondary); font-size:12px;">${k}</div>
+                ${g.cells.map(([k, v, cls, gk]) => `<div style="background:rgba(43, 40, 34, 0.03); border-radius:8px; padding:10px 12px;">
+                    <div style="color:var(--text-secondary); font-size:12px;">${k}${gk ? _gi(gk) : ''}</div>
                     <div class="mono ${cls || ''}" style="font-size:15px; margin-top:2px;">${v}</div>
                 </div>`).join('')}
             </div>
@@ -116,7 +124,7 @@ function _breakdownBars(bd) {
         const pct = Math.round(Math.abs(v) / maxAbs * 100);
         const c = v >= 0 ? 'var(--positive)' : 'var(--negative)';
         return `<div style="display:flex; align-items:center; gap:8px; margin:4px 0; font-size:13px;">
-            <span style="flex:0 0 170px; color:var(--text-secondary);">${_CRITERION_LABEL[k] || k}</span>
+            <span style="flex:0 0 170px; color:var(--text-secondary);">${_CRITERION_LABEL[k] || k}${_gi(_CRITERION_GLOSSARY_KEY[k])}</span>
             <span style="flex:1; background:rgba(43, 40, 34, 0.05); border-radius:4px; height:10px; position:relative;">
                 <span style="position:absolute; left:0; top:0; height:10px; width:${pct}%; background:${c}; border-radius:4px;"></span>
             </span>
@@ -147,7 +155,10 @@ function renderDeepAnalysis(d) {
     const isFund = (d.category || '').includes('fondo') || (d.category || '').includes('etf') || (d.category || '').includes('temático') || (d.category || '').includes('amplio');
     const je = `https://www.justetf.com/en/search.html?query=${encodeURIComponent(d.ticker)}`;
 
-    const chartImg = (url, title) => url ? `<div style="margin:14px 0;"><img src="${url}" alt="${title}" loading="lazy" style="width:100%; max-width:920px; border-radius:8px; display:block;"></div>` : '';
+    const chartImg = (url, title, gk) => url ? `<div style="margin:14px 0;">
+        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;">${title}${gk ? _gi(gk) : ''}</div>
+        <img src="${url}" alt="${title}" loading="lazy" style="width:100%; max-width:920px; border-radius:8px; display:block;">
+    </div>` : '';
 
     return `
     <h2 style="margin:0 0 4px;">🔬 ${d.name} <span class="text-muted" style="font-size:14px; font-weight:normal;">${d.ticker}</span></h2>
@@ -163,20 +174,20 @@ function renderDeepAnalysis(d) {
 
     <h3 style="margin-top:18px;">🧮 Cómo lo puntúa el motor cuantitativo</h3>
     <p class="text-muted" style="font-size:12px; margin:0 0 6px;">
-        Score momentum: <strong class="mono ${_signedCls((d.scores||{}).momentum_score)}">${_signedFmt((d.scores||{}).momentum_score)}</strong>
-        · Score valor: <strong class="mono ${_signedCls((d.scores||{}).value_score)}">${_signedFmt((d.scores||{}).value_score)}</strong>
-        · Afinidad con el "perfil ganador": ${(d.scores||{}).winner_affinity == null ? '—' : Math.round((d.scores.winner_affinity)*100)+'%'}
+        Score momentum${_gi('momentum_score')}: <strong class="mono ${_signedCls((d.scores||{}).momentum_score)}">${_signedFmt((d.scores||{}).momentum_score)}</strong>
+        · Score valor${_gi('value_score')}: <strong class="mono ${_signedCls((d.scores||{}).value_score)}">${_signedFmt((d.scores||{}).value_score)}</strong>
+        · Afinidad con el "perfil ganador"${_gi('winner_affinity')}: ${(d.scores||{}).winner_affinity == null ? '—' : Math.round((d.scores.winner_affinity)*100)+'%'}
         · Tesis dominante: <strong>${d.ensemble_thesis}</strong>
     </p>
     ${_breakdownBars(d.score_breakdown || {})}
 
     <h3 style="margin-top:22px;">📈 Gráficas</h3>
-    ${chartImg(charts.price_with_smas, 'Precio con SMA50 y SMA200')}
-    ${chartImg(charts.drawdown, 'Drawdown histórico')}
-    ${chartImg(charts.returns_histogram, 'Distribución de retornos diarios')}
-    ${chartImg(charts.rolling_volatility, 'Volatilidad rodante 60d')}
-    ${chartImg(charts.rolling_sharpe, 'Sharpe rodante 60d')}
-    ${chartImg(charts.relative_vs_benchmark, 'Rendimiento vs benchmark')}
+    ${chartImg(charts.price_with_smas, 'Precio con SMA50 y SMA200', 'chart_precio_sma')}
+    ${chartImg(charts.drawdown, 'Drawdown histórico', 'drawdown_historico')}
+    ${chartImg(charts.returns_histogram, 'Distribución de retornos diarios', 'distribucion_retornos')}
+    ${chartImg(charts.rolling_volatility, 'Volatilidad rodante 60d', 'chart_rolling_vol')}
+    ${chartImg(charts.rolling_sharpe, 'Sharpe rodante 60d', 'chart_rolling_sharpe')}
+    ${chartImg(charts.relative_vs_benchmark, 'Rendimiento vs benchmark', 'chart_relative_benchmark')}
 
     <h3 style="margin-top:18px;">📰 Noticias del activo (varias fuentes)</h3>
     ${_newsBlock(d.news, d.news_sentiment || {}, d.news_sources || [])}

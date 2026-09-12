@@ -95,12 +95,12 @@ function pmRenderReport(r) {
     const verdictColor = crit.passed ? 'var(--positive)' : 'var(--warning)';
     box.innerHTML = `
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:14px;">
-            <div><div class="text-muted" style="font-size:12px;">Resueltas / abiertas</div><div style="font-size:20px; font-weight:700;">${r.resolved} / ${r.open}</div></div>
-            <div><div class="text-muted" style="font-size:12px;">% de aciertos</div><div style="font-size:20px; font-weight:700;">${r.hit_rate_pct}%</div></div>
-            <div><div class="text-muted" style="font-size:12px;">Rentabilidad neta / apuesta</div><div style="font-size:20px; font-weight:700;">${pmFmtPct(r.mean_net_roi_per_bet_pct)}</div></div>
-            <div><div class="text-muted" style="font-size:12px;">P&amp;L acumulado (papel)</div><div style="font-size:20px; font-weight:700;">${r.total_pnl}€</div></div>
-            <div><div class="text-muted" style="font-size:12px;">Brier modelo vs mercado</div><div style="font-size:20px; font-weight:700;">${r.model_brier ?? '—'} / ${r.market_brier ?? '—'}</div></div>
-            <div><div class="text-muted" style="font-size:12px;">IC95 rentabilidad neta</div><div style="font-size:20px; font-weight:700;">${pmFmtPct(r.net_roi_ci95_low_pct)}</div></div>
+            <div><div class="text-muted" style="font-size:12px;">Resueltas / abiertas${infoIcon('resueltas_abiertas')}</div><div style="font-size:20px; font-weight:700;">${r.resolved} / ${r.open}</div></div>
+            <div><div class="text-muted" style="font-size:12px;">% de aciertos${infoIcon('hit_rate')}</div><div style="font-size:20px; font-weight:700;">${r.hit_rate_pct}%</div></div>
+            <div><div class="text-muted" style="font-size:12px;">Rentabilidad neta / apuesta${infoIcon('rentabilidad_neta_apuesta')}</div><div style="font-size:20px; font-weight:700;">${pmFmtPct(r.mean_net_roi_per_bet_pct)}</div></div>
+            <div><div class="text-muted" style="font-size:12px;">P&amp;L acumulado (papel)${infoIcon('pnl_acumulado_papel')}</div><div style="font-size:20px; font-weight:700;">${r.total_pnl}€</div></div>
+            <div><div class="text-muted" style="font-size:12px;">Brier modelo vs mercado${infoIcon('brier_score')}</div><div style="font-size:20px; font-weight:700;">${r.model_brier ?? '—'} / ${r.market_brier ?? '—'}</div></div>
+            <div><div class="text-muted" style="font-size:12px;">IC95 rentabilidad neta${infoIcon('ic95_roi')}</div><div style="font-size:20px; font-weight:700;">${pmFmtPct(r.net_roi_ci95_low_pct)}</div></div>
         </div>
         <div style="background:${verdictColor}22; border:1px solid ${verdictColor}55; border-radius:8px; padding:12px 16px;">
             <strong style="color:${verdictColor};">🚦 ${pmEsc(crit.verdict || (crit.passed ? 'APTO para piloto mínimo real' : 'NO apto todavía — sigue en papel'))}</strong>
