@@ -180,6 +180,21 @@ class MarketScanner:
             it["category"] = meta.get("cat", "")
             it["region"] = meta.get("region", "")
 
+        # Real yield for bonds (yield − breakeven inflation) so the ensemble can
+        # score fixed income on carry, not just price. One keyless FRED call.
+        try:
+            from app.services.market.fred import FREDClient
+            be = await FREDClient().get_latest("T10YIE")
+            breakeven = be.get("value") if be else None
+        except Exception as exc:
+            logger.debug("breakeven inflation fetch failed: {}", exc)
+            breakeven = None
+        if breakeven is not None:
+            for it in items:
+                b = it.get("bond")
+                if b and b.get("yield") is not None:
+                    b["real_yield"] = round(b["yield"] * 100 - breakeven, 2)
+
         from app.services.discovery.quant_score import score_universe
         score_universe(items)
         logger.info(

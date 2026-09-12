@@ -145,6 +145,8 @@ const CRITERION_LABEL = {
     crecimiento: 'Crecimiento (ventas/BPA)',
     valoracion_fund: 'Valoración (PER/PB, sector)',
     solidez: 'Solidez (deuda)',
+    // Renta fija
+    carry_bono: 'Carry real (yield−inflación, ajust. tipos)',
 };
 
 function assetLinks(op) {

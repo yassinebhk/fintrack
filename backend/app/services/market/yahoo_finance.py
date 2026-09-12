@@ -141,7 +141,9 @@ class YahooFinanceService:
             out: dict = {}
             y = info.get("yield")
             try:
-                if y is not None and 0.0 <= float(y) <= 0.30:  # sane distribution yield (0–30%)
+                # >0, not >=0: accumulating UCITS ETFs report 0.0 (they reinvest
+                # instead of distributing), which is missing data, not a real 0% carry.
+                if y is not None and 0.0 < float(y) <= 0.30:  # sane distribution yield
                     out["yield"] = float(y)
             except (TypeError, ValueError):
                 pass

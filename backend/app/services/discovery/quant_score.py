@@ -240,6 +240,58 @@ def _fundamental_factors(stocks: list[dict]) -> dict[str, dict]:
     }
 
 
+# --- Bond carry (FIXED INCOME) ----------------------------------------------
+# Reward real yield (yield − breakeven inflation) but RISK-ADJUSTED: penalize
+# carry that only exists because the fund takes a lot of rate risk (high 3y beta).
+# Blended modestly into the VALUE thesis for bonds. IMPORTANT: this does NOT
+# capture credit risk — a junk-bond ETF's high yield reflects default risk we
+# cannot measure here — so the tilt stays small and the raw numbers are shown.
+_BOND_BLEND = 0.30   # carry's share of a bond's value score (price = 0.70)
+_BOND_MIN = 3
+
+
+def _is_bond(it: dict) -> bool:
+    cat = str(it.get("category", "")).lower()
+    return "bono" in cat or "renta fija" in cat or "bond" in cat
+
+
+_BOND_EXCLUDE = ("high yield", "junk", "emerging")  # yield here = credit/EM risk we can't measure
+
+
+def _bond_carry(bonds: list[dict]) -> dict[str, float]:
+    """Risk-adjusted carry for INVESTMENT-GRADE / government bonds only:
+    z(real_yield) − 0.5·z(rate sensitivity).
+
+    Two deliberate exclusions keep this from becoming a risk-chasing signal:
+    - High-yield / junk / emerging-market categories are skipped entirely — their
+      extra yield is compensation for CREDIT/default risk, which we cannot measure
+      from this data, so ranking them on yield would just surface the riskiest.
+    - Bonds that don't expose their rate sensitivity are skipped — without it we
+      can't risk-adjust, and raw yield alone favours the longest-duration fund.
+    Skipped bonds fall back to price-only ranking (their raw yield is still shown
+    on the card for the user to judge)."""
+    scored = []
+    for b in bonds:
+        bm = b.get("bond") or {}
+        if bm.get("rate_sensitivity") is None:
+            continue
+        cat = str(bm.get("duration_bucket") or "").lower()
+        if any(x in cat for x in _BOND_EXCLUDE):
+            continue
+        scored.append(b)
+    if len(scored) < _BOND_MIN:
+        return {}
+    ry = [(b["bond"]).get("real_yield") for b in scored]
+    beta = [(b["bond"]).get("rate_sensitivity") for b in scored]
+    zry, zb = _zscore_opt(ry), _zscore_opt(beta)
+    out: dict[str, float] = {}
+    for i, b in enumerate(scored):
+        if zry[i] is None:
+            continue
+        out[b["ticker"]] = zry[i] - 0.5 * (zb[i] or 0.0)
+    return out
+
+
 def _tech_raw(sig: dict) -> float:
     """Compact technical confirmation score from the `ta` signals."""
     if not sig:
@@ -297,6 +349,7 @@ def score_universe(items: list[dict]) -> list[dict]:
     # Fundamental judges for the stocks that carry a `fundamentals` dict (blended
     # into the theses below; ETFs/funds/bonds/crypto are untouched — price-only).
     fundz = _fundamental_factors([it for it in valid if it.get("fundamentals") and _is_stock(it)])
+    bondz = _bond_carry([it for it in valid if _is_bond(it) and (it.get("bond") or {}).get("real_yield") is not None])
 
     for i, it in enumerate(valid):
         price_mom = {
@@ -328,6 +381,14 @@ def score_universe(items: list[dict]) -> list[dict]:
             it["fundamental_score"] = round(
                 mom_parts["calidad_fund"] + mom_parts["crecimiento"]
                 + val_parts["valoracion_fund"] + val_parts["solidez"], 3)
+        elif it["ticker"] in bondz:
+            # Bonds: momentum unchanged; VALUE gets a modest risk-adjusted carry tilt.
+            cz = bondz[it["ticker"]]
+            pw = 1.0 - _BOND_BLEND
+            mom_parts = price_mom
+            val_parts = {k: v * pw for k, v in price_val.items()}
+            val_parts["carry_bono"] = round(_BOND_BLEND * cz, 3)
+            it["bond_carry_score"] = round(_BOND_BLEND * cz, 3)
         else:
             mom_parts, val_parts = price_mom, price_val
 
