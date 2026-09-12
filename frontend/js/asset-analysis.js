@@ -21,6 +21,7 @@ function initAssetAnalysis() {
     loadAssetQuickCards();
     loadBenchmarkChart();
     loadRiskAndCorrelation();
+    loadAdvancedAnalytics();
 }
 
 /**
@@ -632,6 +633,7 @@ async function loadRiskAndCorrelation() {
         const data = await resp.json();
         renderRiskDistribution(data.risk_distribution || {});
         renderCorrelationMatrix(data.correlation || {});
+        renderRiskReturnScatter(data.risk_by_ticker || {}, data.return_by_ticker || {}, data.weight_by_ticker || {});
     } catch (err) {
         console.error('risk/correlation load failed:', err);
     }
@@ -683,6 +685,190 @@ function renderCorrelationMatrix(correlation) {
     }
     html += '</tbody></table></div>';
     container.innerHTML = html;
+}
+
+// ============ Analítica avanzada (gráficos de nivel profesional) ============
+const _advCharts = {};
+const ADV = { blue: '#2C4A6E', green: '#16a34a', red: '#dc2626', ink: '#2b2822', grid: 'rgba(43,40,34,0.08)', muted: '#6b6560' };
+
+function _destroyAdv(id) {
+    if (_advCharts[id]) { try { _advCharts[id].destroy(); } catch (e) {} delete _advCharts[id]; }
+}
+
+function _noData(canvasId, msg) {
+    const c = document.getElementById(canvasId);
+    if (!c) return;
+    _destroyAdv(canvasId);
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = ADV.muted; ctx.font = '12px Outfit, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(msg, (c.width || 200) / 2, (c.height || 80) / 2);
+}
+
+function _dailyReturns(history) {
+    const vals = (history || []).map(h => h.value).filter(v => v > 0);
+    const rets = [];
+    for (let i = 1; i < vals.length; i++) rets.push((vals[i] - vals[i - 1]) / vals[i - 1]);
+    return rets;
+}
+
+async function loadAdvancedAnalytics() {
+    let history = [];
+    try {
+        const r = await fetch(`${ASSET_API}/portfolio/history?days=365`);
+        if (r.ok) history = (await r.json()).history || [];
+    } catch (e) { /* silent: charts show their own "sin datos" state */ }
+    renderUnderwater(history);
+    renderMonthlyHeatmap(history);
+    renderReturnDistribution(history);
+    renderRollingChart(history);
+}
+
+function renderUnderwater(history) {
+    if (!history || history.length < 3) return _noData('underwaterChart', 'Necesita más histórico de cartera.');
+    let peak = -Infinity; const labels = [], dd = [];
+    for (const h of history) {
+        if (h.value == null) continue;
+        peak = Math.max(peak, h.value);
+        labels.push(h.date);
+        dd.push(peak > 0 ? (h.value - peak) / peak * 100 : 0);
+    }
+    _destroyAdv('underwaterChart');
+    _advCharts['underwaterChart'] = new Chart(document.getElementById('underwaterChart').getContext('2d'), {
+        type: 'line',
+        data: { labels, datasets: [{ data: dd, borderColor: ADV.red, backgroundColor: 'rgba(220,38,38,0.15)', fill: true, pointRadius: 0, borderWidth: 1.5, tension: 0.1 }] },
+        options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `Drawdown: ${c.parsed.y.toFixed(2)}%` } } },
+            scales: {
+                x: { ticks: { maxTicksLimit: 6, color: ADV.muted }, grid: { display: false } },
+                y: { max: 0, ticks: { color: ADV.muted, callback: v => v + '%' }, grid: { color: ADV.grid } },
+            },
+        },
+    });
+}
+
+function renderRiskReturnScatter(riskByTicker, returnByTicker, weightByTicker) {
+    const el = document.getElementById('riskReturnChart');
+    if (!el) return;
+    const tickers = Object.keys(riskByTicker || {}).filter(t => returnByTicker && returnByTicker[t] != null);
+    if (!tickers.length) return _noData('riskReturnChart', 'Necesita histórico de posiciones.');
+    const nameOf = (t) => { const info = ASSET_DISPLAY_NAMES[t?.toUpperCase()]; return info ? (info.short || info.name) : t; };
+    const maxW = Math.max(...tickers.map(t => (weightByTicker && weightByTicker[t]) || 1), 1);
+    const points = tickers.map(t => ({
+        x: riskByTicker[t], y: returnByTicker[t],
+        r: 5 + 14 * Math.sqrt(((weightByTicker && weightByTicker[t]) || 1) / maxW),
+        _t: nameOf(t),
+    }));
+    const colors = points.map(p => p.y >= 0 ? 'rgba(22,163,74,0.55)' : 'rgba(220,38,38,0.55)');
+    _destroyAdv('riskReturnChart');
+    _advCharts['riskReturnChart'] = new Chart(el.getContext('2d'), {
+        type: 'bubble',
+        data: { datasets: [{ data: points, backgroundColor: colors, borderColor: ADV.blue, borderWidth: 1 }] },
+        options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.raw._t}: vol ${c.raw.x.toFixed(0)}% · ret ${c.raw.y >= 0 ? '+' : ''}${c.raw.y.toFixed(1)}%` } } },
+            scales: {
+                x: { title: { display: true, text: 'Volatilidad anualizada (%)', color: ADV.muted }, ticks: { color: ADV.muted }, grid: { color: ADV.grid } },
+                y: { title: { display: true, text: 'Retorno 3m (%)', color: ADV.muted }, ticks: { color: ADV.muted, callback: v => v + '%' }, grid: { color: ADV.grid } },
+            },
+        },
+    });
+}
+
+function renderMonthlyHeatmap(history) {
+    const el = document.getElementById('monthlyHeatmap');
+    if (!el) return;
+    const byMonth = {};
+    for (const h of (history || [])) { if (h.value != null) byMonth[h.date.slice(0, 7)] = h.value; }
+    const months = Object.keys(byMonth).sort();
+    if (months.length < 2) { el.innerHTML = '<p class="text-muted">Necesita al menos 2 meses de histórico.</p>'; return; }
+    const ret = {};
+    for (let i = 1; i < months.length; i++) {
+        const prev = byMonth[months[i - 1]], cur = byMonth[months[i]];
+        if (prev > 0) ret[months[i]] = (cur - prev) / prev * 100;
+    }
+    const years = [...new Set(months.map(m => m.slice(0, 4)))].sort();
+    const MN = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const color = (v) => v == null ? 'transparent'
+        : v >= 0 ? `rgba(22,163,74,${Math.min(Math.abs(v) / 8, 1) * 0.7 + 0.05})`
+                 : `rgba(220,38,38,${Math.min(Math.abs(v) / 8, 1) * 0.7 + 0.05})`;
+    let html = '<div style="overflow-x:auto"><table class="mheat"><thead><tr><th></th>' + MN.map(m => `<th>${m}</th>`).join('') + '</tr></thead><tbody>';
+    for (const y of years) {
+        html += `<tr><th>${y}</th>`;
+        for (let m = 1; m <= 12; m++) {
+            const key = `${y}-${String(m).padStart(2, '0')}`;
+            const v = ret[key];
+            html += `<td style="background:${color(v)}" title="${key}">${v == null ? '' : (v >= 0 ? '+' : '') + v.toFixed(1)}</td>`;
+        }
+        html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+}
+
+function renderReturnDistribution(history) {
+    const rets = _dailyReturns(history).map(r => r * 100);
+    if (rets.length < 10) return _noData('returnDistChart', 'Necesita más histórico diario.');
+    const sorted = [...rets].sort((a, b) => a - b);
+    const var95 = sorted[Math.floor(0.05 * sorted.length)];
+    const min = Math.min(...rets), max = Math.max(...rets);
+    const bins = 21, width = (max - min) / bins || 1;
+    const counts = new Array(bins).fill(0);
+    for (const r of rets) counts[Math.min(bins - 1, Math.floor((r - min) / width))]++;
+    const labels = counts.map((_, i) => (min + (i + 0.5) * width).toFixed(1));
+    const colors = counts.map((_, i) => (min + (i + 0.5) * width) < var95 ? 'rgba(220,38,38,0.75)' : ADV.blue);
+    _destroyAdv('returnDistChart');
+    _advCharts['returnDistChart'] = new Chart(document.getElementById('returnDistChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels, datasets: [{ data: counts, backgroundColor: colors, borderWidth: 0, barPercentage: 1, categoryPercentage: 1 }] },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { title: items => `Retorno diario ~${items[0].label}%`, label: c => `${c.parsed.y} días` } },
+                subtitle: { display: true, text: `VaR 95% diario: ${var95.toFixed(2)}%`, color: ADV.red, font: { size: 12, weight: 'bold' } },
+            },
+            scales: {
+                x: { ticks: { maxTicksLimit: 7, color: ADV.muted, callback: function (v) { return this.getLabelForValue(v) + '%'; } }, grid: { display: false } },
+                y: { ticks: { color: ADV.muted }, grid: { color: ADV.grid } },
+            },
+        },
+    });
+}
+
+function renderRollingChart(history) {
+    const rets = _dailyReturns(history);
+    const W = 30;
+    if (rets.length < W + 5) return _noData('rollingChart', 'Necesita 35+ días de histórico.');
+    const labels = [], vol = [], sharpe = [];
+    for (let i = W; i <= rets.length; i++) {
+        const win = rets.slice(i - W, i);
+        const mean = win.reduce((a, b) => a + b, 0) / W;
+        const sd = Math.sqrt(win.reduce((a, b) => a + (b - mean) ** 2, 0) / W);
+        labels.push((history[i] && history[i].date) || '');
+        vol.push(sd * Math.sqrt(252) * 100);
+        sharpe.push(sd > 0 ? (mean / sd) * Math.sqrt(252) : 0);
+    }
+    _destroyAdv('rollingChart');
+    _advCharts['rollingChart'] = new Chart(document.getElementById('rollingChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels, datasets: [
+                { label: 'Volatilidad anual (%)', data: vol, borderColor: ADV.red, backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, yAxisID: 'y', tension: 0.15 },
+                { label: 'Sharpe (30d)', data: sharpe, borderColor: ADV.blue, backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, yAxisID: 'y1', tension: 0.15 },
+            ],
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true, labels: { color: ADV.muted, boxWidth: 12, font: { size: 11 } } } },
+            scales: {
+                x: { ticks: { maxTicksLimit: 6, color: ADV.muted }, grid: { display: false } },
+                y: { position: 'left', ticks: { color: ADV.red, callback: v => v + '%' }, grid: { color: ADV.grid }, title: { display: true, text: 'Vol', color: ADV.red } },
+                y1: { position: 'right', ticks: { color: ADV.blue }, grid: { display: false }, title: { display: true, text: 'Sharpe', color: ADV.blue } },
+            },
+        },
+    });
 }
 
 // Initialize when DOM is ready

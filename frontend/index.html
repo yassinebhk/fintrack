@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260912spark">
+    <link rel="stylesheet" href="css/styles.css?v=20260912adv">
 </head>
 <body>
     <div id="loginGate" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:24px;">
@@ -455,6 +455,39 @@
                             <h4>Correlación de Activos</h4>
                             <div class="correlation-matrix" id="correlationMatrix">
                                 <p class="text-muted">Matriz de correlación basada en rendimientos históricos</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Analítica avanzada: los gráficos que miran los profesionales -->
+                    <section class="advanced-analytics" style="margin-top: var(--spacing-lg);">
+                        <h3 style="margin:8px 0 4px;">📐 Analítica avanzada</h3>
+                        <p class="text-muted" style="font-size:13px; margin:0 0 12px;">Los gráficos que miran los profesionales para juzgar riesgo y consistencia. Se calculan con el histórico real de tu cartera.</p>
+                        <div class="advanced-grid">
+                            <div class="card">
+                                <h4>🌊 Underwater — caída desde máximos</h4>
+                                <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">Cuánto está tu cartera por debajo de su mejor momento, en cada fecha. Cuanto más profundo y más tiempo bajo el agua, peor.</p>
+                                <div class="chart-container-sm"><canvas id="underwaterChart"></canvas></div>
+                            </div>
+                            <div class="card">
+                                <h4>🎯 Riesgo / Retorno (3 meses)</h4>
+                                <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">Cada activo: volatilidad (X) vs retorno (Y). Arriba-izquierda es lo ideal (gana mucho, oscila poco); abajo-derecha, lo peor. El tamaño del punto = su peso en cartera.</p>
+                                <div class="chart-container-sm"><canvas id="riskReturnChart"></canvas></div>
+                            </div>
+                            <div class="card">
+                                <h4>📅 Retornos mensuales</h4>
+                                <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">El rendimiento de cada mes, en verde/rojo, para ver estacionalidad y rachas de un vistazo.</p>
+                                <div id="monthlyHeatmap"><p class="text-muted">Necesita varios meses de histórico para mostrarse.</p></div>
+                            </div>
+                            <div class="card">
+                                <h4>📊 Distribución de retornos diarios</h4>
+                                <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">La "forma" de tu riesgo: con qué frecuencia ganas o pierdes cada día, con el VaR 95% marcado (la pérdida diaria que solo se supera 1 de cada 20 días).</p>
+                                <div class="chart-container-sm"><canvas id="returnDistChart"></canvas></div>
+                            </div>
+                            <div class="card">
+                                <h4>📈 Volatilidad y Sharpe móviles (30d)</h4>
+                                <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">Cómo evolucionan tu riesgo (volatilidad) y tu retorno ajustado al riesgo (Sharpe) en ventanas de 30 días.</p>
+                                <div class="chart-container-sm"><canvas id="rollingChart"></canvas></div>
                             </div>
                         </div>
                     </section>
@@ -1826,7 +1859,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/news.js?v=20260530a"></script>
     <script src="js/portfolio-manager.js?v=20260825a"></script>
     <script src="js/ai-advisor.js?v=20260530a"></script>
-    <script src="js/asset-analysis.js?v=20260912blue"></script>
+    <script src="js/asset-analysis.js?v=20260912adv"></script>
     <script src="js/backtest.js?v=20260912blue"></script>
     <script src="js/opportunities.js?v=20260911d"></script>
     <script src="js/asset-deep-analysis.js?v=20260911d"></script>

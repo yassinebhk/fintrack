@@ -3693,3 +3693,18 @@ button.action-card {
     margin-top: 6px;
     color: var(--text-secondary);
 }
+
+/* --- Analítica avanzada (gráficos de nivel profesional) --- */
+.advanced-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing-md);
+}
+.advanced-grid .card { margin: 0; }
+.advanced-grid .chart-container-sm { position: relative; height: 240px; }
+@media (max-width: 900px) {
+    .advanced-grid { grid-template-columns: 1fr; }
+}
+.mheat { border-collapse: separate; border-spacing: 3px; width: 100%; font-size: 11px; }
+.mheat th { padding: 2px 4px; color: var(--text-secondary); font-weight: 500; text-align: center; }
+.mheat td { padding: 5px 4px; text-align: center; border-radius: 4px; font-variant-numeric: tabular-nums; color: #2b2822; }

@@ -442,6 +442,7 @@ class PortfolioService:
         weight_map = {p["ticker"]: p.get("weight") or 0.0 for p in positions}
         risk_weights = {"low": 0.0, "medium": 0.0, "high": 0.0}
         risk_by_ticker: dict[str, float] = {}
+        return_by_ticker: dict[str, float] = {}  # 3-month %, SAME window as the vol
         for ticker, series in closes.items():
             vals = np.array([v for _, v in sorted(series.items())], dtype=float)
             if len(vals) < 10:
@@ -449,6 +450,7 @@ class PortfolioService:
             rets = np.diff(vals) / vals[:-1]
             ann_vol = float(np.std(rets) * np.sqrt(252) * 100)
             risk_by_ticker[ticker] = round(ann_vol, 1)
+            return_by_ticker[ticker] = round(float((vals[-1] - vals[0]) / vals[0] * 100), 1) if vals[0] else 0.0
             bucket = "low" if ann_vol < 20 else "medium" if ann_vol < 50 else "high"
             risk_weights[bucket] += weight_map.get(ticker, 0.0)
 
@@ -475,6 +477,8 @@ class PortfolioService:
         data = {
             "risk_distribution": risk_distribution,
             "risk_by_ticker": risk_by_ticker,
+            "return_by_ticker": return_by_ticker,   # 3m %, for the risk/return scatter
+            "weight_by_ticker": {t: round(weight_map.get(t, 0.0), 2) for t in risk_by_ticker},
             "correlation": {"tickers": tickers, "matrix": matrix},
         }
         self._risk_cache = {"data": data, "expiry": datetime.now(timezone.utc) + timedelta(hours=1)}
