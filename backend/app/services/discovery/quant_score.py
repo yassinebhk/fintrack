@@ -270,19 +270,22 @@ def _bond_carry(bonds: list[dict]) -> dict[str, float]:
       can't risk-adjust, and raw yield alone favours the longest-duration fund.
     Skipped bonds fall back to price-only ranking (their raw yield is still shown
     on the card for the user to judge)."""
+    # NB: at scoring time the bond dict still holds the RAW yfinance keys
+    # (`beta3Year`, `category`); the enrichment step later renames them to
+    # `rate_sensitivity` / `duration_bucket` for the UI.
     scored = []
     for b in bonds:
         bm = b.get("bond") or {}
-        if bm.get("rate_sensitivity") is None:
+        if bm.get("beta3Year") is None:
             continue
-        cat = str(bm.get("duration_bucket") or "").lower()
+        cat = str(bm.get("category") or "").lower()
         if any(x in cat for x in _BOND_EXCLUDE):
             continue
         scored.append(b)
     if len(scored) < _BOND_MIN:
         return {}
     ry = [(b["bond"]).get("real_yield") for b in scored]
-    beta = [(b["bond"]).get("rate_sensitivity") for b in scored]
+    beta = [(b["bond"]).get("beta3Year") for b in scored]
     zry, zb = _zscore_opt(ry), _zscore_opt(beta)
     out: dict[str, float] = {}
     for i, b in enumerate(scored):
