@@ -23,7 +23,7 @@ on:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/setup-python@v5
         with:
@@ -127,10 +127,23 @@ jobs:
                       print(f"    invidious {base[8:26]}: {type(exc).__name__}")
               return None
 
-          # 1) Ask backend which videos still need a transcript.
-          r = httpx.get(f"{API}/creators/pending-transcripts", params={"secret": SECRET}, timeout=30)
-          r.raise_for_status()
-          pending = r.json().get("pending", [])
+          # 1) Ask backend which videos still need a transcript. Retried: a
+          # 502 here almost always just means the backend was mid-redeploy
+          # (a few seconds of downtime while uvicorn restarts) — not worth
+          # failing the whole job over, since it clears up fast.
+          import time
+          pending = None
+          for attempt in range(4):
+              try:
+                  r = httpx.get(f"{API}/creators/pending-transcripts", params={"secret": SECRET}, timeout=30)
+                  r.raise_for_status()
+                  pending = r.json().get("pending", [])
+                  break
+              except (httpx.HTTPStatusError, httpx.TransportError) as exc:
+                  print(f"pending-transcripts attempt {attempt + 1}/4 failed: {type(exc).__name__}: {exc}")
+                  if attempt == 3:
+                      raise
+                  time.sleep(15)
           print(f"::group::Pending ({len(pending)})")
           for p in pending:
               print(f"  · {p['creator_name']}: {p['title'][:60]} ({p['video_id']})")
@@ -146,18 +159,27 @@ jobs:
                   fail += 1
                   continue
               text = text[:18000]
-              r = httpx.post(
-                  f"{API}/creators/ingest-transcript",
-                  params={"secret": SECRET},
-                  json={"channel_id": p["channel_id"], "video_id": p["video_id"],
-                        "transcript": text, "title": p["title"], "url": p["url"], "deliver": True},
-                  timeout=120,
-              )
-              if r.status_code == 200 and r.json().get("status") == "ok":
-                  print(f"  ✅ {r.json().get('summary_chars')} chars summarized & delivered")
-                  ok += 1
-              else:
-                  print(f"  ❌ ingest failed: {r.status_code} {r.text[:200]}")
+              # Gemini summarization + Telegram delivery happen synchronously
+              # server-side, which can occasionally run long — a slow response
+              # here is not worth crashing the whole job over (the next
+              # scheduled run will just retry this same video since the
+              # backend never got a chance to mark it ingested).
+              try:
+                  r = httpx.post(
+                      f"{API}/creators/ingest-transcript",
+                      params={"secret": SECRET},
+                      json={"channel_id": p["channel_id"], "video_id": p["video_id"],
+                            "transcript": text, "title": p["title"], "url": p["url"], "deliver": True},
+                      timeout=170,
+                  )
+                  if r.status_code == 200 and r.json().get("status") == "ok":
+                      print(f"  ✅ {r.json().get('summary_chars')} chars summarized & delivered")
+                      ok += 1
+                  else:
+                      print(f"  ❌ ingest failed: {r.status_code} {r.text[:200]}")
+                      fail += 1
+              except httpx.TransportError as exc:
+                  print(f"  ❌ ingest request failed: {type(exc).__name__}: {exc}")
                   fail += 1
 
           print(f"\nDone: {ok} ok, {fail} failed.")
