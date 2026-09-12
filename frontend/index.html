@@ -844,13 +844,13 @@
                     <div class="manager-actions">
                         <button type="button" class="action-card" onclick="showMovementModal()" style="border:1px solid var(--accent-primary);">
                             <span class="action-icon">💶</span>
-                            <h4>Registrar movimiento</h4>
-                            <p>Aporté / retiré dinero en mi broker (€ + fecha)</p>
+                            <h4>Añadir / mover activo <span style="font-size:11px;color:var(--accent-primary);">· recomendado</span></h4>
+                            <p>Solo ticker + € — detecto tipo, nombre y precio automáticamente</p>
                         </button>
                         <button type="button" class="action-card" onclick="showAddPositionModal()">
                             <span class="action-icon">➕</span>
-                            <h4>Añadir Posición</h4>
-                            <p>Añade una posición manualmente (participaciones)</p>
+                            <h4>Añadir con detalle</h4>
+                            <p>Introduce participaciones y precio de compra a mano</p>
                         </button>
                         <button type="button" class="action-card" onclick="showImportPdfModal()">
                             <span class="action-icon">📄</span>
@@ -891,21 +891,22 @@
                                 </div>
                             </div>
                             <div id="mvNewFields" style="display:none;">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>Ticker o ISIN *</label>
-                                        <input type="text" id="mvTicker" placeholder="Ej. ICLN, IE00B1XNHC34">
-                                        <small class="text-muted">Mejor el ISIN (encuentro el mercado/divisa correctos)</small>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Tipo *</label>
-                                        <select id="mvType">
-                                            <option value="etf">ETF</option>
-                                            <option value="fund">Fondo</option>
-                                            <option value="stock">Acción</option>
-                                            <option value="crypto">Cripto</option>
-                                        </select>
-                                    </div>
+                                <div class="form-group">
+                                    <label>Ticker o ISIN *</label>
+                                    <input type="text" id="mvTicker" placeholder="Ej. AAPL, ICLN, IE00B1XNHC34" oninput="onMvTickerInput()" autocomplete="off">
+                                    <small class="text-muted">Escribe el símbolo o ISIN — detecto el nombre, tipo y precio automáticamente</small>
+                                    <div id="mvResolvePreview" style="margin-top:6px;font-size:13px;"></div>
+                                </div>
+                                <!-- Tipo: normalmente auto-detectado; solo se muestra si no lo reconozco -->
+                                <div class="form-group" id="mvTypeGroup" style="display:none;">
+                                    <label>Tipo *</label>
+                                    <select id="mvType">
+                                        <option value="etf">ETF</option>
+                                        <option value="fund">Fondo</option>
+                                        <option value="stock">Acción</option>
+                                        <option value="crypto">Cripto</option>
+                                    </select>
+                                    <small class="text-muted">No pude detectarlo — elígelo tú</small>
                                 </div>
                                 <div class="form-group">
                                     <label>Broker *</label>
@@ -1911,7 +1912,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260912blue"></script>
     <script src="js/news.js?v=20260530a"></script>
-    <script src="js/portfolio-manager.js?v=20260825a"></script>
+    <script src="js/portfolio-manager.js?v=20260912simplify"></script>
     <script src="js/ai-advisor.js?v=20260530a"></script>
     <script src="js/asset-analysis.js?v=20260912axes"></script>
     <script src="js/backtest.js?v=20260912info"></script>

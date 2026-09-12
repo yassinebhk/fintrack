@@ -57,6 +57,71 @@ class YahooFinanceService:
             logger.debug("ticker mapping DB lookup failed for {}: {}", ticker, exc)
         return HARDCODED_FALLBACK.get(ticker, ticker)
 
+    # Yahoo `quoteType` -> our internal asset_type vocabulary.
+    _QUOTE_TYPE_MAP = {
+        "EQUITY": "stock",
+        "ETF": "etf",
+        "MUTUALFUND": "fund",
+        "CRYPTOCURRENCY": "crypto",
+    }
+
+    async def resolve_asset(self, query: str) -> dict | None:
+        """Resolve a ticker OR ISIN to its identity so the user doesn't have to
+        type the asset type/name themselves. Uses Yahoo's search endpoint (fast,
+        handles ISIN->ticker) to get the symbol, name and quoteType, then maps the
+        quoteType to our vocabulary. Returns None if nothing plausible is found.
+
+        Result: {symbol, name, asset_type, currency, quote_type}. Crypto symbols
+        are normalised to the bare base (BTC-USD -> BTC) so CoinGecko pricing works.
+        """
+        q = (query or "").strip()
+        if not q:
+            return None
+        key = f"resolve:{q.upper()}"
+        if self._fresh(key):
+            return self._cache.get(key)
+
+        url = f"{self.BASE_URL}/v1/finance/search"
+        params = {"q": q, "quotesCount": 5, "newsCount": 0}
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(url, headers=YAHOO_HEADERS, params=params)
+                if resp.status_code != 200:
+                    logger.warning("yahoo search {} -> HTTP {}", q, resp.status_code)
+                    return None
+                quotes = resp.json().get("quotes", []) or []
+        except Exception as exc:
+            logger.warning("yahoo search error for {}: {}", q, exc)
+            return None
+
+        # Prefer the first quote whose quoteType we understand (skips indices,
+        # futures, currencies). Falls back to the first quote overall.
+        chosen = next(
+            (x for x in quotes if x.get("quoteType") in self._QUOTE_TYPE_MAP),
+            quotes[0] if quotes else None,
+        )
+        if not chosen or not chosen.get("symbol"):
+            return None
+
+        quote_type = chosen.get("quoteType", "")
+        asset_type = self._QUOTE_TYPE_MAP.get(quote_type, "stock")
+        symbol = chosen["symbol"].strip().upper()
+        if asset_type == "crypto":
+            # BTC-USD / BTC-EUR -> BTC (CoinGecko wants the bare symbol)
+            symbol = symbol.split("-")[0]
+        name = chosen.get("shortname") or chosen.get("longname") or symbol
+
+        result = {
+            "symbol": symbol,
+            "name": name,
+            "asset_type": asset_type,
+            "quote_type": quote_type,
+            "currency": chosen.get("currency") or "",
+        }
+        self._cache[key] = result
+        self._expiry[key] = datetime.now() + self._ttl
+        return result
+
     FUNDAMENTAL_FIELDS = (
         "trailingPE", "forwardPE", "priceToBook", "pegRatio",
         "returnOnEquity", "returnOnAssets", "operatingMargins", "profitMargins",

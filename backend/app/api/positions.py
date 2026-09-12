@@ -105,12 +105,70 @@ async def contribute(
     }
 
 
+_TYPE_LABELS_ES = {
+    "stock": "Acción",
+    "etf": "ETF",
+    "fund": "Fondo",
+    "crypto": "Cripto",
+}
+
+
+@router.get("/resolve")
+async def resolve_asset(
+    query: str,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Look up a ticker OR ISIN and return everything we can auto-derive so the
+    user only has to type the symbol + amount when adding a new asset. Powers the
+    live preview in the "Registrar movimiento" modal."""
+    q = (query or "").strip()
+    if not q:
+        return {"ok": False, "detail": "Escribe un ticker o ISIN"}
+
+    resolved = await _yahoo.resolve_asset(q)
+    if not resolved:
+        return {"ok": False, "detail": f"No encontré ningún activo para «{q}»"}
+
+    symbol = resolved["symbol"]
+    asset_type = resolved["asset_type"]
+
+    # Fetch price WITH its currency so the preview labels it honestly (crypto is
+    # priced in EUR via CoinGecko; stocks/ETFs come back in their native currency).
+    price = None
+    currency = ""
+    if asset_type == "crypto":
+        p = await _coingecko.get_price(symbol, vs_currency="eur")
+        if p is not None:
+            price, currency = p.get("price"), "EUR"
+        else:
+            p = await _yahoo.get_price(f"{symbol}-EUR")
+            if p:
+                price, currency = p.get("price"), "EUR"
+    else:
+        p = await _yahoo.get_price(symbol)
+        if p:
+            price, currency = p.get("price"), (p.get("currency") or "")
+
+    return {
+        "ok": True,
+        "query": q,
+        "symbol": symbol,
+        "name": resolved["name"],
+        "asset_type": asset_type,
+        "type_label": _TYPE_LABELS_ES.get(asset_type, asset_type),
+        "currency": currency,
+        "isin": q.upper() if len(q) == 12 and q[:2].isalpha() else None,
+        "price": round(price, 4) if price else None,
+        "price_ok": bool(price and price > 0),
+    }
+
+
 class MovementIn(BaseModel):
     action: str = Field(description="'aportar' o 'retirar'")
     ticker: str = Field(min_length=1, max_length=32)
     broker: str
     eur_amount: float = Field(gt=0, description="Euros aportados/retirados")
-    asset_type: str | None = Field(default=None, description="stock|etf|fund|crypto (requerido si el activo es nuevo)")
+    asset_type: str | None = Field(default=None, description="stock|etf|fund|crypto (auto-detectado si se omite)")
     isin: str | None = None
     asset_name: str | None = None
     executed_at: str | None = Field(default=None, description="YYYY-MM-DD; por defecto hoy")
@@ -148,7 +206,28 @@ async def register_movement(
     existing = await repo.get(ticker, payload.broker)
 
     if action == "aportar":
-        asset_type = (existing.type if existing else payload.asset_type) or "stock"
+        asset_type = existing.type if existing else payload.asset_type
+        asset_name = payload.asset_name
+        isin = payload.isin
+
+        # New asset: auto-derive type/name (and resolve ISIN->ticker) from Yahoo so
+        # the user only has to enter the symbol + amount. Only reach out when we're
+        # missing what we need (no type, or the input looks like an ISIN).
+        if not existing and (not asset_type or (len(ticker) == 12 and ticker[:2].isalpha())):
+            resolved = await _yahoo.resolve_asset(ticker)
+            if resolved:
+                if len(ticker) == 12 and ticker[:2].isalpha():
+                    isin = isin or ticker  # keep the ISIN the user typed
+                    ticker = resolved["symbol"]  # store the real market ticker
+                asset_type = asset_type or resolved["asset_type"]
+                asset_name = asset_name or resolved["name"]
+            elif not asset_type:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No pude identificar «{ticker}». Revisa el ticker/ISIN o indica el tipo de activo.",
+                )
+
+        asset_type = asset_type or "stock"
         price = await _current_price(ticker, asset_type)
         if not price or price <= 0:
             raise HTTPException(
@@ -164,12 +243,10 @@ async def register_movement(
             existing.avg_price = (old_cost + payload.eur_amount) / existing.quantity
             new_qty = existing.quantity
         else:
-            if not payload.asset_type:
-                raise HTTPException(status_code=400, detail="Es un activo nuevo: indica asset_type (stock/etf/fund/crypto)")
             await repo.upsert(
                 ticker=ticker, quantity=shares_added, avg_price=price,
-                type=payload.asset_type, currency="EUR", broker=payload.broker,
-                isin=payload.isin, asset_name=payload.asset_name, source="manual_movement",
+                type=asset_type, currency="EUR", broker=payload.broker,
+                isin=isin, asset_name=asset_name, source="manual_movement",
             )
             new_qty = shares_added
 
