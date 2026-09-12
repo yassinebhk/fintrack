@@ -287,6 +287,7 @@ class OpportunityService:
 
         market_regime = next((t.get("market_regime") for t in themes if t.get("market_regime")), "neutral")
         market_breadth = next((t.get("market_breadth") for t in themes if t.get("market_breadth") is not None), None)
+        risk_climate = self._risk_climate(market_breadth, rates_context)
 
         # Self-training feedback: the engine's own out-of-sample track record (gated —
         # see scorecard.py — so a small/short sample is never used as if it were a
@@ -372,6 +373,7 @@ class OpportunityService:
             "market_regime": market_regime,
             "market_breadth": market_breadth,
             "rates_context": rates_context,
+            "risk_climate": risk_climate,
             "trends": trends,
             "market_summary": market_summary,
             "opportunities": opportunities,
@@ -406,14 +408,37 @@ class OpportunityService:
 
             ten, two = await val("DGS10"), await val("DGS2")
             real, be = await val("DFII10"), await val("T10YIE")
+            vix = await val("VIXCLS")
             return {
                 "nominal_10y": ten, "real_10y": real, "breakeven_inflation": be,
-                "two_y": two,
+                "two_y": two, "vix": vix,
                 "curve_10y_2y": round(ten - two, 2) if (ten is not None and two is not None) else None,
             }
         except Exception as exc:
             logger.warning("rates context fetch failed: {}", exc)
             return {}
+
+    @staticmethod
+    def _risk_climate(breadth: float | None, rates: dict | None) -> dict:
+        """Composite risk-on/off climate — beyond the breadth-only regime — from
+        market breadth + VIX + the 10Y-2Y curve. Each stress signal counts once;
+        it's context for the user, not a change to the (validated) scoring tilt."""
+        rates = rates or {}
+        vix, curve = rates.get("vix"), rates.get("curve_10y_2y")
+        score, reasons = 0, []
+        if vix is not None and vix >= 25:
+            score += 1; reasons.append(f"VIX alto ({vix:.0f})")
+        elif vix is not None and vix < 15:
+            score -= 1; reasons.append(f"VIX bajo ({vix:.0f})")
+        if curve is not None and curve < 0:
+            score += 1; reasons.append(f"curva invertida ({curve:+.2f})")
+        if breadth is not None and breadth < 0.45:
+            score += 1; reasons.append(f"amplitud débil ({breadth * 100:.0f}%)")
+        elif breadth is not None and breadth > 0.60:
+            score -= 1; reasons.append(f"amplitud fuerte ({breadth * 100:.0f}%)")
+        label = "risk-off" if score >= 2 else "cauto" if score == 1 else "risk-on" if score <= -1 else "neutral"
+        return {"label": label, "score": score, "vix": vix, "curve_10y_2y": curve,
+                "breadth_pct": round(breadth * 100) if breadth is not None else None, "reasons": reasons}
 
     def _froth_guard(self, themes: list[dict], opportunities: list[dict]) -> dict:
         """Anti-bubble guard. Detects (1) market euphoria (% of the universe

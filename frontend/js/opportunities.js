@@ -409,6 +409,10 @@ function renderOpportunities(data) {
     const inverted = rcx.curve_10y_2y != null && rcx.curve_10y_2y < 0;
     const ratesBanner = (rcx.nominal_10y != null || rcx.real_10y != null) ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:rgba(43,40,34,0.04); border:1px solid rgba(43,40,34,0.12); font-size:13px;">🏦 <strong>Contexto de tipos (EE.UU.):</strong> 10Y <strong>${fmtP(rcx.nominal_10y)}</strong> · 10Y real ${fmtP(rcx.real_10y)} · inflación implícita ${fmtP(rcx.breakeven_inflation)} · 2Y ${fmtP(rcx.two_y)} · curva 10Y-2Y <strong style="color:${inverted ? 'var(--negative)' : 'var(--positive)'};">${rcx.curve_10y_2y == null ? '—' : (rcx.curve_10y_2y > 0 ? '+' : '') + rcx.curve_10y_2y}</strong>${inverted ? ' (invertida ⚠️)' : ''}<br><span class="text-muted" style="font-size:11px;">Marco para renta fija: el <strong>yield real</strong> (yield − inflación) es lo que de verdad ganas; una curva invertida suele avisar de recesión.</span></div>` : '';
 
+    const rk = data.risk_climate || {};
+    const rkColor = rk.label === 'risk-off' ? 'var(--negative)' : rk.label === 'cauto' ? 'var(--warning)' : rk.label === 'risk-on' ? 'var(--positive)' : 'var(--text-secondary)';
+    const climateBanner = rk.label ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:${rkColor}14; border:1px solid ${rkColor}44; font-size:13px;">🌡️ <strong>Clima de riesgo:</strong> <span style="color:${rkColor}; text-transform:uppercase; font-weight:600;">${rk.label}</span>${rk.vix != null ? ` · VIX ${Math.round(rk.vix)}` : ''}${rk.curve_10y_2y != null ? ` · curva ${rk.curve_10y_2y > 0 ? '+' : ''}${rk.curve_10y_2y}` : ''}${rk.breadth_pct != null ? ` · amplitud ${rk.breadth_pct}%` : ''}${(rk.reasons && rk.reasons.length) ? `<br><span class="text-muted" style="font-size:11px;">Señales: ${rk.reasons.join(' · ')}</span>` : ''}</div>` : '';
+
     const t = data.trends || {};
     const growRow = (g) => {
         const safeTicker = (g.ticker + '').replace(/'/g, "&#39;");
@@ -443,6 +447,7 @@ function renderOpportunities(data) {
     content.innerHTML = `
         ${frothBanner}
         ${regimeBanner}
+        ${climateBanner}
         ${ratesBanner}
         ${data.market_summary ? `<div class="integrations-banner-inner" style="margin-bottom:16px;"><div class="integrations-banner-icon">🧠</div><div class="integrations-banner-body"><strong>Resumen de mercado</strong><p style="margin:6px 0 0;">${data.market_summary}</p></div></div>` : ''}
         ${trendsCard}
