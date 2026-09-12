@@ -22,6 +22,8 @@ SERIES = {
     "DFF":      {"label": "Fed Funds rate", "unit": "%", "freq": "daily"},
     "DGS10":    {"label": "10Y Treasury yield", "unit": "%", "freq": "daily"},
     "DGS2":     {"label": "2Y Treasury yield", "unit": "%", "freq": "daily"},
+    "DFII10":   {"label": "10Y real yield (TIPS)", "unit": "%", "freq": "daily"},
+    "T10YIE":   {"label": "Inflación implícita 10Y (breakeven)", "unit": "%", "freq": "daily"},
     "VIXCLS":   {"label": "VIX", "unit": "índice", "freq": "daily"},
     "DEXUSEU":  {"label": "USD/EUR spot", "unit": "ratio", "freq": "daily"},
 }

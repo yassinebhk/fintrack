@@ -217,6 +217,23 @@ function renderDecision(op) {
         </div>`;
     }
 
+    // Renta fija (bonos): yield, yield real, tramo de duración, sensibilidad a tipos.
+    const bo = op.bond;
+    let bondBlock = '';
+    if (bo) {
+        const brows = [
+            ['Yield', bo.yield_pct == null ? null : bo.yield_pct + '%'],
+            ['Yield real', bo.real_yield_pct == null ? null : bo.real_yield_pct + '%'],
+            ['Duración', bo.duration_bucket],
+            ['Sensib. tipos', bo.rate_sensitivity == null ? null : 'β ' + (+bo.rate_sensitivity).toFixed(2)],
+        ].filter(([, v]) => v != null);
+        const bchips = brows.map(([k, v]) => `<span style="background:rgba(43,40,34,0.05); border-radius:6px; padding:2px 7px; font-size:11.5px; white-space:nowrap;">${k} <strong>${v}</strong></span>`).join(' ');
+        bondBlock = `<div style="margin:6px 0 8px;">
+            <div style="font-size:11px; color:var(--text-secondary); margin-bottom:4px;">🏦 Renta fija</div>
+            <div style="display:flex; gap:4px; flex-wrap:wrap;">${bchips}</div>
+        </div>`;
+    }
+
     const tile = (label, value, sub) => `<div style="flex:1; min-width:118px; background:rgba(43,40,34,0.03); border-radius:8px; padding:8px 10px;">
         <div style="font-size:11px; color:var(--text-secondary);">${label}</div>
         <div style="font-size:14px; font-weight:600; margin-top:2px;">${value}</div>
@@ -242,11 +259,12 @@ function renderDecision(op) {
     const horizonTile = op.horizon ? tile('⏳ Horizonte', op.horizon, 'típico de esta estrategia') : '';
 
     const tiles = [riskTile, sizeTile, expTile, horizonTile].filter(Boolean).join('');
-    if (!edgeLine && !tiles && !fundBlock) return '';
+    if (!edgeLine && !tiles && !fundBlock && !bondBlock) return '';
     return `<div style="margin:10px 0; padding:10px 12px; border:1px solid rgba(43,40,34,0.10); border-radius:10px; background:rgba(43,40,34,0.015);">
         <div style="font-size:12px; color:var(--text-secondary); font-weight:600; margin-bottom:6px;">🧭 Marco de decisión</div>
         ${edgeLine}
         ${fundBlock}
+        ${bondBlock}
         <div style="display:flex; gap:8px; flex-wrap:wrap;">${tiles}</div>
         <div style="font-size:10.5px; color:var(--text-tertiary); margin-top:8px; line-height:1.4;">Riesgo y tamaño = estadística sobre precios (el tamaño ignora la correlación con tu cartera). Expectancy = resultado real de esta estrategia <em>después</em> de recomendar (out-of-sample), no una promesa. No es asesoramiento financiero.</div>
     </div>`;
@@ -348,6 +366,11 @@ function renderOpportunities(data) {
     const rc = regimeColor[data.market_regime] || 'var(--warning)';
     const regimeBanner = data.market_regime ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:${rc}18; border:1px solid ${rc}44; font-size:13px;">📡 <strong>Régimen de mercado:</strong> <span style="color:${rc}; text-transform:uppercase; font-weight:600;">${data.market_regime}</span>${data.market_breadth != null ? ` · ${Math.round(data.market_breadth*100)}% de activos sobre su tendencia de 200 sesiones` : ''}<br><span class="text-muted" style="font-size:11px;">En régimen alcista pesa más el momentum; en bajista, el valor/defensivo.</span></div>` : '';
 
+    const rcx = data.rates_context || {};
+    const fmtP = (v) => (v == null ? '—' : v + '%');
+    const inverted = rcx.curve_10y_2y != null && rcx.curve_10y_2y < 0;
+    const ratesBanner = (rcx.nominal_10y != null || rcx.real_10y != null) ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:rgba(43,40,34,0.04); border:1px solid rgba(43,40,34,0.12); font-size:13px;">🏦 <strong>Contexto de tipos (EE.UU.):</strong> 10Y <strong>${fmtP(rcx.nominal_10y)}</strong> · 10Y real ${fmtP(rcx.real_10y)} · inflación implícita ${fmtP(rcx.breakeven_inflation)} · 2Y ${fmtP(rcx.two_y)} · curva 10Y-2Y <strong style="color:${inverted ? 'var(--negative)' : 'var(--positive)'};">${rcx.curve_10y_2y == null ? '—' : (rcx.curve_10y_2y > 0 ? '+' : '') + rcx.curve_10y_2y}</strong>${inverted ? ' (invertida ⚠️)' : ''}<br><span class="text-muted" style="font-size:11px;">Marco para renta fija: el <strong>yield real</strong> (yield − inflación) es lo que de verdad ganas; una curva invertida suele avisar de recesión.</span></div>` : '';
+
     const t = data.trends || {};
     const growRow = (g) => `<tr><td>${g.name} <span class="text-muted" style="font-size:12px;">${g.ticker}</span></td><td class="text-right mono ${(g.ret_3m||0)>=0?'value-positive':'value-negative'}">${g.ret_3m!=null?(g.ret_3m>=0?'+':'')+Math.round(g.ret_3m)+'%':'—'}</td><td class="text-right">${g.above_sma200?'📈':'📉'}</td></tr>`;
     const trendsCard = (t.top_growers_etf && t.top_growers_etf.length) ? `
@@ -378,6 +401,7 @@ function renderOpportunities(data) {
     content.innerHTML = `
         ${frothBanner}
         ${regimeBanner}
+        ${ratesBanner}
         ${data.market_summary ? `<div class="integrations-banner-inner" style="margin-bottom:16px;"><div class="integrations-banner-icon">🧠</div><div class="integrations-banner-body"><strong>Resumen de mercado</strong><p style="margin:6px 0 0;">${data.market_summary}</p></div></div>` : ''}
         ${trendsCard}
         ${opps}

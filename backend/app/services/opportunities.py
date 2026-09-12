@@ -262,6 +262,10 @@ class OpportunityService:
         except Exception as exc:
             logger.warning("opportunities macro fetch partial: {}", exc)
 
+        # Rates backdrop for fixed income (nominal/real 10Y, breakeven inflation,
+        # 2Y, curve slope) — context for bond ideas, computed here on the VM (FRED).
+        rates_context = await self._rates_context()
+
         # Recent news (already sentiment-classified by LLM) to give the analyst current context.
         # Indexed so the analyst can reference the exact headlines that back each idea.
         news_str, news_items = "", []
@@ -314,7 +318,7 @@ class OpportunityService:
             content = {"disclaimer": "Generado automáticamente desde los datos (IA no disponible ahora)."}
         # Enrich each idea with a 6-month trend chart + the headlines that back it +
         # the ensemble score breakdown of the matching instrument.
-        await self._enrich_opportunities(opportunities, news_items, {t["ticker"]: t for t in themes}, feedback)
+        await self._enrich_opportunities(opportunities, news_items, {t["ticker"]: t for t in themes}, feedback, rates_context)
 
         # 🫧 Froth guard: flag overheated ideas + thematic concentration + market euphoria,
         # so a momentum engine doesn't quietly push the user into a bubble top.
@@ -360,6 +364,7 @@ class OpportunityService:
             "universe_size": len(themes),
             "market_regime": market_regime,
             "market_breadth": market_breadth,
+            "rates_context": rates_context,
             "trends": trends,
             "market_summary": market_summary,
             "opportunities": opportunities,
@@ -379,6 +384,29 @@ class OpportunityService:
         except Exception as exc:
             logger.warning("scorecard snapshot failed: {}", exc)
         return payload
+
+    async def _rates_context(self) -> dict:
+        """US rates backdrop for fixed income: nominal & real 10Y yield, 10Y
+        breakeven inflation, 2Y yield and the 10Y-2Y curve slope (negative =
+        inverted = classic recession signal). Best-effort — FRED works without an
+        API key via its public CSV fallback."""
+        try:
+            fred = FREDClient()
+
+            async def val(sid: str):
+                d = await fred.get_latest(sid)
+                return d.get("value") if d else None
+
+            ten, two = await val("DGS10"), await val("DGS2")
+            real, be = await val("DFII10"), await val("T10YIE")
+            return {
+                "nominal_10y": ten, "real_10y": real, "breakeven_inflation": be,
+                "two_y": two,
+                "curve_10y_2y": round(ten - two, 2) if (ten is not None and two is not None) else None,
+            }
+        except Exception as exc:
+            logger.warning("rates context fetch failed: {}", exc)
+            return {}
 
     def _froth_guard(self, themes: list[dict], opportunities: list[dict]) -> dict:
         """Anti-bubble guard. Detects (1) market euphoria (% of the universe
@@ -559,14 +587,17 @@ class OpportunityService:
     async def _enrich_opportunities(
         self, opportunities: list[dict], news_items: list[dict],
         by_ticker: dict[str, dict] | None = None, feedback: dict | None = None,
+        rates_context: dict | None = None,
     ) -> None:
         """Attach a 6-month trend chart_url, supporting news (with links), the
         ensemble score breakdown, and the per-idea decision frame (quantified risk,
-        inverse-volatility position size, out-of-sample expectancy, horizon)."""
+        inverse-volatility position size, out-of-sample expectancy, horizon,
+        fundamentals for stocks / yield+duration for bonds)."""
         from app.services.charts import line_chart
 
         by_ticker = by_ticker or {}
         by_approach = (feedback or {}).get("by_approach") or {}
+        breakeven = (rates_context or {}).get("breakeven_inflation")
 
         def attach_scores(opp: dict) -> None:
             tk = (opp.get("ticker_or_isin") or "").strip().upper()
@@ -623,6 +654,19 @@ class OpportunityService:
                     "div_yield": fund.get("dividendYield"),
                 }
                 opp["fundamental_score"] = t.get("fundamental_score")
+            # Bonds (fixed income) — yield, real yield, duration bucket, rate sensitivity.
+            bond = t.get("bond")
+            if bond:
+                y = bond.get("yield")
+                yield_pct = round(y * 100, 2) if y is not None else None
+                real_yield = (round(yield_pct - breakeven, 2)
+                              if (yield_pct is not None and breakeven is not None) else None)
+                opp["bond"] = {
+                    "yield_pct": yield_pct,
+                    "real_yield_pct": real_yield,
+                    "duration_bucket": bond.get("category"),
+                    "rate_sensitivity": bond.get("beta3Year"),
+                }
 
         def attach_news(opp: dict) -> None:
             refs = []

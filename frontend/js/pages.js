@@ -761,6 +761,17 @@ en medio                                → NEUTRAL</pre>
         <p><strong>Cómo se combina:</strong> para una acción, estos jueces se mezclan con los de precio (60% precio / 40% fundamentales): <em>valoración + solidez</em> suman a la tesis <strong>VALOR</strong>, y <em>calidad + crecimiento</em> suman a <strong>MOMENTUM</strong>. Resultado: si los números dicen que una empresa es buena y barata, <strong>sube en el ranking y se recomienda</strong>, con sus ratios visibles en la tarjeta para justificarlo. Los ETFs/fondos/bonos siguen puntuando solo por precio, como siempre.</p>
         <p><strong>Honestidad sobre los datos:</strong> vienen de Yahoo (yfinance) y son gratuitos pero no perfectos — algunos sectores (bancos, aseguradoras) no reportan ciertos campos (FCF, deuda), y ahí ese juez simplemente no vota para esa empresa, en vez de inventarse un número.</p>
 
+        <h3>⑫ Renta fija (bonos): tipos, no fundamentales</h3>
+        <p><strong>Qué mide:</strong> un bono no tiene "PER" ni "ROE" — se analiza con <strong>tipos de interés</strong>. Para los ETFs de bonos añadimos, cuando el dato existe (mejor cobertura en ETFs de EE.UU.):</p>
+        <ul>
+            <li><strong>Yield</strong> — el interés anual que reparte el fondo.</li>
+            <li><strong>Yield real</strong> — el yield menos la inflación implícita del mercado. Es <em>lo que de verdad ganas</em> por encima de la inflación: un yield del 4% con inflación del 3% son solo <strong>1% real</strong>.</li>
+            <li><strong>Duración</strong> (tramo corto / intermedio / largo) — cuánto tarda de media en devolverte el dinero; a más larga, más sube o baja el precio cuando cambian los tipos.</li>
+            <li><strong>Sensibilidad a tipos</strong> (beta a 3 años) — cuánto se mueve el ETF cuando se mueven los tipos. Un bono a 20 años (beta alta) es una montaña rusa; uno a 1-3 años (beta baja) es tranquilo.</li>
+        </ul>
+        <p>Arriba de Recomendaciones verás un <strong>banner de contexto de tipos</strong>: 10Y nominal y real, inflación implícita, y la <strong>curva 10Y−2Y</strong> — si es negativa, la curva está "invertida", una señal clásica de recesión.</p>
+        <p><strong>Honestidad — lo que NO hacemos:</strong> no apostamos algorítmicamente a si los tipos van a subir o bajar (es una apuesta macro con mucho riesgo de equivocarse). Te damos los números reales — yield, yield real, duración, sensibilidad — como <em>contexto</em> para que tú y la IA decidáis, no como una orden. Y aviso: los bonos <strong>individuales del Estado</strong> tienen datos retail muy limitados; la cobertura buena es en ETFs de bonos (sobre todo de EE.UU.).</p>
+
         <h3>🔗 De la estadística a la explicación</h3>
         <p>Todo lo anterior produce un <strong>ranking objetivo</strong>. Solo entonces entra la IA (Gemini), y <strong>únicamente para explicar</strong> en lenguaje claro las ideas mejor puntuadas (qué es, por qué ahora, riesgos, encaje). La IA <em>no</em> decide el orden ni inventa tickers. El recorrido completo está en <a href="#el-cerebro">El cerebro: cómo descubre y recomienda</a>.</p>
 
@@ -1113,7 +1124,9 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
                 <tr><td><strong>Alpha</strong></td><td>El retorno de más (o de menos) que obtuvo una recomendación frente a su propio benchmark. Alpha +7% = ganó 7 puntos más que el índice con el que se compara. Ver <a href="#autoentrenamiento">Autoentrenamiento</a>.</td></tr>
                 <tr><td><strong>Bollinger %B</strong></td><td>Indicador técnico que sitúa el precio dentro de su banda de volatilidad reciente (cerca del techo o del suelo). Ver <a href="#algoritmos">algoritmos ③</a>.</td></tr>
                 <tr><td><strong>Convicción</strong></td><td>Etiqueta (alta/media/baja) que acompaña cada recomendación, según lo fuerte que sea su puntuación combinada.</td></tr>
+                <tr><td><strong>Curva de tipos (10Y-2Y)</strong></td><td>La diferencia entre el interés del bono a 10 años y el de 2 años. Si es negativa ("invertida"), el corto plazo paga más que el largo — señal clásica que suele anticipar recesión. Ver <a href="#algoritmos">algoritmos ⑫</a>.</td></tr>
                 <tr><td><strong>Drawdown</strong></td><td>La peor caída porcentual desde el punto más alto alcanzado, no desde que empezaste. Mide el "dolor" máximo real.</td></tr>
+                <tr><td><strong>Duración (bonos)</strong></td><td>Cuánto tarda de media en devolverte el dinero un bono/ETF de bonos; a más larga, más sube o baja su precio cuando cambian los tipos de interés. Ver <a href="#algoritmos">algoritmos ⑫</a>.</td></tr>
                 <tr><td><strong>Edge (ventaja)</strong></td><td>Los pocos factores (jueces) que más sostienen la tesis de una idea — el "por qué" en números, no un relato. Aparece en el marco de decisión de cada oportunidad. Ver <a href="#algoritmos">algoritmos 🧭</a>.</td></tr>
                 <tr><td><strong>EWMA (volatilidad)</strong></td><td>Media exponencial que da más peso a los días recientes al calcular el riesgo, para reaccionar antes que una media simple. Ver <a href="#algoritmos">algoritmos ⑤</a>.</td></tr>
                 <tr><td><strong>Expectancy (esperanza matemática)</strong></td><td>Ganancia media esperada de una estrategia = (% acierto × ganancia media) + (% fallo × pérdida media). Puede ser positiva acertando &lt;50% si los aciertos son mayores que los fallos. Es por estrategia y out-of-sample. Ver <a href="#algoritmos">algoritmos 🧭</a>.</td></tr>
@@ -1142,6 +1155,8 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
                 <tr><td><strong>Ticker</strong></td><td>El código corto con el que se identifica un activo en el mercado (p. ej. SOXX, BTC).</td></tr>
                 <tr><td><strong>Valor / Contrarian (tesis)</strong></td><td>La segunda de las dos tesis del motor: activos castigados pero de calidad (baratos y sanos), frente al MOMENTUM.</td></tr>
                 <tr><td><strong>Volatilidad anualizada</strong></td><td>Cuánto oscila el precio de un activo, expresado en términos de un año. Ver <a href="#algoritmos">algoritmos ②</a>.</td></tr>
+                <tr><td><strong>Yield (de un bono/ETF)</strong></td><td>El interés anual que reparte, en %. Ver <a href="#algoritmos">algoritmos ⑫</a>.</td></tr>
+                <tr><td><strong>Yield real</strong></td><td>El yield menos la inflación (implícita del mercado): lo que de verdad ganas por encima de la inflación. 4% de yield con 3% de inflación = 1% real. Ver <a href="#algoritmos">algoritmos ⑫</a>.</td></tr>
                 <tr><td><strong>Z-score (winsorizado)</strong></td><td>Cuántas desviaciones típicas se aparta un valor de la media de todo el universo comparado ese día, recortado a ±3 para evitar que un dato extremo distorsione el ranking. Ver <a href="#algoritmos">algoritmos ⑦</a>.</td></tr>
             </tbody>
         </table>

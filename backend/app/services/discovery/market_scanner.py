@@ -100,14 +100,19 @@ class MarketScanner:
                 "signals": signals,
                 "factors": factors,
             }
-            # Fundamentals only for individual stocks (ETFs/funds/bonds have none).
+            # Fundamentals for individual stocks; bond metrics for fixed income.
             # `desc` carries the category in the universe scan (see scan_universe).
+            dl = str(desc).lower()
             if fetch_fundamentals and (desc == "acción" or str(desc).startswith("screener ·")):
                 fund = await self.yahoo.get_fundamentals(ticker)
                 if fund:
                     result["fundamentals"] = fund
                     if fund.get("sector"):
                         result["sector"] = fund["sector"]
+            elif fetch_fundamentals and ("bono" in dl or "renta fija" in dl or "bond" in dl):
+                bond = await self.yahoo.get_bond_metrics(ticker)
+                if bond:
+                    result["bond"] = bond
             return result
 
         if sem is not None:
@@ -302,9 +307,22 @@ class MarketScanner:
                     bits.append(f"fund_score {fscore:+.2f}")
                 if bits:
                     fund_str = " · fund: " + ", ".join(bits)
+            # Bond metrics (fixed income) — so the analyst can justify with yield/duration.
+            bo = t.get("bond")
+            bond_str = ""
+            if bo:
+                bb = []
+                if bo.get("yield") is not None:
+                    bb.append(f"yield {bo['yield'] * 100:.1f}%")
+                if bo.get("category"):
+                    bb.append(str(bo["category"]))
+                if bo.get("beta3Year") is not None:
+                    bb.append(f"sensib.tipos β{bo['beta3Year']:.2f}")
+                if bb:
+                    bond_str = " · bono: " + ", ".join(bb)
             return (
                 f"{base}: 1m {t['ret_1m']:+.1f}% · 3m {t['ret_3m']:+.1f}% · 1y {t['ret_1y']:+.1f}% · "
-                f"rango52s {t['range_pos_52w']:.0f}%{sharpe_str} · [técnico: {tech}]{fund_str}{tag}"
+                f"rango52s {t['range_pos_52w']:.0f}%{sharpe_str} · [técnico: {tech}]{fund_str}{bond_str}{tag}"
             )
 
         scored = [t for t in themes if t.get("factors")]

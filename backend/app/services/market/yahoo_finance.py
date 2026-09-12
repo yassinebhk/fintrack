@@ -65,12 +65,28 @@ class YahooFinanceService:
         "sector", "industry",
     )
 
+    # Plausibility bounds — Yahoo occasionally returns garbage (wrong unit / scale,
+    # e.g. a margin of 95.95 instead of 0.9595). A value outside its range is
+    # DROPPED (that judge simply doesn't vote for this name) rather than trusted or
+    # zero-filled. Margins/growth/ROE are fractions (0.30 = 30%); PE/PB/PEG ratios;
+    # debtToEquity a percentage-style figure; dividendYield already a percent.
+    # freeCashflow is unbounded (can be legitimately negative). No bound = no check.
+    _FUND_BOUNDS = {
+        "trailingPE": (0.0, 300.0), "forwardPE": (0.0, 300.0),
+        "priceToBook": (0.0, 100.0), "pegRatio": (0.0, 20.0),
+        "returnOnEquity": (-2.0, 5.0), "returnOnAssets": (-1.0, 1.5),
+        "operatingMargins": (-2.0, 1.5), "profitMargins": (-2.0, 1.5),
+        "revenueGrowth": (-1.0, 10.0), "earningsGrowth": (-1.0, 20.0),
+        "debtToEquity": (0.0, 2000.0), "currentRatio": (0.0, 100.0),
+        "dividendYield": (0.0, 30.0), "marketCap": (0.0, float("inf")),
+    }
+
     async def get_fundamentals(self, ticker: str) -> dict | None:
         """Fundamental ratios for a STOCK via yfinance `.get_info()`. Best-effort:
-        returns the fields present (partial for banks/REITs — they lack FCF /
-        currentRatio, etc.), or None for non-equities and failures. Network-heavy
-        and slow — meant for the daily GitHub-Actions universe scan, NOT the request
-        hot path. Cached 12h (fundamentals barely move intraday)."""
+        returns the fields present AND plausible (partial for banks/REITs — they
+        lack FCF / currentRatio, etc.), or None for non-equities and failures.
+        Network-heavy and slow — meant for the daily GitHub-Actions universe scan,
+        NOT the request hot path. Cached 12h (fundamentals barely move intraday)."""
         key = f"fund:{ticker.upper()}"
         if self._fresh(key):
             return self._cache.get(key)
@@ -83,7 +99,59 @@ class YahooFinanceService:
                 return None
             if not info or info.get("quoteType") != "EQUITY":
                 return None
-            out = {f: info.get(f) for f in self.FUNDAMENTAL_FIELDS if info.get(f) is not None}
+            out: dict = {}
+            for f in self.FUNDAMENTAL_FIELDS:
+                v = info.get(f)
+                if v is None:
+                    continue
+                bounds = self._FUND_BOUNDS.get(f)
+                if bounds is not None:  # numeric field with a sanity range
+                    try:
+                        if not (bounds[0] <= float(v) <= bounds[1]):
+                            continue  # implausible → drop (garbage in Yahoo's data)
+                    except (TypeError, ValueError):
+                        continue
+                out[f] = v
+            return out or None
+
+        loop = asyncio.get_event_loop()
+        res = await loop.run_in_executor(self._executor, _work)
+        self._cache[key] = res
+        self._expiry[key] = datetime.now() + timedelta(hours=12)
+        return res
+
+    async def get_bond_metrics(self, ticker: str) -> dict | None:
+        """Bond-ETF metrics via yfinance `.get_info()`: distribution `yield`, the
+        Morningstar `category` (a duration/credit bucket, e.g. 'Long Government'),
+        `beta3Year` (rate-sensitivity proxy — long-duration funds run high) and YTD.
+        Good for US-listed bond ETFs; EU UCITS bond ETFs are data-poor on Yahoo and
+        usually return None. Cached 12h."""
+        key = f"bond:{ticker.upper()}"
+        if self._fresh(key):
+            return self._cache.get(key)
+
+        def _work() -> dict | None:
+            try:
+                info = yf.Ticker(ticker).get_info()
+            except Exception as exc:
+                logger.debug("bond metrics for {} failed: {}", ticker, exc)
+                return None
+            if not info or info.get("quoteType") != "ETF":
+                return None
+            out: dict = {}
+            y = info.get("yield")
+            try:
+                if y is not None and 0.0 <= float(y) <= 0.30:  # sane distribution yield (0–30%)
+                    out["yield"] = float(y)
+            except (TypeError, ValueError):
+                pass
+            # ytdReturn is left out on purpose: Yahoo returns it on an inconsistent
+            # scale across bond ETFs (some fraction, some already-percent → garbage
+            # like -288%), so it's not trustworthy enough to show.
+            for f in ("category", "beta3Year", "totalAssets"):
+                v = info.get(f)
+                if v is not None:
+                    out[f] = v
             return out or None
 
         loop = asyncio.get_event_loop()
