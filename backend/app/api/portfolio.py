@@ -75,6 +75,15 @@ async def get_portfolio_attribution(svc: PortfolioService = Depends(_get_service
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/portfolio/stress-test")
+async def get_portfolio_stress_test(svc: PortfolioService = Depends(_get_service)) -> dict:
+    """Illustrative what-if scenarios applied to current holdings."""
+    try:
+        return await svc.stress_test()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.get("/portfolio/history")
 async def get_portfolio_history(
     days: int = Query(default=365, ge=1, le=3650), svc: PortfolioService = Depends(_get_service)

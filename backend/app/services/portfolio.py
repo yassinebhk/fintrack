@@ -489,6 +489,63 @@ class PortfolioService:
         )
         return {"total_gain_loss_eur": round(total_gl, 2), "by_position": by_position, "by_type": by_type}
 
+    async def stress_test(self) -> dict:
+        """Illustrative what-if scenarios applied to the CURRENT holdings — the
+        'how much could I lose' view a risk-aware trader wants. Flat class shocks are
+        illustrative (labelled as such); the −2σ scenario is grounded in each asset's
+        own realized volatility. Not predictions."""
+        portfolio = await self.calculate_portfolio()
+        positions = portfolio.get("positions", []) or []
+        total = portfolio.get("total_value") or 0.0
+        if not positions or total <= 0:
+            return {"total_value": total, "scenarios": []}
+
+        try:
+            vol_by = (await self.risk_analysis()).get("risk_by_ticker") or {}
+        except Exception:
+            vol_by = {}
+
+        def mv(p) -> float:
+            return p.get("market_value_base") or 0.0
+
+        is_crypto = lambda p: p.get("type") == "crypto"  # noqa: E731
+        is_equity = lambda p: p.get("type") in ("stock", "etf", "fund")  # noqa: E731
+        scenarios = []
+
+        def add(name, desc, impact, note=None):
+            s = {"name": name, "desc": desc, "impact_eur": round(impact, 2),
+                 "impact_pct": round(impact / total * 100, 2), "new_value": round(total + impact, 2)}
+            if note:
+                s["note"] = note
+            scenarios.append(s)
+
+        def flat(name, desc, eq, cr):
+            imp = sum(mv(p) * (cr if is_crypto(p) else eq if is_equity(p) else 0.0) for p in positions)
+            add(name, desc, imp)
+
+        flat("Corrección de mercado", "Bolsa −15%, cripto −25%", -0.15, -0.25)
+        flat("Crash severo (tipo 2008)", "Bolsa −35%, cripto −55%", -0.35, -0.55)
+        flat("Crash cripto", "Cripto −50%, bolsa −5%", -0.05, -0.50)
+
+        top = max(positions, key=mv)
+        add("Tu mayor posición cae 40%", f"{top.get('name') or top.get('ticker')} −40%", -0.40 * mv(top))
+
+        if vol_by:
+            imp = covered = 0.0
+            for p in positions:
+                v = vol_by.get(p.get("ticker"))
+                if v is None:
+                    continue
+                daily = (v / 100.0) / (252 ** 0.5)
+                imp += mv(p) * (-2 * daily)
+                covered += mv(p)
+            if covered > 0:
+                add("Día malo histórico (−2σ)",
+                    "Cada activo cae 2 desviaciones típicas diarias (según su propia volatilidad)",
+                    imp, note=f"cubre {round(covered / total * 100)}% de la cartera con histórico")
+
+        return {"total_value": round(total, 2), "scenarios": scenarios}
+
     async def get_portfolio_history(self, days: int = 365) -> list[dict]:
         async with session_scope() as session:
             rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)

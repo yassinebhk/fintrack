@@ -25,6 +25,7 @@ function initAssetAnalysis() {
     loadPortfolioRiskMetrics();
     loadHoldingsCatalysts();
     loadAttribution();
+    loadStressTest();
 }
 
 /**
@@ -748,6 +749,28 @@ async function loadPortfolioRiskMetrics() {
         ${tile('Alpha anual', d.alpha_annual_pct == null ? '—' : d.alpha_annual_pct + '%', `vs ${d.benchmark}`)}
     </div>
     <p class="text-muted" style="font-size:10.5px; margin:8px 0 0;">Sobre ${d.n_returns} días de retorno reales (excluye días de aportación). Benchmark: ${d.benchmark}.</p>`;
+}
+
+async function loadStressTest() {
+    const el = document.getElementById('stressTestContent');
+    if (!el) return;
+    let d;
+    try {
+        const r = await fetch(`${ASSET_API}/portfolio/stress-test`);
+        if (!r.ok) { el.innerHTML = '<p class="text-muted">No disponible.</p>'; return; }
+        d = await r.json();
+    } catch (e) { el.innerHTML = '<p class="text-muted">No disponible.</p>'; return; }
+    const sc = d.scenarios || [];
+    if (!sc.length) { el.innerHTML = '<p class="text-muted">Sin posiciones para simular.</p>'; return; }
+    const fmt = (v) => (v >= 0 ? '+' : '') + Math.round(v).toLocaleString('es-ES') + ' €';
+    const rows = sc.map(s => {
+        const color = s.impact_eur >= 0 ? 'var(--positive)' : 'var(--negative)';
+        return `<div style="display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin:6px 0; padding:8px 10px; background:rgba(43,40,34,0.03); border-radius:8px; flex-wrap:wrap;">
+            <div><strong>${s.name}</strong> <span class="text-muted" style="font-size:12px;">${s.desc}</span>${s.note ? `<br><span class="text-muted" style="font-size:10.5px;">${s.note}</span>` : ''}</div>
+            <div style="text-align:right;"><span class="mono" style="color:${color}; font-weight:600;">${fmt(s.impact_eur)} (${s.impact_pct}%)</span><br><span class="text-muted" style="font-size:11px;">quedaría en ${Math.round(s.new_value).toLocaleString('es-ES')} €</span></div>
+        </div>`;
+    }).join('');
+    el.innerHTML = `<p style="font-size:13px; margin:0 0 6px;">Valor actual: <strong>${Math.round(d.total_value).toLocaleString('es-ES')} €</strong></p>${rows}`;
 }
 
 async function loadAttribution() {
