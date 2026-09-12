@@ -385,6 +385,9 @@ async function handleEditPosition(event) {
 // so submit can send the detected type/name without the user picking anything.
 let mvResolved = null;
 let mvResolveTimer = null;
+// True once the user chooses to override the auto-detected type by hand; when set,
+// the manual "Tipo" dropdown wins over whatever detection returned.
+let mvTypeManual = false;
 
 function showMovementModal() {
     const sel = document.getElementById('mvAsset');
@@ -399,6 +402,7 @@ function showMovementModal() {
     document.getElementById('mvResolvePreview').innerHTML = '';
     document.getElementById('mvTypeGroup').style.display = 'none';
     mvResolved = null;
+    mvTypeManual = false;
     onMovementAssetChange();
     showModal('movementModal');
 }
@@ -415,6 +419,7 @@ function onMvTickerInput() {
     const q = document.getElementById('mvTicker').value.trim();
     const preview = document.getElementById('mvResolvePreview');
     mvResolved = null;
+    mvTypeManual = false;
     if (mvResolveTimer) clearTimeout(mvResolveTimer);
     if (q.length < 2) {
         preview.innerHTML = '';
@@ -435,23 +440,43 @@ async function resolveMvTicker(q) {
         if (document.getElementById('mvTicker').value.trim() !== q) return;
         if (!resp.ok || !data.ok) {
             mvResolved = null;
+            mvTypeManual = true; // no detection -> the dropdown is authoritative
             preview.innerHTML = `<span style="color:var(--terracotta,#C6473C);">⚠️ ${data.detail || 'No pude identificar el activo'} — elige el tipo abajo</span>`;
             typeGroup.style.display = 'block';
             return;
         }
         mvResolved = data;
         typeGroup.style.display = 'none';
+        mvTypeManual = false;
         const cur = data.currency || '';
         const priceTxt = data.price_ok
             ? ` · ~${data.price.toLocaleString('es-ES', { maximumFractionDigits: 2 })}${cur ? ' ' + cur : ''}`
             : ' · <span style="color:var(--terracotta,#C6473C);">sin precio</span>';
-        preview.innerHTML = `<span style="color:var(--positive,#4A9B8E);">✓ <strong>${data.name}</strong> · ${data.type_label}${priceTxt}</span>`;
+        preview.innerHTML = `<span style="color:var(--positive,#4A9B8E);">✓ <strong>${data.name}</strong> · ${data.type_label}${priceTxt}</span>`
+            + ` <a href="#" onclick="revealMvTypeOverride(event)" style="margin-left:6px;font-size:12px;">✏️ ajustar tipo</a>`;
     } catch (err) {
         if (document.getElementById('mvTicker').value.trim() !== q) return;
         mvResolved = null;
-        preview.innerHTML = '<span class="text-muted">No pude comprobar el activo ahora; puedes registrarlo igualmente.</span>';
+        mvTypeManual = true;
+        preview.innerHTML = '<span class="text-muted">No pude comprobar el activo ahora; elige el tipo y regístralo igualmente.</span>';
         typeGroup.style.display = 'block';
     }
+}
+
+// Let the user override the auto-detected type by hand.
+function revealMvTypeOverride(ev) {
+    if (ev) ev.preventDefault();
+    const group = document.getElementById('mvTypeGroup');
+    group.style.display = 'block';
+    if (mvResolved && mvResolved.asset_type) {
+        document.getElementById('mvType').value = mvResolved.asset_type;
+    }
+    mvTypeManual = true;
+}
+
+// Fires when the user actually changes the Tipo dropdown.
+function onMvTypeManualChange() {
+    mvTypeManual = true;
 }
 
 async function submitMovement() {
@@ -471,11 +496,12 @@ async function submitMovement() {
     if (assetVal === '__new__') {
         const ticker = document.getElementById('mvTicker').value.trim();
         if (!ticker) { result.innerHTML = '<div class="alert alert-error">Indica el ticker o ISIN</div>'; return; }
-        // Prefer the auto-detected type; only fall back to the manual dropdown when
-        // detection failed (in which case its group is visible). Backend also
-        // auto-detects if asset_type is omitted, so this is belt-and-suspenders.
-        const typeVisible = document.getElementById('mvTypeGroup').style.display !== 'none';
-        const assetType = (mvResolved && mvResolved.asset_type) || (typeVisible ? document.getElementById('mvType').value : null);
+        // A manual override (user picked the type by hand, or detection failed)
+        // wins; otherwise use the auto-detected type; otherwise let the backend
+        // auto-detect (asset_type omitted).
+        const assetType = mvTypeManual
+            ? document.getElementById('mvType').value
+            : (mvResolved ? mvResolved.asset_type : null);
         body = {
             action, ticker, broker: document.getElementById('mvBrokerNew').value,
             eur_amount: amount, asset_type: assetType,

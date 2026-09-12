@@ -897,16 +897,16 @@
                                     <small class="text-muted">Escribe el símbolo o ISIN — detecto el nombre, tipo y precio automáticamente</small>
                                     <div id="mvResolvePreview" style="margin-top:6px;font-size:13px;"></div>
                                 </div>
-                                <!-- Tipo: normalmente auto-detectado; solo se muestra si no lo reconozco -->
+                                <!-- Tipo: normalmente auto-detectado; se muestra al pulsar "ajustar tipo" o si no lo reconozco -->
                                 <div class="form-group" id="mvTypeGroup" style="display:none;">
                                     <label>Tipo *</label>
-                                    <select id="mvType">
+                                    <select id="mvType" onchange="onMvTypeManualChange()">
                                         <option value="etf">ETF</option>
                                         <option value="fund">Fondo</option>
                                         <option value="stock">Acción</option>
                                         <option value="crypto">Cripto</option>
                                     </select>
-                                    <small class="text-muted">No pude detectarlo — elígelo tú</small>
+                                    <small class="text-muted">Ajústalo si la detección no es correcta</small>
                                 </div>
                                 <div class="form-group">
                                     <label>Broker *</label>
@@ -1912,7 +1912,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260912blue"></script>
     <script src="js/news.js?v=20260530a"></script>
-    <script src="js/portfolio-manager.js?v=20260912simplify"></script>
+    <script src="js/portfolio-manager.js?v=20260912override"></script>
     <script src="js/ai-advisor.js?v=20260530a"></script>
     <script src="js/asset-analysis.js?v=20260912axes"></script>
     <script src="js/backtest.js?v=20260912info"></script>
