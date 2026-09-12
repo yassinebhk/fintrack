@@ -282,14 +282,27 @@ function renderDecision(op) {
         if (parts.length) catBlock = `<div style="font-size:11.5px; margin:6px 0 2px; color:var(--text-secondary);">📅 Próximos catalizadores: ${parts.join(' · ')}</div>`;
     }
 
+    // Técnico: fuerza de tendencia (ADX), volatilidad (ATR) + stop sugerido, volumen.
+    const tc = op.technical;
+    let techBlock = '';
+    if (tc) {
+        const bits = [];
+        if (tc.adx != null) bits.push(`ADX ${tc.adx}${tc.adx_signal ? ` (${tc.adx_signal})` : ''}`);
+        if (tc.atr_pct != null) bits.push(`ATR ${tc.atr_pct}%`);
+        if (tc.stop_pct != null) bits.push(`<span title="2×ATR bajo el precio">🛑 stop sugerido ${tc.stop_pct}%</span>`);
+        if (tc.volume_signal) bits.push(`volumen ${tc.volume_signal}${tc.rvol != null ? ` (${tc.rvol}×)` : ''}`);
+        if (bits.length) techBlock = `<div style="font-size:11.5px; margin:6px 0 2px; color:var(--text-secondary);">📐 Técnico: ${bits.join(' · ')}</div>`;
+    }
+
     const tiles = [riskTile, sizeTile, expTile, horizonTile].filter(Boolean).join('');
-    if (!edgeLine && !tiles && !fundBlock && !bondBlock && !catBlock) return '';
+    if (!edgeLine && !tiles && !fundBlock && !bondBlock && !catBlock && !techBlock) return '';
     return `<div style="margin:10px 0; padding:10px 12px; border:1px solid rgba(43,40,34,0.10); border-radius:10px; background:rgba(43,40,34,0.015);">
         <div style="font-size:12px; color:var(--text-secondary); font-weight:600; margin-bottom:6px;">🧭 Marco de decisión</div>
         ${edgeLine}
         ${fundBlock}
         ${bondBlock}
         ${catBlock}
+        ${techBlock}
         <div style="display:flex; gap:8px; flex-wrap:wrap;">${tiles}</div>
         <div style="font-size:10.5px; color:var(--text-tertiary); margin-top:8px; line-height:1.4;">Riesgo = estadística sobre precios; el tamaño se ajusta por correlación con tu cartera. Expectancy = resultado real de esta estrategia <em>después</em> de recomendar (out-of-sample), no una promesa. No es asesoramiento financiero.</div>
     </div>`;

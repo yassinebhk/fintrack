@@ -54,7 +54,11 @@ class MarketScanner:
             if not hist or len(hist) < 30:
                 return None
 
-            closes = [h["close"] for h in hist if h.get("close")]
+            rows = [h for h in hist if h.get("close")]
+            closes = [h["close"] for h in rows]
+            highs = [h.get("high") for h in rows]
+            lows = [h.get("low") for h in rows]
+            volumes = [h.get("volume") for h in rows]
             if len(closes) < 30:
                 return None
 
@@ -84,7 +88,7 @@ class MarketScanner:
             # Technical signals via `ta` + quant factors via empyrical (objective)
             from app.services.discovery.technical import compute_signals
             from app.services.discovery.quant_score import compute_factors
-            signals = compute_signals(closes)
+            signals = compute_signals(closes, highs=highs, lows=lows, volumes=volumes)
             factors = compute_factors(closes)
 
             result = {

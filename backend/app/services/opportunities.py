@@ -714,6 +714,12 @@ class OpportunityService:
                     opp["catalysts"] = cats
             except Exception:
                 pass
+            # Technical extras (ADX trend strength, ATR volatility + 2×ATR stop, volume).
+            sig = t.get("signals") or {}
+            tech = {k: sig[k] for k in ("adx", "adx_signal", "atr_pct", "stop_pct", "rvol", "volume_signal")
+                    if sig.get(k) is not None}
+            if tech:
+                opp["technical"] = tech
 
         def attach_news(opp: dict) -> None:
             refs = []
