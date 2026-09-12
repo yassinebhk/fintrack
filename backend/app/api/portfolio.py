@@ -48,6 +48,15 @@ async def get_risk_analysis(svc: PortfolioService = Depends(_get_service)) -> di
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/portfolio/risk-metrics")
+async def get_portfolio_risk_metrics(svc: PortfolioService = Depends(_get_service)) -> dict:
+    """Book-level risk metrics (vol, Sortino, VaR/CVaR, max DD, Calmar, beta/alpha)."""
+    try:
+        return await svc.portfolio_risk_metrics()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.get("/portfolio/history")
 async def get_portfolio_history(
     days: int = Query(default=365, ge=1, le=3650), svc: PortfolioService = Depends(_get_service)

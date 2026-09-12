@@ -463,6 +463,11 @@
                     <section class="advanced-analytics" style="margin-top: var(--spacing-lg);">
                         <h3 style="margin:8px 0 4px;">📐 Analítica avanzada</h3>
                         <p class="text-muted" style="font-size:13px; margin:0 0 12px;">Los gráficos que miran los profesionales para juzgar riesgo y consistencia. Se calculan con el histórico real de tu cartera.</p>
+                        <div class="card" id="portfolioRiskCard" style="margin-bottom: var(--spacing-md);">
+                            <h4>🛡️ Riesgo de la cartera (libro entero)</h4>
+                            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">Las mismas métricas que ves por activo, pero de toda tu cartera junta — cómo se comporta el conjunto.</p>
+                            <div id="portfolioRiskMetrics"><p class="text-muted">Cargando…</p></div>
+                        </div>
                         <div class="advanced-grid">
                             <div class="card">
                                 <h4>🌊 Underwater — caída desde máximos<button type="button" class="info-icon" data-info-key="drawdown_historico" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></h4>
@@ -1862,7 +1867,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/ai-advisor.js?v=20260530a"></script>
     <script src="js/asset-analysis.js?v=20260912axes"></script>
     <script src="js/backtest.js?v=20260912info"></script>
-    <script src="js/opportunities.js?v=20260912info"></script>
+    <script src="js/opportunities.js?v=20260912fix"></script>
     <script src="js/asset-deep-analysis.js?v=20260912info"></script>
     <script src="js/asset-detail.js?v=20260912axes"></script>
     <script src="js/transactions.js?v=20260911d"></script>

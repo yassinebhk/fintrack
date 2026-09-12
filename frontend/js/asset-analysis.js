@@ -22,6 +22,7 @@ function initAssetAnalysis() {
     loadBenchmarkChart();
     loadRiskAndCorrelation();
     loadAdvancedAnalytics();
+    loadPortfolioRiskMetrics();
 }
 
 /**
@@ -712,6 +713,39 @@ function _dailyReturns(history) {
     const rets = [];
     for (let i = 1; i < vals.length; i++) rets.push((vals[i] - vals[i - 1]) / vals[i - 1]);
     return rets;
+}
+
+async function loadPortfolioRiskMetrics() {
+    const el = document.getElementById('portfolioRiskMetrics');
+    if (!el) return;
+    let d;
+    try {
+        const r = await fetch(`${ASSET_API}/portfolio/risk-metrics`);
+        if (!r.ok) { el.innerHTML = '<p class="text-muted">No disponible ahora mismo.</p>'; return; }
+        d = await r.json();
+    } catch (e) { el.innerHTML = '<p class="text-muted">No disponible ahora mismo.</p>'; return; }
+    if (d.status !== 'ready') {
+        el.innerHTML = `<p class="text-muted">Necesita más histórico de cartera (${d.days_tracked || 0} días registrados) — se va construyendo cada día.</p>`;
+        return;
+    }
+    const num = (v) => v == null ? '—' : (+v).toFixed(2);
+    const tile = (label, value, sub) => `<div style="background:rgba(43,40,34,0.03); border-radius:8px; padding:10px 12px; min-width:118px; flex:1;">
+        <div style="font-size:11px; color:var(--text-secondary);">${label}</div>
+        <div style="font-size:18px; font-weight:700; margin-top:2px;">${value}</div>
+        ${sub ? `<div style="font-size:10.5px; color:var(--text-tertiary); margin-top:1px;">${sub}</div>` : ''}
+    </div>`;
+    el.innerHTML = `<div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${tile('Volatilidad anual', d.volatility_pct + '%', 'cuánto oscila')}
+        ${tile('Máx. drawdown', d.max_drawdown_pct + '%', 'peor caída desde máximo')}
+        ${tile('Sharpe', num(d.sharpe), 'retorno / riesgo')}
+        ${tile('Sortino', num(d.sortino), 'penaliza solo caídas')}
+        ${tile('Calmar', num(d.calmar), 'retorno / peor caída')}
+        ${tile('VaR 95% diario', d.var_95_pct + '%', 'pérdida diaria extrema')}
+        ${tile('CVaR 95%', d.cvar_95_pct + '%', 'media del peor 5% de días')}
+        ${tile('Beta', num(d.beta), `vs ${d.benchmark}`)}
+        ${tile('Alpha anual', d.alpha_annual_pct == null ? '—' : d.alpha_annual_pct + '%', `vs ${d.benchmark}`)}
+    </div>
+    <p class="text-muted" style="font-size:10.5px; margin:8px 0 0;">Sobre ${d.n_returns} días de retorno reales (excluye días de aportación). Benchmark: ${d.benchmark}.</p>`;
 }
 
 async function loadAdvancedAnalytics() {

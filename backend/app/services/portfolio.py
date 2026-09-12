@@ -319,6 +319,100 @@ class PortfolioService:
         kpis["max_drawdown_date"] = max_dd_date.strftime("%Y-%m-%d") if max_dd > 0 else None
         return kpis
 
+    async def portfolio_risk_metrics(self, benchmark: str = "EUNL.DE") -> dict:
+        """Book-LEVEL risk metrics — the same family we compute per asset, but for the
+        WHOLE portfolio: annualized vol, Sortino, historical VaR/CVaR 95-99, max
+        drawdown, Calmar, Sharpe, skew/kurtosis, and beta/alpha vs a benchmark
+        (MSCI World). Computed from daily NAV snapshots, excluding contribution days
+        (a deposit is a cash flow, not a return). Returns status 'insufficient' when
+        there isn't enough history yet."""
+        async with session_scope() as session:
+            snaps = await SnapshotRepository(session, self.user_id).list_all()
+        out = {"status": "insufficient", "days_tracked": len(snaps)}
+        if len(snaps) < 20:
+            return out
+        dates = [s.snapshot_date for s in snaps]
+        vals = np.array([s.total_value for s in snaps], dtype=float)
+        mask = vals > 0
+        vals, dates = vals[mask], [d for d, m in zip(dates, mask) if m]
+        if len(vals) < 20:
+            return out
+
+        raw = np.diff(vals) / vals[:-1]
+        FLOW = 0.20  # a >20% same-day jump is a deposit/withdrawal, not performance
+        keep = np.abs(raw) <= FLOW
+        r = raw[keep]
+        if len(r) < 15:
+            return out
+
+        ann = np.sqrt(252)
+        rf_daily = 0.03 / 252
+        excess = r - rf_daily
+        vol = float(np.std(r) * ann)
+        downside = r[r < 0]
+        dstd = float(np.std(downside)) if len(downside) else 0.0
+        sortino = float(np.mean(excess) / dstd * ann) if dstd > 0 else 0.0
+        sharpe = float(np.mean(excess) / np.std(excess) * ann) if np.std(excess) > 0 else 0.0
+        var95, var99 = float(np.percentile(r, 5)), float(np.percentile(r, 1))
+        cvar95 = float(r[r <= var95].mean()) if (r <= var95).any() else var95
+        cvar99 = float(r[r <= var99].mean()) if (r <= var99).any() else var99
+
+        peak, max_dd = vals[0], 0.0
+        for v in vals:
+            peak = max(peak, v)
+            max_dd = max(max_dd, (peak - v) / peak)
+        clean = np.where(keep, raw, 0.0)
+        cum = np.cumprod(1 + clean)
+        years = (dates[-1] - dates[0]).days / 365.25
+        cagr = (float(cum[-1]) ** (1 / years) - 1) if years > 0 and cum[-1] > 0 else 0.0
+        calmar = float(cagr / max_dd) if max_dd > 0 else 0.0
+
+        from scipy.stats import kurtosis as _kurt, skew as _skew
+        skewv = float(_skew(r)) if len(r) > 3 else 0.0
+        kurtv = float(_kurt(r)) if len(r) > 3 else 0.0
+
+        # Beta / alpha vs benchmark, aligned on the same snapshot dates.
+        beta = alpha = None
+        try:
+            bh = await self.yahoo.get_history(benchmark, period="1y") or []
+            bmap = {h["date"]: h.get("close") for h in bh if h.get("close")}
+            closes_on = [bmap.get(d.isoformat()) for d in dates]
+            braw = [((closes_on[i] - closes_on[i - 1]) / closes_on[i - 1])
+                    if (closes_on[i] and closes_on[i - 1]) else None
+                    for i in range(1, len(closes_on))]
+            rp, rb = [], []
+            for i, k in enumerate(keep):
+                if k and braw[i] is not None:
+                    rp.append(raw[i]); rb.append(braw[i])
+            if len(rp) >= 15:
+                rp, rb = np.array(rp), np.array(rb)
+                varb = float(np.var(rb))
+                if varb > 0:
+                    beta = float(np.cov(rp, rb)[0, 1] / varb)
+                    alpha = float((np.mean(rp) - beta * np.mean(rb)) * 252 * 100)
+        except Exception as exc:
+            logger.debug("portfolio beta/alpha failed: {}", exc)
+
+        return {
+            "status": "ready",
+            "days_tracked": len(snaps),
+            "n_returns": len(r),
+            "volatility_pct": round(vol * 100, 1),
+            "sortino": round(sortino, 2),
+            "sharpe": round(sharpe, 2),
+            "var_95_pct": round(var95 * 100, 2),
+            "var_99_pct": round(var99 * 100, 2),
+            "cvar_95_pct": round(cvar95 * 100, 2),
+            "cvar_99_pct": round(cvar99 * 100, 2),
+            "max_drawdown_pct": round(-max_dd * 100, 1),
+            "calmar": round(calmar, 2),
+            "skew": round(skewv, 2),
+            "excess_kurtosis": round(kurtv, 2),
+            "beta": round(beta, 2) if beta is not None else None,
+            "alpha_annual_pct": round(alpha, 1) if alpha is not None else None,
+            "benchmark": benchmark,
+        }
+
     async def get_portfolio_history(self, days: int = 365) -> list[dict]:
         async with session_scope() as session:
             rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)
