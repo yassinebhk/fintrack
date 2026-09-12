@@ -14,6 +14,7 @@ from app.models.snapshot import Snapshot
 from app.models.ticker_mapping import TickerMapping
 from app.models.transaction import Transaction
 from app.models.user import User
+from app.models.watchlist import Watchlist
 
 __all__ = [
     "AgentRun",
@@ -30,4 +31,5 @@ __all__ = [
     "TickerMapping",
     "Transaction",
     "User",
+    "Watchlist",
 ]

@@ -49,6 +49,10 @@
                     <span class="nav-icon">📔</span>
                     <span class="nav-label">Diario</span>
                 </li>
+                <li class="nav-item" data-page="watchlist">
+                    <span class="nav-icon">👀</span>
+                    <span class="nav-label">Watchlist</span>
+                </li>
                 <li class="nav-item" data-page="analysis">
                     <span class="nav-icon">📈</span>
                     <span class="nav-label">Análisis</span>
@@ -1523,6 +1527,16 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                     <div id="journalContent"></div>
                 </div>
 
+                <div class="page page-watchlist" id="page-watchlist">
+                    <section class="manager-header">
+                        <div>
+                            <h2>👀 Watchlist</h2>
+                            <p>Activos que vigilas para comprar, con su <strong>setup de entrada</strong> en vivo (RSI, tendencia, rango 52s, ADX).</p>
+                        </div>
+                    </section>
+                    <div id="watchlistContent"></div>
+                </div>
+
                 <div class="page page-backtest" id="page-backtest">
                     <section class="manager-header">
                         <div>
@@ -1904,6 +1918,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/polymarket.js?v=20260912info"></script>
     <script src="js/daytrading.js?v=20260912info"></script>
     <script src="js/journal.js?v=20260912journal"></script>
+    <script src="js/watchlist.js?v=20260912watch"></script>
     <script src="js/pages.js?v=20260912axes"></script>
 </body>
 </html>

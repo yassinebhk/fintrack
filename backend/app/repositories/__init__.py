@@ -7,6 +7,7 @@ from app.repositories.price_cache import PriceCacheRepository
 from app.repositories.snapshots import SnapshotRepository
 from app.repositories.ticker_mappings import TickerMappingRepository
 from app.repositories.transactions import TransactionRepository
+from app.repositories.watchlist import WatchlistRepository
 
 __all__ = [
     "DayTradeRepository",
@@ -16,4 +17,5 @@ __all__ = [
     "SnapshotRepository",
     "TickerMappingRepository",
     "TransactionRepository",
+    "WatchlistRepository",
 ]

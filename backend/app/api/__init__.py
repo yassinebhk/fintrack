@@ -30,6 +30,7 @@ from app.api import (
     systematic,
     telegram,
     transactions,
+    watchlist,
 )
 
 
@@ -62,4 +63,5 @@ def build_api_router() -> APIRouter:
     router.include_router(settings.router)
     router.include_router(systematic.router)
     router.include_router(telegram.router)
+    router.include_router(watchlist.router)
     return router
