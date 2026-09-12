@@ -24,6 +24,7 @@ function initAssetAnalysis() {
     loadAdvancedAnalytics();
     loadPortfolioRiskMetrics();
     loadHoldingsCatalysts();
+    loadAttribution();
 }
 
 /**
@@ -747,6 +748,40 @@ async function loadPortfolioRiskMetrics() {
         ${tile('Alpha anual', d.alpha_annual_pct == null ? '—' : d.alpha_annual_pct + '%', `vs ${d.benchmark}`)}
     </div>
     <p class="text-muted" style="font-size:10.5px; margin:8px 0 0;">Sobre ${d.n_returns} días de retorno reales (excluye días de aportación). Benchmark: ${d.benchmark}.</p>`;
+}
+
+async function loadAttribution() {
+    const el = document.getElementById('attributionContent');
+    if (!el) return;
+    let d;
+    try {
+        const r = await fetch(`${ASSET_API}/portfolio/attribution`);
+        if (!r.ok) { el.innerHTML = '<p class="text-muted">No disponible.</p>'; return; }
+        d = await r.json();
+    } catch (e) { el.innerHTML = '<p class="text-muted">No disponible.</p>'; return; }
+    const pos = d.by_position || [];
+    if (!pos.length) { el.innerHTML = '<p class="text-muted">Sin posiciones.</p>'; return; }
+    const maxAbs = Math.max(...pos.map(p => Math.abs(p.gain_loss_eur)), 1);
+    const fmt = (v) => (v >= 0 ? '+' : '') + Math.round(v).toLocaleString('es-ES') + ' €';
+    const rows = pos.map(p => {
+        const w = Math.round(Math.abs(p.gain_loss_eur) / maxAbs * 100);
+        const color = p.gain_loss_eur >= 0 ? 'var(--positive)' : 'var(--negative)';
+        return `<div style="display:flex; align-items:center; gap:8px; margin:4px 0; font-size:12.5px;">
+            <span style="flex:0 0 140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${p.name}">${p.name}</span>
+            <span style="flex:1; background:rgba(43,40,34,0.05); border-radius:4px; height:14px; position:relative;">
+                <span style="position:absolute; left:0; top:0; height:14px; width:${w}%; background:${color}; border-radius:4px;"></span>
+            </span>
+            <span class="mono" style="flex:0 0 92px; text-align:right; color:${color};">${fmt(p.gain_loss_eur)}</span>
+            <span class="mono text-muted" style="flex:0 0 52px; text-align:right;">${p.contribution_pct}%</span>
+        </div>`;
+    }).join('');
+    const tsum = (d.by_type || []).map(t =>
+        `${t.type}: <strong style="color:${t.gain_loss_eur >= 0 ? 'var(--positive)' : 'var(--negative)'};">${fmt(t.gain_loss_eur)}</strong>`
+    ).join(' · ');
+    el.innerHTML = `<p style="font-size:13px; margin:0 0 8px;">P/L total: <strong>${fmt(d.total_gain_loss_eur)}</strong></p>
+        ${rows}
+        ${tsum ? `<p class="text-muted" style="font-size:11.5px; margin:10px 0 0;">Por tipo: ${tsum}</p>` : ''}
+        <p class="text-muted" style="font-size:10.5px; margin:6px 0 0;">El % es la contribución al P/L <em>neto</em> — puede pasar de 100% si hay posiciones que restan.</p>`;
 }
 
 async function loadHoldingsCatalysts() {

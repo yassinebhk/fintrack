@@ -454,6 +454,41 @@ class PortfolioService:
         events.sort(key=lambda e: e["date"])
         return events[:20]
 
+    async def performance_attribution(self) -> dict:
+        """What is actually driving your P/L: each holding's contribution to the total
+        gain/loss (€ and % of the net total), plus a breakdown by asset type. Money-
+        terms attribution from current unrealized P/L — the most honest view without
+        per-lot return series. NOTE: a single winner can exceed 100% of the NET total
+        when other positions are losing (the % is share of the net, not of a pie)."""
+        portfolio = await self.calculate_portfolio()
+        positions = portfolio.get("positions", []) or []
+        total_gl = sum((p.get("gain_loss") or 0.0) for p in positions)
+
+        by_position = sorted(
+            [{
+                "ticker": p.get("ticker"),
+                "name": p.get("name") or p.get("ticker"),
+                "type": p.get("type") or "otro",
+                "gain_loss_eur": round(p.get("gain_loss") or 0.0, 2),
+                "gain_loss_pct": round(p.get("gain_loss_pct") or 0.0, 2),
+                "weight_pct": round(p.get("weight") or 0.0, 2),
+                "contribution_pct": round((p.get("gain_loss") or 0.0) / total_gl * 100, 1) if total_gl else 0.0,
+            } for p in positions],
+            key=lambda c: c["gain_loss_eur"], reverse=True,
+        )
+
+        by_type_map: dict[str, float] = {}
+        for p in positions:
+            t = p.get("type") or "otro"
+            by_type_map[t] = by_type_map.get(t, 0.0) + (p.get("gain_loss") or 0.0)
+        by_type = sorted(
+            [{"type": t, "gain_loss_eur": round(v, 2),
+              "contribution_pct": round(v / total_gl * 100, 1) if total_gl else 0.0}
+             for t, v in by_type_map.items()],
+            key=lambda x: x["gain_loss_eur"], reverse=True,
+        )
+        return {"total_gain_loss_eur": round(total_gl, 2), "by_position": by_position, "by_type": by_type}
+
     async def get_portfolio_history(self, days: int = 365) -> list[dict]:
         async with session_scope() as session:
             rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)

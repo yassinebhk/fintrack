@@ -66,6 +66,15 @@ async def get_portfolio_catalysts(svc: PortfolioService = Depends(_get_service))
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/portfolio/attribution")
+async def get_portfolio_attribution(svc: PortfolioService = Depends(_get_service)) -> dict:
+    """Contribution to total P/L per holding and per asset type."""
+    try:
+        return await svc.performance_attribution()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.get("/portfolio/history")
 async def get_portfolio_history(
     days: int = Query(default=365, ge=1, le=3650), svc: PortfolioService = Depends(_get_service)
