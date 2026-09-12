@@ -5,6 +5,7 @@ from app.models.alert import Alert
 from app.models.briefing import Briefing
 from app.models.broker_sync import BrokerSync
 from app.models.day_trade import DayTrade
+from app.models.journal import JournalEntry
 from app.models.json_cache import JsonCache
 from app.models.position import Position
 from app.models.price_cache import PriceCache
@@ -20,6 +21,7 @@ __all__ = [
     "Briefing",
     "BrokerSync",
     "DayTrade",
+    "JournalEntry",
     "JsonCache",
     "Position",
     "PriceCache",

@@ -45,6 +45,10 @@
                     <span class="nav-icon">💸</span>
                     <span class="nav-label">Transacciones</span>
                 </li>
+                <li class="nav-item" data-page="journal">
+                    <span class="nav-icon">📔</span>
+                    <span class="nav-label">Diario</span>
+                </li>
                 <li class="nav-item" data-page="analysis">
                     <span class="nav-icon">📈</span>
                     <span class="nav-label">Análisis</span>
@@ -1499,6 +1503,16 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                 </div>
 
                 <!-- Backtest Lab Page -->
+                <div class="page page-journal" id="page-journal">
+                    <section class="manager-header">
+                        <div>
+                            <h2>📔 Diario de decisiones</h2>
+                            <p>Registra <strong>por qué</strong> decides (tesis) y, al revisar, <strong>qué aprendiste</strong> (lección) — el hábito que más mejora tus decisiones con el tiempo.</p>
+                        </div>
+                    </section>
+                    <div id="journalContent"></div>
+                </div>
+
                 <div class="page page-backtest" id="page-backtest">
                     <section class="manager-header">
                         <div>
@@ -1879,6 +1893,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/position-review.js?v=20260911d"></script>
     <script src="js/polymarket.js?v=20260912info"></script>
     <script src="js/daytrading.js?v=20260912info"></script>
+    <script src="js/journal.js?v=20260912journal"></script>
     <script src="js/pages.js?v=20260912axes"></script>
 </body>
 </html>
