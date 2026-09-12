@@ -56,10 +56,19 @@ def _process(df: pd.DataFrame, broker: str) -> pd.DataFrame:
                 })
         return pd.DataFrame(result)
 
-    # Generic
-    ticker_col = next((c for c in ["ticker", "symbol", "isin", "name"] if c in cols), None)
+    # Generic — also covers eToro ("Instrument"/"Units"/"Open Rate") and Revolut
+    # ("Symbol"/"Quantity"/"Price per share") position/portfolio exports, which
+    # don't match any of the specific formats above but use recognizable
+    # column-name variants.
+    ticker_col = next((c for c in ["ticker", "symbol", "isin", "instrument", "name"] if c in cols), None)
     qty_col = next((c for c in ["quantity", "qty", "shares", "units", "amount", "anzahl"] if c in cols), None)
-    price_col = next((c for c in ["avg_price", "price", "cost", "purchase_price", "kaufkurs"] if c in cols), None)
+    price_col = next(
+        (c for c in [
+            "avg_price", "price", "cost", "purchase_price", "kaufkurs",
+            "open rate", "open price", "price per share", "average cost", "avg. open rate",
+        ] if c in cols),
+        None,
+    )
     type_col = next((c for c in ["type", "asset_type", "category"] if c in cols), None)
     currency_col = next((c for c in ["currency", "ccy"] if c in cols), None)
 
@@ -71,7 +80,9 @@ def _process(df: pd.DataFrame, broker: str) -> pd.DataFrame:
         entry = {
             "ticker": str(row.get(ticker_col, "")).upper().strip(),
             "quantity": float(str(row.get(qty_col, 0)).replace(",", ".")),
-            "avg_price": float(str(row.get(price_col, 0)).replace(",", ".").replace("€", "").replace("$", "").strip()) if price_col else 0,
+            "avg_price": float(
+                str(row.get(price_col, 0)).replace(",", ".").replace("€", "").replace("$", "").replace("£", "").strip()
+            ) if price_col else 0,
             "type": str(row.get(type_col, "stock")).lower() if type_col else "stock",
             "currency": str(row.get(currency_col, "EUR")).upper() if currency_col else "EUR",
             "broker": broker,

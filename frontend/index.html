@@ -6,17 +6,20 @@
     <title>FinTrack - Dashboard Financiero Personal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260912blue">
+    <link rel="stylesheet" href="css/styles.css?v=20260912spark">
 </head>
 <body>
     <div id="loginGate" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:24px;">
         <h1 style="font-size:22px; margin:0;">📊 FinTrack</h1>
         <p id="loginGateMsg" style="color:#888; max-width:360px; margin:0;">Inicia sesión con tu cuenta de Google para ver tu cartera privada.</p>
         <a href="/api/auth/login" style="display:inline-flex; align-items:center; gap:8px; background:#4285F4; color:#fff; text-decoration:none; padding:10px 20px; border-radius:8px; font-weight:600;">Iniciar sesión con Google</a>
+    </div>
+    <div class="tape-wrap" id="tapeWrap" style="display:none;">
+        <div class="tape-track" id="tapeTrack"></div>
     </div>
     <div class="app">
         <!-- Sidebar Navigation -->
@@ -301,6 +304,7 @@
                                             <th class="text-right" data-sort="quantity">Cantidad</th>
                                             <th class="text-right" data-sort="avg_price">Coste/Unidad</th>
                                             <th class="text-right" data-sort="current_price">Precio Actual</th>
+                                            <th class="text-right">Tendencia</th>
                                             <th class="text-right" data-sort="market_value">Valor</th>
                                             <th class="text-right" data-sort="gain_loss">P/L</th>
                                             <th class="text-right" data-sort="gain_loss_pct">P/L %</th>
@@ -310,7 +314,7 @@
                                     </thead>
                                     <tbody id="positionsBody">
                                         <tr>
-                                            <td colspan="11" class="loading-row">Cargando posiciones...</td>
+                                            <td colspan="12" class="loading-row">Cargando posiciones...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -571,6 +575,8 @@
                                             <option value="TradeRepublic">Trade Republic</option>
                                             <option value="MyInvestor">MyInvestor</option>
                                             <option value="Kraken">Kraken</option>
+                                            <option value="eToro">eToro</option>
+                                            <option value="Revolut">Revolut</option>
                                         </select>
                                     </div>
                                 </div>
@@ -841,6 +847,8 @@
                                         <option value="TradeRepublic">Trade Republic</option>
                                         <option value="MyInvestor">MyInvestor</option>
                                         <option value="Kraken">Kraken</option>
+                                        <option value="eToro">eToro</option>
+                                        <option value="Revolut">Revolut</option>
                                         <option value="DEGIRO">DEGIRO</option>
                                         <option value="Otro">Otro</option>
                                     </select>
@@ -872,7 +880,7 @@
                                 <button class="modal-close" onclick="closeModal('importPdfModal')">×</button>
                             </div>
                             <p class="text-muted" style="margin: 0 0 12px;">
-                                Sube un extracto mensual de MyInvestor o Trade Republic. La IA extrae las posiciones automáticamente y reemplaza las anteriores del mismo broker.
+                                Sube un extracto mensual (MyInvestor, Trade Republic, Kraken, eToro, Revolut...). La IA extrae las posiciones automáticamente y reemplaza las anteriores del mismo broker.
                             </p>
                             <div class="form-row">
                                 <div class="form-group">
@@ -880,6 +888,9 @@
                                     <select id="pdfBroker">
                                         <option value="MyInvestor">MyInvestor</option>
                                         <option value="TradeRepublic">Trade Republic</option>
+                                        <option value="Kraken">Kraken</option>
+                                        <option value="eToro">eToro</option>
+                                        <option value="Revolut">Revolut</option>
                                         <option value="Generic">Otro broker</option>
                                     </select>
                                 </div>
@@ -968,6 +979,8 @@
                                         <option value="Kraken">Kraken</option>
                                         <option value="TradeRepublic">Trade Republic</option>
                                         <option value="MyInvestor">MyInvestor</option>
+                                        <option value="eToro">eToro</option>
+                                        <option value="Revolut">Revolut</option>
                                         <option value="DEGIRO">DEGIRO</option>
                                         <option value="Interactive Brokers">Interactive Brokers</option>
                                         <option value="Otro">Otro</option>
@@ -1040,7 +1053,7 @@
                                     <span class="upload-icon">📁</span>
                                     <p>Arrastra un archivo CSV aquí o haz clic para seleccionar</p>
                                     <input type="file" id="csvFileInput" accept=".csv,.txt" hidden>
-                                    <small>Formatos soportados: Trade Republic, MyInvestor, Kraken, CSV genérico</small>
+                                    <small>Formatos soportados: Trade Republic, MyInvestor, Kraken, eToro, Revolut, CSV genérico</small>
                                 </div>
                                 <div class="form-group" style="margin-top: 1rem;">
                                     <label>Broker de origen</label>
@@ -1048,6 +1061,8 @@
                                         <option value="TradeRepublic">Trade Republic</option>
                                         <option value="MyInvestor">MyInvestor</option>
                                         <option value="Kraken">Kraken</option>
+                                        <option value="eToro">eToro</option>
+                                        <option value="Revolut">Revolut</option>
                                         <option value="DEGIRO">DEGIRO</option>
                                         <option value="Manual">Otro / Manual</option>
                                     </select>
@@ -1598,6 +1613,38 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                         </div>
                     </div>
 
+                    <div class="card" style="margin-bottom:16px;">
+                        <div class="card-header">
+                            <h3>🎯 Tu historial de apuestas en papel</h3>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn-secondary" onclick="pmResetLab()" id="pmResetBtn">🗑️ Reiniciar</button>
+                                <button class="btn-primary" onclick="pmRunLab()" id="pmRunBtn">🔄 Actualizar ahora</button>
+                            </div>
+                        </div>
+                        <p class="text-muted" style="margin-bottom:12px;">Privado — solo tú ves tus apuestas de papel. "Actualizar ahora" busca nuevas señales y resuelve las apuestas cuyo mercado ya haya cerrado.</p>
+                        <div id="pmReportBody">
+                            <p class="text-muted">Cargando tu historial…</p>
+                        </div>
+                        <div class="table-container" style="margin-top:16px;">
+                            <table class="manager-table">
+                                <thead>
+                                    <tr>
+                                        <th>Mercado</th>
+                                        <th class="text-right">Voy a</th>
+                                        <th class="text-right">Modelo</th>
+                                        <th class="text-right">Mercado</th>
+                                        <th class="text-right">Stake</th>
+                                        <th class="text-right">P&amp;L</th>
+                                        <th class="text-right">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pmLedgerBody">
+                                    <tr><td colspan="7" class="text-center text-muted" style="padding:2rem;">Cargando…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <div style="background:#6366f114; border:1px solid #6366f144; border-radius:10px; padding:14px 18px; text-align:center;">
                         <strong>🎉 Has completado el recorrido.</strong>
                         <p style="margin:6px 0 10px; font-size:14px;">Ya sabes invertir (Aprender), cómo funciona FinTrack (Documentación) y hacia dónde va (este Lab).</p>
@@ -1773,7 +1820,8 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="js/app.js?v=20260912blue"></script>
+    <script src="js/app.js?v=20260912spark"></script>
+    <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260912blue"></script>
     <script src="js/news.js?v=20260530a"></script>
     <script src="js/portfolio-manager.js?v=20260825a"></script>
@@ -1785,7 +1833,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/asset-detail.js?v=20260912blue"></script>
     <script src="js/transactions.js?v=20260911d"></script>
     <script src="js/position-review.js?v=20260911d"></script>
-    <script src="js/polymarket.js?v=20260530a"></script>
+    <script src="js/polymarket.js?v=20260912a"></script>
     <script src="js/daytrading.js?v=20260903a"></script>
     <script src="js/pages.js?v=20260912blue"></script>
 </body>

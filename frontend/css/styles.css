@@ -52,6 +52,7 @@
 
     /* Typography */
     --font-display: 'Outfit', sans-serif;
+    --font-serif: 'Source Serif 4', Georgia, serif;
     --font-mono: 'JetBrains Mono', monospace;
 
     /* Spacing */
@@ -114,6 +115,51 @@ body::before {
 }
 
 /* ============================================
+   Ticker tape — live quotes strip, own dark world on purpose
+   (true black so the gain/loss reds and greens pop by contrast)
+   ============================================ */
+.tape-wrap {
+    background: #060606;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.tape-track {
+    display: inline-flex;
+    animation: scroll-tape 42s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tape-track { animation: none; }
+}
+
+@keyframes scroll-tape {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+
+.tape-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 9px;
+    padding: 9px 22px;
+    border-right: 1px solid rgba(255, 255, 255, 0.09);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #8A8A8A;
+    white-space: nowrap;
+}
+
+.tape-item b {
+    color: #F5F3EE;
+    font-weight: 600;
+}
+
+.tape-item .tape-up { color: #34D399; }
+.tape-item .tape-down { color: #FB5A5A; }
+
+/* ============================================
    App Layout with Sidebar
    ============================================ */
 .app {
@@ -162,8 +208,9 @@ body::before {
 }
 
 .logo-text {
+    font-family: var(--font-serif);
     font-size: 1.5rem;
-    font-weight: 700;
+    font-weight: 600;
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -332,9 +379,10 @@ body::before {
 }
 
 .page-title {
-    font-size: 1.25rem;
+    font-family: var(--font-serif);
+    font-size: 1.4rem;
     font-weight: 600;
-    color: var(--text-primary);
+    color: var(--accent-primary);
 }
 
 .header-right {
@@ -441,10 +489,24 @@ body::before {
 }
 
 .card-header h3 {
-    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
     font-weight: 600;
-    color: var(--text-secondary);
-    letter-spacing: 0.02em;
+    color: var(--accent-primary);
+    letter-spacing: 0.01em;
+}
+
+.card-header h3::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: var(--accent-primary);
+    flex: none;
 }
 
 /* ============================================
@@ -812,10 +874,10 @@ body::before {
 
 .positions-table th {
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--text-muted);
+    color: var(--accent-primary);
     padding: var(--spacing-md);
     border-bottom: 1px solid var(--border-primary);
     text-align: left;
@@ -894,27 +956,39 @@ body::before {
 }
 
 .type-badge {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    padding: 3px 8px;
-    border-radius: var(--radius-sm);
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.68rem;
+    padding: 3px 9px;
+    border-radius: 20px;
     text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .type-badge.stock {
-    background: rgba(99, 102, 241, 0.15);
-    color: #818cf8;
+    background: #F0ECF6;
+    color: #7A5FA0;
 }
 
-.type-badge.etf {
-    background: rgba(201, 154, 62, 0.15);
-    color: #fbbf24;
+.type-badge.etf,
+.type-badge.fund {
+    background: #E7ECF2;
+    color: var(--accent-primary);
 }
 
 .type-badge.crypto {
-    background: rgba(214, 91, 138, 0.15);
-    color: #f472b6;
+    background: #FAF0DD;
+    color: #B5822E;
 }
+
+.type-badge.bond,
+.type-badge.commodity {
+    background: var(--positive-bg);
+    color: var(--positive);
+}
+
+/* Small inline trend sparkline shown in a table row */
+.row-spark { vertical-align: middle; display: inline-block; }
 
 .broker-name {
     font-size: 0.8rem;
@@ -1229,8 +1303,8 @@ body::before {
 }
 
 .correlation-table th {
-    color: var(--text-secondary);
-    font-weight: 500;
+    color: var(--accent-primary);
+    font-weight: 600;
 }
 
 .correlation-table td {
@@ -1535,8 +1609,9 @@ body::before {
 
 .transactions-table th {
     font-size: 0.75rem;
+    font-weight: 700;
     text-transform: uppercase;
-    color: var(--text-muted);
+    color: var(--accent-primary);
 }
 
 /* ============================================
@@ -1915,8 +1990,8 @@ body::before {
 
 .services-table th {
     background: var(--bg-tertiary);
-    font-weight: 600;
-    color: var(--text-primary);
+    font-weight: 700;
+    color: var(--accent-primary);
 }
 
 .services-table td,
@@ -2088,8 +2163,8 @@ body::before {
 
 .data-table th {
     background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    font-weight: 600;
+    color: var(--accent-primary);
+    font-weight: 700;
     text-transform: uppercase;
     font-size: 0.75rem;
 }
@@ -2387,7 +2462,10 @@ body::before {
 }
 
 .manager-header h2 {
+    font-family: var(--font-serif);
     font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--accent-primary);
     margin-bottom: var(--spacing-xs);
 }
 
@@ -2464,8 +2542,8 @@ button.action-card {
 .manager-table th {
     font-size: 0.75rem;
     text-transform: uppercase;
-    color: var(--text-muted);
-    font-weight: 600;
+    color: var(--accent-primary);
+    font-weight: 700;
 }
 
 .manager-table tbody tr:hover {
@@ -2584,6 +2662,8 @@ button.action-card {
 
 .preview-table th {
     background: var(--bg-tertiary);
+    color: var(--accent-primary);
+    font-weight: 700;
     position: sticky;
     top: 0;
 }

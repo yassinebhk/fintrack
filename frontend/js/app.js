@@ -375,7 +375,7 @@ function updatePositionsTable(positions) {
     if (!tbody) return;
     
     if (!positions || positions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="loading-row">No hay posiciones</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="loading-row">No hay posiciones</td></tr>';
         return;
     }
     
@@ -435,6 +435,7 @@ function updatePositionsTable(positions) {
             <td class="text-right mono">${formatNumber(pos.quantity, pos.type === 'crypto' ? 6 : 2)}</td>
             <td class="text-right mono">${formatNumber(pos.avg_price)}</td>
             <td class="text-right mono">${formatNumber(pos.current_price)}</td>
+            <td class="text-right" data-spark-ticker="${pos.ticker}" data-spark-broker="${pos.broker}"></td>
             <td class="text-right mono">${formatCurrency(pos.market_value, pos.currency)}</td>
             <td class="text-right mono ${pos.gain_loss >= 0 ? 'value-positive' : 'value-negative'}">
                 ${formatCurrency(pos.gain_loss, pos.currency)}
@@ -448,6 +449,53 @@ function updatePositionsTable(positions) {
             <td class="text-right mono">${formatNumber(pos.weight)}%</td>
         </tr>
     `}).join('');
+
+    // Real recent-trend sparklines, only for the biggest few positions — each
+    // one is a live yfinance-backed call, so we bound the fan-out rather than
+    // firing 20 of them on every dashboard load.
+    loadPositionSparklines(filtered.slice(0, 5));
+}
+
+const _sparklineCache = new Map(); // ticker -> {values, up} — avoids re-hitting yfinance on every re-sort
+
+async function loadPositionSparklines(topPositions) {
+    await Promise.all(topPositions.map(async (pos) => {
+        const cell = document.querySelector(`[data-spark-ticker="${pos.ticker}"][data-spark-broker="${pos.broker}"]`);
+        if (!cell) return;
+
+        const cached = _sparklineCache.get(pos.ticker);
+        if (cached) { cell.innerHTML = renderSparkline(cached.values, cached.up); return; }
+
+        try {
+            const resp = await fetch(`${CONFIG.API_BASE_URL}/portfolio/position-history/${encodeURIComponent(pos.ticker)}?days=30`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const values = (data.history || []).map(h => h.value).filter(v => v > 0);
+            if (values.length < 2) return;
+            const up = values[values.length - 1] >= values[0];
+            _sparklineCache.set(pos.ticker, { values, up });
+            cell.innerHTML = renderSparkline(values, up);
+        } catch (err) {
+            // Silent: a missing sparkline is not worth surfacing as an error.
+        }
+    }));
+}
+
+function renderSparkline(values, up) {
+    const w = 64, h = 24;
+    const min = Math.min(...values), max = Math.max(...values);
+    const range = (max - min) || 1;
+    const pts = values.map((v, i) => {
+        const x = (i / (values.length - 1)) * (w - 4) + 2;
+        const y = h - 2 - ((v - min) / range) * (h - 4);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    const last = pts[pts.length - 1].split(',');
+    const color = up ? 'var(--positive)' : 'var(--negative)';
+    return `<svg class="row-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <polyline fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="${pts.join(' ')}"/>
+        <circle cx="${last[0]}" cy="${last[1]}" r="2" fill="${color}"/>
+    </svg>`;
 }
 
 function updateBrokerFilter(brokers) {
@@ -884,8 +932,10 @@ async function checkAuth() {
 function showLoginGate() {
     const gate = document.getElementById('loginGate');
     const app = document.querySelector('.app');
+    const tape = document.getElementById('tapeWrap');
     if (gate) gate.style.display = 'flex';
     if (app) app.style.display = 'none';
+    if (tape) tape.style.display = 'none';
 }
 
 function showApp() {
@@ -893,6 +943,7 @@ function showApp() {
     const app = document.querySelector('.app');
     if (gate) gate.style.display = 'none';
     if (app) app.style.display = '';
+    if (window.initTicker) window.initTicker();
     const nameEl = document.getElementById('userChipName');
     if (nameEl && currentUser) nameEl.textContent = currentUser.name || currentUser.email;
     const logoutLink = document.getElementById('logoutLink');

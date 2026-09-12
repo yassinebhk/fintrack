@@ -15,7 +15,7 @@ from app.services.brokers.kraken import KrakenAPIError, KrakenAuthError
 
 router = APIRouter(prefix="/api/brokers", tags=["brokers"])
 
-ALLOWED_PDF_BROKERS = {"MyInvestor", "TradeRepublic", "Generic"}
+ALLOWED_PDF_BROKERS = {"MyInvestor", "TradeRepublic", "Kraken", "eToro", "Revolut", "Generic"}
 MAX_PDF_SIZE_MB = 10
 
 
@@ -72,7 +72,7 @@ async def kraken_balance(current_user: User = Depends(get_current_user)) -> dict
 @router.post("/pdf/import")
 async def pdf_import(
     file: UploadFile = File(..., description="PDF de extracto (MyInvestor, TradeRepublic, etc.)"),
-    broker: str = Form(default="Generic", description="MyInvestor | TradeRepublic | Generic"),
+    broker: str = Form(default="Generic", description="MyInvestor | TradeRepublic | Kraken | eToro | Revolut | Generic"),
     replace_existing: bool = Form(default=True, description="Si true, borra las posiciones previas del broker antes de importar"),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),

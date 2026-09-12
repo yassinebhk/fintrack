@@ -271,7 +271,7 @@ def _short_label(b: dict) -> str:
 async def telegram_digest(user_id: int) -> str:
     """Self-explanatory, clean HTML digest for Telegram. Defines every term inline."""
     from app.services.notifications.telegram import html_escape
-    rep = await report()
+    rep = await report(user_id)
     data = await _load(user_id)
     open_bets = [b for b in data.get("bets", []) if b.get("status") == "open"]
 
