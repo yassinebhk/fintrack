@@ -266,6 +266,13 @@ class OpportunityService:
         # 2Y, curve slope) — context for bond ideas, computed here on the VM (FRED).
         rates_context = await self._rates_context()
 
+        # Portfolio daily returns — for correlation-aware position sizing of ideas.
+        try:
+            port_returns = await (await self._get_portfolio_service()).get_nav_returns()
+        except Exception as exc:
+            logger.debug("nav returns for sizing failed: {}", exc)
+            port_returns = {}
+
         # Recent news (already sentiment-classified by LLM) to give the analyst current context.
         # Indexed so the analyst can reference the exact headlines that back each idea.
         news_str, news_items = "", []
@@ -318,7 +325,7 @@ class OpportunityService:
             content = {"disclaimer": "Generado automáticamente desde los datos (IA no disponible ahora)."}
         # Enrich each idea with a 6-month trend chart + the headlines that back it +
         # the ensemble score breakdown of the matching instrument.
-        await self._enrich_opportunities(opportunities, news_items, {t["ticker"]: t for t in themes}, feedback, rates_context)
+        await self._enrich_opportunities(opportunities, news_items, {t["ticker"]: t for t in themes}, feedback, rates_context, port_returns)
 
         # 🫧 Froth guard: flag overheated ideas + thematic concentration + market euphoria,
         # so a momentum engine doesn't quietly push the user into a bubble top.
@@ -584,20 +591,47 @@ class OpportunityService:
         )
         return "\n".join(lines)
 
+    async def _corr_to_portfolio(self, ticker: str, port_returns: dict) -> float | None:
+        """Correlation of a candidate's daily returns with the portfolio's, over the
+        common recent window (needs >=20 overlapping days). Feeds correlation-aware
+        sizing. Reuses the cached 6-month history the chart also fetches, so no extra
+        network cost."""
+        try:
+            import numpy as np
+            hist = await self.scanner.yahoo.get_history(ticker, period="6mo")
+            closes = [(h["date"], h["close"]) for h in (hist or []) if h.get("close")]
+            cand = {}
+            for i in range(1, len(closes)):
+                (d0, c0), (d1, c1) = closes[i - 1], closes[i]
+                if c0:
+                    cand[d1] = (c1 - c0) / c0
+            common = sorted(set(cand) & set(port_returns))
+            if len(common) < 20:
+                return None
+            a = np.array([cand[d] for d in common])
+            b = np.array([port_returns[d] for d in common])
+            if np.std(a) == 0 or np.std(b) == 0:
+                return None
+            return float(np.corrcoef(a, b)[0, 1])
+        except Exception as exc:
+            logger.debug("corr_to_portfolio {} failed: {}", ticker, exc)
+            return None
+
     async def _enrich_opportunities(
         self, opportunities: list[dict], news_items: list[dict],
         by_ticker: dict[str, dict] | None = None, feedback: dict | None = None,
-        rates_context: dict | None = None,
+        rates_context: dict | None = None, port_returns: dict | None = None,
     ) -> None:
         """Attach a 6-month trend chart_url, supporting news (with links), the
         ensemble score breakdown, and the per-idea decision frame (quantified risk,
-        inverse-volatility position size, out-of-sample expectancy, horizon,
+        correlation-aware position size, out-of-sample expectancy, horizon,
         fundamentals for stocks / yield+duration for bonds)."""
         from app.services.charts import line_chart
 
         by_ticker = by_ticker or {}
         by_approach = (feedback or {}).get("by_approach") or {}
         breakeven = (rates_context or {}).get("breakeven_inflation")
+        port_returns = port_returns or {}
 
         def attach_scores(opp: dict) -> None:
             tk = (opp.get("ticker_or_isin") or "").strip().upper()
@@ -615,7 +649,7 @@ class OpportunityService:
             # sorted by absolute contribution, biggest drivers first
             opp["score_breakdown"] = dict(sorted(bd.items(), key=lambda kv: abs(kv[1]), reverse=True))
 
-        def attach_decision(opp: dict) -> None:
+        async def attach_decision(opp: dict) -> None:
             """The 4-part decision frame, each field from real data — never invented.
             Risk/size come from the instrument's price-based factors; expectancy from
             the engine's own out-of-sample track record (gated), never a promise."""
@@ -629,12 +663,18 @@ class OpportunityService:
                 "max_drawdown_pct": round(mdd * 100, 1) if mdd is not None else None,
                 "sharpe": f.get("sharpe"),
             }
-            # Position sizing = inverse-volatility: size the idea so its standalone
-            # contribution to annual portfolio vol (w * vol) stays within a fixed
-            # risk budget. Ignores correlation on purpose (stated in the UI). A real,
-            # standard method (risk parity), using only vol we already compute.
+            # Position sizing: inverse-volatility (risk budget / vol), THEN adjusted
+            # for correlation with the current book — shrink an idea that moves WITH
+            # what you already hold (adds concentration), keep/grow a diversifier.
             if vol and vol > 0:
                 w = max(_SIZE_MIN, min(_SIZE_MAX, _RISK_BUDGET_VOL / vol))
+                if port_returns:
+                    corr = await self._corr_to_portfolio(tk, port_returns)
+                    if corr is not None:
+                        opp["correlation_to_portfolio"] = round(corr, 2)
+                        div = max(0.5, min(1.3, 1.0 - 0.6 * corr))  # high corr -> smaller
+                        w = max(_SIZE_MIN, min(_SIZE_MAX, w * div))
+                        risk["corr_adjusted"] = True
                 risk["suggested_weight_pct"] = round(w * 100, 1)
             opp["risk"] = risk
             opp["expectancy"] = _expectancy_view(by_approach.get(opp.get("approach")))
@@ -696,7 +736,7 @@ class OpportunityService:
         for opp in opportunities:
             attach_news(opp)
             attach_scores(opp)
-            attach_decision(opp)
+        await asyncio.gather(*(attach_decision(o) for o in opportunities))
         await asyncio.gather(*(attach_chart(o) for o in opportunities))
 
 

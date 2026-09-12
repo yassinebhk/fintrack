@@ -413,6 +413,20 @@ class PortfolioService:
             "benchmark": benchmark,
         }
 
+    async def get_nav_returns(self, days: int = 180) -> dict:
+        """Daily portfolio returns keyed by ISO date, excluding contribution days
+        (>20% same-day jump = a cash flow, not performance). Used for correlation-
+        aware position sizing of new ideas vs the current book."""
+        hist = await self.get_portfolio_history(days)
+        out: dict[str, float] = {}
+        for i in range(1, len(hist)):
+            v0, v1 = hist[i - 1].get("value"), hist[i].get("value")
+            if v0 and v1 and v0 > 0:
+                r = (v1 - v0) / v0
+                if abs(r) <= 0.20:
+                    out[hist[i]["date"]] = r
+        return out
+
     async def get_portfolio_history(self, days: int = 365) -> list[dict]:
         async with session_scope() as session:
             rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)

@@ -246,7 +246,11 @@ function renderDecision(op) {
         ? tile('⚖️ Riesgo', `${r.volatility_pct}% vol.`, r.max_drawdown_pct != null ? `peor caída histórica ${r.max_drawdown_pct}%` : '', 'riesgo_score')
         : '';
     const sizeTile = (r.suggested_weight_pct != null)
-        ? tile('📏 Tamaño sugerido', `${r.suggested_weight_pct}%`, 'inverse-vol · ≤2% de vol. a la cartera', 'tamano_sugerido')
+        ? tile('📏 Tamaño sugerido', `${r.suggested_weight_pct}%`,
+            op.correlation_to_portfolio != null
+                ? `inverse-vol · ajustado por correlación con tu cartera (r=${op.correlation_to_portfolio})`
+                : 'inverse-vol · ≤2% de vol. a la cartera',
+            'tamano_sugerido')
         : '';
 
     let expTile = '';
@@ -374,7 +378,11 @@ function renderOpportunities(data) {
     const ratesBanner = (rcx.nominal_10y != null || rcx.real_10y != null) ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:rgba(43,40,34,0.04); border:1px solid rgba(43,40,34,0.12); font-size:13px;">🏦 <strong>Contexto de tipos (EE.UU.):</strong> 10Y <strong>${fmtP(rcx.nominal_10y)}</strong> · 10Y real ${fmtP(rcx.real_10y)} · inflación implícita ${fmtP(rcx.breakeven_inflation)} · 2Y ${fmtP(rcx.two_y)} · curva 10Y-2Y <strong style="color:${inverted ? 'var(--negative)' : 'var(--positive)'};">${rcx.curve_10y_2y == null ? '—' : (rcx.curve_10y_2y > 0 ? '+' : '') + rcx.curve_10y_2y}</strong>${inverted ? ' (invertida ⚠️)' : ''}<br><span class="text-muted" style="font-size:11px;">Marco para renta fija: el <strong>yield real</strong> (yield − inflación) es lo que de verdad ganas; una curva invertida suele avisar de recesión.</span></div>` : '';
 
     const t = data.trends || {};
-    const growRow = (g) => `<tr><td>${g.name} <span class="text-muted" style="font-size:12px;">${g.ticker}</span></td><td class="text-right mono ${(g.ret_3m||0)>=0?'value-positive':'value-negative'}">${g.ret_3m!=null?(g.ret_3m>=0?'+':'')+Math.round(g.ret_3m)+'%':'—'}</td><td class="text-right">${g.above_sma200?'📈':'📉'}</td></tr>`;
+    const growRow = (g) => {
+        const safeTicker = (g.ticker + '').replace(/'/g, "&#39;");
+        const safeName = (g.name + '').replace(/'/g, "&#39;");
+        return `<tr onclick="openDeepAnalysis('${safeTicker}','${safeName}')" style="cursor:pointer;" title="Ver análisis completo"><td>${g.name} <span class="text-muted" style="font-size:12px;">${g.ticker}</span></td><td class="text-right mono ${(g.ret_3m||0)>=0?'value-positive':'value-negative'}">${g.ret_3m!=null?(g.ret_3m>=0?'+':'')+Math.round(g.ret_3m)+'%':'—'}</td><td class="text-right">${g.above_sma200?'📈':'📉'}</td></tr>`;
+    };
     const trendsCard = (t.top_growers_etf && t.top_growers_etf.length) ? `
         <div class="card" style="margin-bottom:16px;">
             <h3>🚀 Tendencias del momento — qué más ha crecido</h3>
