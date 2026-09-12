@@ -546,6 +546,61 @@ class PortfolioService:
 
         return {"total_value": round(total, 2), "scenarios": scenarios}
 
+    async def money_weighted_return(self) -> dict:
+        """Money-weighted return (annualized XIRR) — your TRUE personal return, which
+        accounts for the timing and size of your contributions (unlike time-weighted
+        CAGR). Cashflows are derived from net cost-basis changes in the daily NAV
+        snapshots (money in when your invested cost rises), plus the current value as
+        the final flow. Solved by bisection."""
+        async with session_scope() as session:
+            snaps = await SnapshotRepository(session, self.user_id).list_all()
+        if len(snaps) < 2:
+            return {"status": "insufficient", "days_tracked": len(snaps)}
+
+        flows: list[tuple] = []  # (date, amount) — investor view: money IN is negative
+        prev_cost = None
+        for sN in snaps:
+            c = float(sN.total_cost or 0.0)
+            if prev_cost is None:
+                if c > 0:
+                    flows.append((sN.snapshot_date, -c))
+            else:
+                delta = c - prev_cost
+                if abs(delta) > 1e-6:
+                    flows.append((sN.snapshot_date, -delta))
+            prev_cost = c
+        last = snaps[-1]
+        flows.append((last.snapshot_date, float(last.total_value or 0.0)))
+        if len(flows) < 2 or not any(cf < 0 for _, cf in flows) or not any(cf > 0 for _, cf in flows):
+            return {"status": "insufficient", "days_tracked": len(snaps)}
+
+        t0 = flows[0][0]
+
+        def npv(rate: float) -> float:
+            return sum(cf / ((1 + rate) ** ((d - t0).days / 365.0)) for d, cf in flows)
+
+        lo, hi = -0.9999, 10.0
+        flo, fhi = npv(lo), npv(hi)
+        if flo * fhi > 0:
+            return {"status": "no_converge", "days_tracked": len(snaps)}
+        for _ in range(200):
+            mid = (lo + hi) / 2.0
+            fm = npv(mid)
+            if abs(fm) < 1e-6:
+                lo = hi = mid
+                break
+            if flo * fm < 0:
+                hi = mid
+            else:
+                lo, flo = mid, fm
+        xirr = (lo + hi) / 2.0
+        return {
+            "status": "ready", "days_tracked": len(snaps),
+            "xirr_pct": round(xirr * 100, 2),
+            "net_invested_eur": round(sum(-cf for _, cf in flows[:-1] if cf < 0), 2),
+            "current_value_eur": round(float(last.total_value or 0.0), 2),
+        }
+
     async def get_portfolio_history(self, days: int = 365) -> list[dict]:
         async with session_scope() as session:
             rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)

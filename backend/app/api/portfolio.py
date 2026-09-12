@@ -84,6 +84,15 @@ async def get_portfolio_stress_test(svc: PortfolioService = Depends(_get_service
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/portfolio/money-weighted")
+async def get_portfolio_money_weighted(svc: PortfolioService = Depends(_get_service)) -> dict:
+    """Money-weighted return (annualized XIRR) accounting for contribution timing."""
+    try:
+        return await svc.money_weighted_return()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.get("/portfolio/history")
 async def get_portfolio_history(
     days: int = Query(default=365, ge=1, le=3650), svc: PortfolioService = Depends(_get_service)

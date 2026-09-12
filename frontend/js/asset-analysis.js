@@ -737,7 +737,11 @@ async function loadPortfolioRiskMetrics() {
         <div style="font-size:18px; font-weight:700; margin-top:2px;">${value}</div>
         ${sub ? `<div style="font-size:10.5px; color:var(--text-tertiary); margin-top:1px;">${sub}</div>` : ''}
     </div>`;
+    let mw = null;
+    try { const rm = await fetch(`${ASSET_API}/portfolio/money-weighted`); if (rm.ok) mw = await rm.json(); } catch (e) { /* optional */ }
+    const tirTile = (mw && mw.status === 'ready') ? tile('TIR (money-weighted)', mw.xirr_pct + '%', 'tu retorno real anualizado, con aportaciones') : '';
     el.innerHTML = `<div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${tirTile}
         ${tile('Volatilidad anual', d.volatility_pct + '%', 'cuánto oscila')}
         ${tile('Máx. drawdown', d.max_drawdown_pct + '%', 'peor caída desde máximo')}
         ${tile('Sharpe', num(d.sharpe), 'retorno / riesgo')}
