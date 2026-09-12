@@ -49,8 +49,14 @@ def _axis_title(text: str) -> dict:
 
 
 def _scales(x_title: str = "Fecha", y_title: str = "") -> dict:
-    x = {"ticks": {"color": MUTED, "maxRotation": 0, "font": {"size": 11}}, "grid": {"display": False}}
-    y = {"ticks": {"color": MUTED, "font": {"size": 11}}, "grid": {"color": GRID}}
+    # autoSkip:False so Chart.js renders exactly the labels we kept in _thin (incl.
+    # the last/most-recent date) instead of auto-dropping them; tickLength:0 keeps
+    # the many blank in-between ticks from cluttering the axis.
+    x = {
+        "ticks": {"color": MUTED, "maxRotation": 0, "autoSkip": False, "font": {"size": 11}},
+        "grid": {"display": False, "tickLength": 0},
+    }
+    y = {"ticks": {"color": MUTED, "font": {"size": 11}}, "grid": {"color": GRID, "tickLength": 0}}
     if x_title:
         x["title"] = _axis_title(x_title)
     if y_title:
@@ -59,10 +65,20 @@ def _scales(x_title: str = "Fecha", y_title: str = "") -> dict:
 
 
 def _thin(labels: list[str]) -> list[str]:
-    """Thin out x labels so they don't overlap."""
+    """Keep ~8 evenly-spaced x labels PLUS always the last one (today), blanking the
+    rest, so the most-recent date is never dropped off the right edge. A step label
+    too close to that final one is dropped so they don't overlap."""
     n = len(labels)
+    if n <= 10:
+        return list(labels)
     step = max(1, n // 8)
-    return [lbl if i % step == 0 else "" for i, lbl in enumerate(labels)]
+    out = []
+    for i, lbl in enumerate(labels):
+        keep = (i == n - 1)  # the last date (today) always shows
+        if not keep and i % step == 0 and (n - 1 - i) >= step * 0.6:
+            keep = True  # evenly spaced, but not so near the last that labels collide
+        out.append(lbl if keep else "")
+    return out
 
 
 def line_chart(title: str, labels: list[str], values: list[float], color: str = ACCENT,
