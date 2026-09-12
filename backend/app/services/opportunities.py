@@ -707,6 +707,13 @@ class OpportunityService:
                     "duration_bucket": bond.get("category"),
                     "rate_sensitivity": bond.get("beta3Year"),
                 }
+            # Upcoming catalysts (next earnings / ex-dividend) — mostly for stocks.
+            try:
+                cats = await self.scanner.yahoo.get_catalysts(tk)
+                if cats:
+                    opp["catalysts"] = cats
+            except Exception:
+                pass
 
         def attach_news(opp: dict) -> None:
             refs = []

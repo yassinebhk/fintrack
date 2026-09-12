@@ -57,6 +57,15 @@ async def get_portfolio_risk_metrics(svc: PortfolioService = Depends(_get_servic
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/portfolio/catalysts")
+async def get_portfolio_catalysts(svc: PortfolioService = Depends(_get_service)) -> dict:
+    """Upcoming earnings / ex-dividend dates for held assets, soonest first."""
+    try:
+        return {"events": await svc.get_holdings_catalysts()}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.get("/portfolio/history")
 async def get_portfolio_history(
     days: int = Query(default=365, ge=1, le=3650), svc: PortfolioService = Depends(_get_service)

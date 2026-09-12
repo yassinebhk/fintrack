@@ -162,6 +162,41 @@ class YahooFinanceService:
         self._expiry[key] = datetime.now() + timedelta(hours=12)
         return res
 
+    async def get_catalysts(self, ticker: str) -> dict | None:
+        """Upcoming per-asset catalysts via yfinance `.calendar`: next earnings date,
+        ex-dividend and dividend-payment dates (ISO strings). Mostly populated for
+        stocks; ETFs usually return nothing. Uses `.calendar` (no lxml needed).
+        Cached 12h."""
+        key = f"cat:{ticker.upper()}"
+        if self._fresh(key):
+            return self._cache.get(key)
+
+        def _work() -> dict | None:
+            try:
+                cal = yf.Ticker(ticker).calendar
+            except Exception as exc:
+                logger.debug("catalysts for {} failed: {}", ticker, exc)
+                return None
+            if not isinstance(cal, dict) or not cal:
+                return None
+            out: dict = {}
+            ed = cal.get("Earnings Date")
+            if isinstance(ed, (list, tuple)):
+                ed = ed[0] if ed else None
+            if ed is not None:
+                out["earnings"] = ed.isoformat() if hasattr(ed, "isoformat") else str(ed)
+            for src, name in (("Ex-Dividend Date", "ex_dividend"), ("Dividend Date", "dividend")):
+                v = cal.get(src)
+                if v is not None:
+                    out[name] = v.isoformat() if hasattr(v, "isoformat") else str(v)
+            return out or None
+
+        loop = asyncio.get_event_loop()
+        res = await loop.run_in_executor(self._executor, _work)
+        self._cache[key] = res
+        self._expiry[key] = datetime.now() + timedelta(hours=12)
+        return res
+
     async def _fetch_api(self, ticker: str) -> dict | None:
         mapped = await self._resolve_ticker(ticker)
         url = f"{self.BASE_URL}/v8/finance/chart/{mapped}"

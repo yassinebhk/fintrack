@@ -427,6 +427,33 @@ class PortfolioService:
                     out[hist[i]["date"]] = r
         return out
 
+    async def get_holdings_catalysts(self) -> list[dict]:
+        """Upcoming earnings / ex-dividend dates for the (non-crypto) assets you hold,
+        soonest first — so a catalyst on something you own never blindsides you."""
+        portfolio = await self.calculate_portfolio()
+        positions = [p for p in portfolio.get("positions", [])
+                     if p.get("type") != "crypto" and p.get("ticker")]
+
+        async def one(p):
+            try:
+                return p, await self.yahoo.get_catalysts(p["ticker"])
+            except Exception:
+                return p, None
+
+        results = await asyncio.gather(*[one(p) for p in positions]) if positions else []
+        today = date.today().isoformat()
+        events = []
+        for p, c in results:
+            if not c:
+                continue
+            nm = p.get("name") or p["ticker"]
+            for kind, label in (("earnings", "Resultados"), ("ex_dividend", "Ex-dividendo")):
+                d = c.get(kind)
+                if d and d >= today:
+                    events.append({"ticker": p["ticker"], "name": nm, "event": label, "date": d})
+        events.sort(key=lambda e: e["date"])
+        return events[:20]
+
     async def get_portfolio_history(self, days: int = 365) -> list[dict]:
         async with session_scope() as session:
             rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)

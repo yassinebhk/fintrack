@@ -264,15 +264,34 @@ function renderDecision(op) {
 
     const horizonTile = op.horizon ? tile('⏳ Horizonte', op.horizon, 'típico de esta estrategia', 'horizonte') : '';
 
+    // Próximos catalizadores (resultados / ex-dividendo) — no operar a ciegas.
+    const cat = op.catalysts;
+    let catBlock = '';
+    if (cat && (cat.earnings || cat.ex_dividend)) {
+        const daysTo = (iso) => Math.round((new Date(iso) - new Date()) / 86400000);
+        const parts = [];
+        if (cat.earnings) {
+            const dd = daysTo(cat.earnings);
+            const soon = dd >= 0 && dd <= 14;
+            parts.push(`<span${soon ? ' style="color:var(--negative); font-weight:600;"' : ''}>📊 Resultados ${cat.earnings}${dd >= 0 ? ` (en ${dd}d)` : ''}${soon ? ' ⚠️' : ''}</span>`);
+        }
+        if (cat.ex_dividend) {
+            const dd = daysTo(cat.ex_dividend);
+            if (dd >= 0) parts.push(`💰 Ex-dividendo ${cat.ex_dividend} (en ${dd}d)`);
+        }
+        if (parts.length) catBlock = `<div style="font-size:11.5px; margin:6px 0 2px; color:var(--text-secondary);">📅 Próximos catalizadores: ${parts.join(' · ')}</div>`;
+    }
+
     const tiles = [riskTile, sizeTile, expTile, horizonTile].filter(Boolean).join('');
-    if (!edgeLine && !tiles && !fundBlock && !bondBlock) return '';
+    if (!edgeLine && !tiles && !fundBlock && !bondBlock && !catBlock) return '';
     return `<div style="margin:10px 0; padding:10px 12px; border:1px solid rgba(43,40,34,0.10); border-radius:10px; background:rgba(43,40,34,0.015);">
         <div style="font-size:12px; color:var(--text-secondary); font-weight:600; margin-bottom:6px;">🧭 Marco de decisión</div>
         ${edgeLine}
         ${fundBlock}
         ${bondBlock}
+        ${catBlock}
         <div style="display:flex; gap:8px; flex-wrap:wrap;">${tiles}</div>
-        <div style="font-size:10.5px; color:var(--text-tertiary); margin-top:8px; line-height:1.4;">Riesgo y tamaño = estadística sobre precios (el tamaño ignora la correlación con tu cartera). Expectancy = resultado real de esta estrategia <em>después</em> de recomendar (out-of-sample), no una promesa. No es asesoramiento financiero.</div>
+        <div style="font-size:10.5px; color:var(--text-tertiary); margin-top:8px; line-height:1.4;">Riesgo = estadística sobre precios; el tamaño se ajusta por correlación con tu cartera. Expectancy = resultado real de esta estrategia <em>después</em> de recomendar (out-of-sample), no una promesa. No es asesoramiento financiero.</div>
     </div>`;
 }
 

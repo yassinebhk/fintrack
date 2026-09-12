@@ -23,6 +23,7 @@ function initAssetAnalysis() {
     loadRiskAndCorrelation();
     loadAdvancedAnalytics();
     loadPortfolioRiskMetrics();
+    loadHoldingsCatalysts();
 }
 
 /**
@@ -746,6 +747,34 @@ async function loadPortfolioRiskMetrics() {
         ${tile('Alpha anual', d.alpha_annual_pct == null ? '—' : d.alpha_annual_pct + '%', `vs ${d.benchmark}`)}
     </div>
     <p class="text-muted" style="font-size:10.5px; margin:8px 0 0;">Sobre ${d.n_returns} días de retorno reales (excluye días de aportación). Benchmark: ${d.benchmark}.</p>`;
+}
+
+async function loadHoldingsCatalysts() {
+    const el = document.getElementById('holdingsCatalysts');
+    if (!el) return;
+    let ev;
+    try {
+        const r = await fetch(`${ASSET_API}/portfolio/catalysts`);
+        if (!r.ok) { el.innerHTML = '<p class="text-muted">No disponible ahora mismo.</p>'; return; }
+        ev = (await r.json()).events || [];
+    } catch (e) { el.innerHTML = '<p class="text-muted">No disponible ahora mismo.</p>'; return; }
+    if (!ev.length) {
+        el.innerHTML = '<p class="text-muted">Sin eventos próximos detectados (o tu cartera es de ETFs/fondos, que no publican estas fechas).</p>';
+        return;
+    }
+    const daysTo = (iso) => Math.round((new Date(iso) - new Date()) / 86400000);
+    el.innerHTML = `<div class="table-container"><table class="manager-table">
+        <thead><tr><th>Activo</th><th>Evento</th><th class="text-right">Fecha</th><th class="text-right">En</th></tr></thead>
+        <tbody>${ev.map(e => {
+            const dd = daysTo(e.date);
+            const soon = e.event === 'Resultados' && dd >= 0 && dd <= 14;
+            const icon = e.event === 'Resultados' ? '📊' : '💰';
+            return `<tr${soon ? ' style="background:rgba(198,71,60,0.08);"' : ''}>
+                <td>${e.name} <span class="text-muted mono" style="font-size:11px;">${e.ticker}</span></td>
+                <td>${icon} ${e.event}${soon ? ' ⚠️' : ''}</td>
+                <td class="text-right mono">${e.date}</td>
+                <td class="text-right mono">${dd}d</td></tr>`;
+        }).join('')}</tbody></table></div>`;
 }
 
 async function loadAdvancedAnalytics() {
