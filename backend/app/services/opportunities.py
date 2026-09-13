@@ -593,6 +593,13 @@ class OpportunityService:
     def _render_trends_for_prompt(self, trends: dict) -> str:
         """Compact 'what's growing + shared patterns' block for the analyst prompt."""
         lines = ["TENDENCIAS DEL MOMENTO — qué más ha crecido (últimos meses) y patrones comunes:"]
+        st = trends.get("top_growers_stocks") or []
+        if st:
+            lines.append("Top acciones por crecimiento:")
+            for g in st[:6]:
+                r3 = g.get("ret_3m")
+                lines.append(f"  · {g['name']} ({g['ticker']}): 3m {r3:+.0f}%" if r3 is not None
+                             else f"  · {g['name']} ({g['ticker']})")
         gr = trends.get("top_growers_etf") or []
         if gr:
             lines.append("Top ETFs/fondos por crecimiento:")

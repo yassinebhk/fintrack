@@ -14,6 +14,15 @@ from collections import Counter
 from statistics import median
 
 
+def _is_stock(it: dict) -> bool:
+    """Single company vs fund/ETF/bond/commodity. Uses the same category
+    convention as opportunities._cat_group: stocks are tagged 'acción' or come
+    from an equity screen ('screener · …'); ETF screens are 'screener-fondo · …'
+    and stay on the fund side."""
+    cat = str(it.get("category", ""))
+    return cat == "acción" or cat.startswith("screener ·")
+
+
 def _growth(it: dict) -> float | None:
     """Trailing growth: blend 3m (primary) and 6m if available."""
     r3, r6 = it.get("ret_3m"), it.get("ret_6m")
@@ -119,9 +128,16 @@ def analyze_trends(universe_items: list[dict], crypto_items: list[dict] | None =
         if mm is not None:
             patterns.append(f"Momentum medio de los líderes: {mm*100:+.0f}% (multi-periodo).")
 
+    # Split single stocks from ETFs/funds so each gets its own leaderboard
+    # (previously everything non-crypto was lumped under "ETFs/fondos", which hid
+    # the individual stocks that were actually topping the list).
+    stock_items = [it for it in universe_items if _is_stock(it)]
+    fund_items = [it for it in universe_items if not _is_stock(it)]
+
     return {
         "top_growers": top_list(everything, k=8),
-        "top_growers_etf": top_list(universe_items, k=6),
+        "top_growers_stocks": top_list(stock_items, k=6),
+        "top_growers_etf": top_list(fund_items, k=6),
         "top_growers_crypto": top_list(crypto_items, k=5),
         "profile": profile,
         "patterns": patterns,

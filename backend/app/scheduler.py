@@ -329,6 +329,28 @@ async def _day_trading_auto_job() -> None:
         logger.error("day trading auto job failed: {}", exc)
 
 
+async def _intraday_pulse_job() -> None:
+    """A couple of times a day on weekdays: push a compact snapshot of how the
+    owner's holdings are moving intraday, so short-term add/trim calls have fresh
+    context. Owner-only; silent if Telegram is off or the portfolio is empty."""
+    try:
+        from app.auth import get_owner_user_id_cached
+        from app.services.daytrading import pulse
+        from app.services.notifications.telegram import TelegramNotifier
+        notifier = TelegramNotifier()
+        if not notifier.enabled:
+            return
+        owner_id = await get_owner_user_id_cached()
+        if owner_id is None:
+            return
+        html = await pulse.build_pulse_html(owner_id)
+        if html:
+            await notifier.send_html(html)
+        logger.info("intraday pulse: {}", "sent" if html else "nothing to send")
+    except Exception as exc:
+        logger.error("intraday pulse job failed: {}", exc)
+
+
 async def _ipo_spacex_reminder() -> None:
     """One-off heads-up around the SpaceX IPO (12-Jun-2026): how the user's space
     ETF (JEDI) is moving, plus a 'sell the news' caution. Fires on 11 and 12 Jun."""
@@ -514,6 +536,17 @@ def setup_jobs() -> None:
         replace_existing=True, max_instances=1, coalesce=True,
     )
     logger.info("scheduled: day_trading_auto_pick @ 08:15 {}", settings.timezone)
+
+    # Intraday trading pulse: how the owner's holdings are moving TODAY, twice on
+    # weekdays (16:00 catches the US open + EU close; 20:00 catches US midday).
+    sched.add_job(
+        _intraday_pulse_job,
+        trigger=CronTrigger(day_of_week="mon-fri", hour="16,20", minute=0, timezone=settings.timezone),
+        id="intraday_pulse",
+        name="Intraday trading pulse (weekdays 16:00 & 20:00)",
+        replace_existing=True, max_instances=1, coalesce=True,
+    )
+    logger.info("scheduled: intraday_pulse @ 16:00 & 20:00 (mon-fri) {}", settings.timezone)
 
 
 def start_scheduler() -> None:

@@ -262,11 +262,17 @@ class TelegramBotHandler:
                 )
             # 'What's growing' trend block (winners + shared patterns)
             trends = payload.get("trends") or {}
-            if trends.get("top_growers_etf") or trends.get("patterns"):
+            if trends.get("top_growers_stocks") or trends.get("top_growers_etf") or trends.get("patterns"):
                 tl = ["🚀 <b>Tendencias del momento</b>"]
+                stk = trends.get("top_growers_stocks") or []
+                if stk:
+                    tl.append("<b>📈 Acciones que más suben (3m):</b>")
+                    for g in stk[:5]:
+                        r3 = g.get("ret_3m")
+                        tl.append(f"• {g.get('name')} ({g.get('ticker')}){f': {r3:+.0f}%' if r3 is not None else ''}")
                 etf = trends.get("top_growers_etf") or []
                 if etf:
-                    tl.append("<b>ETFs/fondos que más suben (3m):</b>")
+                    tl.append("<b>📊 ETFs/fondos que más suben (3m):</b>")
                     for g in etf[:5]:
                         r3 = g.get("ret_3m")
                         tl.append(f"• {g.get('name')} ({g.get('ticker')}){f': {r3:+.0f}%' if r3 is not None else ''}")
