@@ -334,6 +334,7 @@ function renderOpportunities(data) {
             <p style="margin:4px 0;"><strong>📈 Por qué ahora:</strong> ${op.why_now}</p>
             <p style="margin:4px 0;"><strong>⚠️ Riesgos:</strong> ${op.risks}</p>
             <p style="margin:4px 0;"><strong>🎯 Encaje en tu cartera:</strong> ${op.fit}</p>
+            ${(op.macro_shocks && op.macro_shocks.length) ? `<div style="margin:6px 0; font-size:12.5px;"><strong>🌐 Contexto macro:</strong> ${op.macro_shocks.map(m => `<span style="background:${m.direction === 'beneficiado' ? 'rgba(74,155,142,0.15)' : 'rgba(198,71,60,0.13)'}; color:${m.direction === 'beneficiado' ? 'var(--positive)' : 'var(--negative)'}; padding:2px 8px; border-radius:10px; white-space:nowrap;">${m.emoji} ${m.name.split(' (')[0]} ${m.direction === 'beneficiado' ? '✅' : '⚠️'}</span>`).join(' ')}</div>` : ''}
             ${renderDecision(op)}
             ${op.extended ? `<div style="margin:8px 0; background:#a855f718; border:1px solid #a855f755; border-radius:8px; padding:8px 12px; font-size:13px;">${op.extended_note || '🫧 Extendido: alto riesgo de reversión.'}</div>` : ''}
             ${assetLinks(op)}
@@ -411,8 +412,8 @@ function renderOpportunities(data) {
 
     const rk = data.risk_climate || {};
     const rkColor = rk.label === 'risk-off' ? 'var(--negative)' : rk.label === 'cauto' ? 'var(--warning)' : rk.label === 'risk-on' ? 'var(--positive)' : 'var(--text-secondary)';
-    const oilShock = rk.oil_shock ? `<br><span style="color:${rkColor}; font-size:12px;">🛢️ <strong>Riesgo de oferta de petróleo${rk.oil_shock.chokepoint ? ' (' + rk.oil_shock.chokepoint + ')' : ''}</strong>: energía/oro (+) · aerolíneas, consumo, bonos largos y RV amplia (−)</span>` : '';
-    const climateBanner = rk.label ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:${rkColor}14; border:1px solid ${rkColor}44; font-size:13px;">🌡️ <strong>Clima de riesgo:</strong> <span style="color:${rkColor}; text-transform:uppercase; font-weight:600;">${rk.label}</span>${rk.vix != null ? ` · VIX ${Math.round(rk.vix)}` : ''}${rk.curve_10y_2y != null ? ` · curva ${rk.curve_10y_2y > 0 ? '+' : ''}${rk.curve_10y_2y}` : ''}${rk.breadth_pct != null ? ` · amplitud ${rk.breadth_pct}%` : ''}${(rk.reasons && rk.reasons.length) ? `<br><span class="text-muted" style="font-size:11px;">Señales: ${rk.reasons.join(' · ')}</span>` : ''}${oilShock}</div>` : '';
+    const shockLines = (rk.shocks && rk.shocks.length) ? '<br>' + rk.shocks.map(s => `<span style="color:${rkColor}; font-size:12px;">${s.emoji} <strong>${s.name}${s.chokepoint ? ' (' + s.chokepoint + ')' : ''}</strong>: ${s.note}</span>`).join('<br>') : '';
+    const climateBanner = rk.label ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:${rkColor}14; border:1px solid ${rkColor}44; font-size:13px;">🌡️ <strong>Clima de riesgo:</strong> <span style="color:${rkColor}; text-transform:uppercase; font-weight:600;">${rk.label}</span>${rk.vix != null ? ` · VIX ${Math.round(rk.vix)}` : ''}${rk.curve_10y_2y != null ? ` · curva ${rk.curve_10y_2y > 0 ? '+' : ''}${rk.curve_10y_2y}` : ''}${rk.breadth_pct != null ? ` · amplitud ${rk.breadth_pct}%` : ''}${(rk.reasons && rk.reasons.length) ? `<br><span class="text-muted" style="font-size:11px;">Señales: ${rk.reasons.join(' · ')}</span>` : ''}${shockLines}</div>` : '';
 
     const t = data.trends || {};
     const growRow = (g) => {

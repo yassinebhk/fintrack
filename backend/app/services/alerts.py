@@ -181,47 +181,43 @@ class AlertsEngine:
                 )
             )
 
-        # Rule 5: oil supply / maritime-chokepoint shock. The sentiment classifier
-        # often reads these diplomatic-sounding headlines as 'neutral', so flag it
-        # explicitly + spell out the SECOND-ORDER effects on the rest of the book
-        # (what an oil spike drags with it), and which held names are exposed.
+        # Rule 5: macro-shock radar (energy, chips, tariffs, rates, geopolitics,
+        # credit). ONE consolidated deduped alert listing every active shock with
+        # its headlines + second-order effects + which held names are exposed. The
+        # sentiment classifier often reads these as 'neutral', so this flags them.
         try:
-            from app.services import geo_risk
-            shocks = geo_risk.detect(news)
+            from app.services import macro_shocks
+            shocks = macro_shocks.active_shocks(news)
             if shocks:
-                top = shocks[:3]
-                cp = next((s.get("chokepoint") for s in top if s.get("chokepoint")), None)
-                headlines = "\n".join(
-                    f"• {s.get('source','')}: {s.get('title','')}" + (f"\n  {s.get('url')}" if s.get("url") else "")
-                    for s in top
-                )
-                exp = geo_risk.exposure(portfolio.get("positions", []))
-                lines = [
-                    f"{len(shocks)} titular(es) de riesgo de oferta de petróleo"
-                    + (f" ({cp})" if cp else "") + ":",
-                    headlines,
-                    "",
-                    geo_risk.SECOND_ORDER_NOTE,
-                ]
-                if exp["beneficiado"] or exp["presionado"]:
-                    lines.append("\nEn tu cartera (heurístico, no señal cuantitativa):")
-                    for e in exp["beneficiado"]:
-                        lines.append(f"👍 {e['ticker']} — {e['reason']}")
-                    for e in exp["presionado"]:
-                        lines.append(f"👎 {e['ticker']} — {e['reason']}")
+                positions = portfolio.get("positions", [])
+                blocks = []
+                for s in shocks:
+                    cp = s.get("chokepoint")
+                    lines = [f"{s['emoji']} <b>{s['name']}</b>" + (f" — {cp}" if cp else "")]
+                    for h in s["hits"][:2]:
+                        lines.append(f"• {h.get('source','')}: {h.get('title','')}")
+                    lines.append(s["note"])
+                    exp = macro_shocks.exposure(positions, s["key"])
+                    tags = [f"👍{e['ticker']}" for e in exp["beneficiado"]] \
+                         + [f"👎{e['ticker']}" for e in exp["presionado"]]
+                    if tags:
+                        lines.append("En tu cartera: " + " · ".join(tags))
+                    blocks.append("\n".join(lines))
+                keys = "+".join(sorted(s["key"] for s in shocks))
+                short = ", ".join(s["name"].split(" (")[0] for s in shocks)
                 created.append(
                     await self._maybe_create(
-                        kind="oil_supply_shock",
+                        kind="macro_shock",
                         severity="warning",
-                        title="🛢️ Riesgo de oferta de petróleo" + (f" — {cp}" if cp else ""),
-                        body="\n".join(lines),
-                        payload={"count": len(shocks), "chokepoint": cp,
-                                 "urls": [s.get("url") for s in top]},
-                        dedupe_key=f"oil_supply_shock:{cp or 'generic'}:{today_str}",
+                        title=f"⚠️ Radar macro: {short}",
+                        body="\n\n".join(blocks)
+                             + "\n\n<i>Heurístico, no señal cuantitativa — no cambia el ranking.</i>",
+                        payload={"themes": [s["key"] for s in shocks]},
+                        dedupe_key=f"macro_shock:{keys}:{today_str}",
                     )
                 )
         except Exception as exc:
-            logger.debug("oil supply-shock rule failed: {}", exc)
+            logger.debug("macro-shock rule failed: {}", exc)
 
         return await self._deliver_batch([c for c in created if c is not None])
 

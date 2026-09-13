@@ -289,18 +289,16 @@ class OpportunityService:
 
         market_regime = next((t.get("market_regime") for t in themes if t.get("market_regime")), "neutral")
         market_breadth = next((t.get("market_breadth") for t in themes if t.get("market_breadth") is not None), None)
-        # Active oil supply / chokepoint shock in today's headlines → folds into the
-        # risk climate as context (the same detector powers the 5-min alert).
-        oil_shock = None
+        # Active macro shocks in today's headlines (energy, chips, tariffs, rates,
+        # geopolitics, credit) → fold into the risk climate as context (the same
+        # detector powers the 5-min alert and tags the ideas below).
+        shocks = []
         try:
-            from app.services import geo_risk
-            oil_hits = geo_risk.detect(news_items)
-            if oil_hits:
-                cp = next((s.get("chokepoint") for s in oil_hits if s.get("chokepoint")), None)
-                oil_shock = {"count": len(oil_hits), "chokepoint": cp, "top": oil_hits[0].get("title")}
+            from app.services import macro_shocks
+            shocks = macro_shocks.active_shocks(news_items)
         except Exception as exc:
-            logger.debug("oil shock detect (climate) failed: {}", exc)
-        risk_climate = self._risk_climate(market_breadth, rates_context, oil_shock)
+            logger.debug("macro shock detect (climate) failed: {}", exc)
+        risk_climate = self._risk_climate(market_breadth, rates_context, shocks)
 
         # Self-training feedback: the engine's own out-of-sample track record (gated —
         # see scorecard.py — so a small/short sample is never used as if it were a
@@ -340,6 +338,23 @@ class OpportunityService:
         # Enrich each idea with a 6-month trend chart + the headlines that back it +
         # the ensemble score breakdown of the matching instrument.
         await self._enrich_opportunities(opportunities, news_items, {t["ticker"]: t for t in themes}, feedback, rates_context, port_returns)
+
+        # Cross the macro-shock radar with each idea: mark which are helped/hurt by
+        # an active shock, so the recommendation carries its geopolitical context.
+        if shocks:
+            try:
+                from app.services import macro_shocks as _ms
+                for opp in opportunities:
+                    tags = []
+                    for s in shocks:
+                        d = _ms.classify_opportunity(opp, s["key"])
+                        if d:
+                            tags.append({"key": s["key"], "emoji": s["emoji"],
+                                         "name": s["name"], "direction": d})
+                    if tags:
+                        opp["macro_shocks"] = tags
+            except Exception as exc:
+                logger.debug("tag opportunities with shocks failed: {}", exc)
 
         # 🫧 Froth guard: flag overheated ideas + thematic concentration + market euphoria,
         # so a momentum engine doesn't quietly push the user into a bubble top.
@@ -432,11 +447,11 @@ class OpportunityService:
             return {}
 
     @staticmethod
-    def _risk_climate(breadth: float | None, rates: dict | None, oil_shock: dict | None = None) -> dict:
+    def _risk_climate(breadth: float | None, rates: dict | None, shocks: list[dict] | None = None) -> dict:
         """Composite risk-on/off climate — beyond the breadth-only regime — from
-        market breadth + VIX + the 10Y-2Y curve (+ an active oil supply shock).
-        Each stress signal counts once; it's context for the user, not a change to
-        the (validated) scoring tilt."""
+        market breadth + VIX + the 10Y-2Y curve (+ any active macro shocks:
+        energy, chips, tariffs, rates, geopolitics, credit). Each stress signal
+        counts once; it's context for the user, not a change to the scoring tilt."""
         rates = rates or {}
         vix, curve = rates.get("vix"), rates.get("curve_10y_2y")
         score, reasons = 0, []
@@ -450,14 +465,20 @@ class OpportunityService:
             score += 1; reasons.append(f"amplitud débil ({breadth * 100:.0f}%)")
         elif breadth is not None and breadth > 0.60:
             score -= 1; reasons.append(f"amplitud fuerte ({breadth * 100:.0f}%)")
-        if oil_shock and oil_shock.get("count"):
-            cp = oil_shock.get("chokepoint")
-            score += 1; reasons.append(f"riesgo de oferta de petróleo{f' ({cp})' if cp else ''}")
+        if shocks:
+            score += 1  # any active macro shock nudges the climate once (not per theme)
+            for s in shocks:
+                cp = s.get("chokepoint")
+                reasons.append(f"{s['name'].split(' (')[0]}{f' ({cp})' if cp else ''}")
         label = "risk-off" if score >= 2 else "cauto" if score == 1 else "risk-on" if score <= -1 else "neutral"
         out = {"label": label, "score": score, "vix": vix, "curve_10y_2y": curve,
                "breadth_pct": round(breadth * 100) if breadth is not None else None, "reasons": reasons}
-        if oil_shock and oil_shock.get("count"):
-            out["oil_shock"] = oil_shock
+        if shocks:
+            out["shocks"] = [
+                {"key": s["key"], "name": s["name"], "emoji": s["emoji"],
+                 "note": s["note"], "chokepoint": s.get("chokepoint")}
+                for s in shocks
+            ]
         return out
 
     def _froth_guard(self, themes: list[dict], opportunities: list[dict]) -> dict:
@@ -863,6 +884,13 @@ def render_opportunity_caption(op: dict) -> str:
         top = list(bd.items())[:3]  # already sorted by |contribution|
         chips = " · ".join(f"{labels.get(k,k)} {'+' if v>=0 else ''}{v:.2f}" for k, v in top)
         lines.append(f"<b>🧮 Criterios:</b> <i>{esc(chips)}</i>")
+    ms = op.get("macro_shocks") or []
+    if ms:
+        parts = [
+            f"{m['emoji']}{'✅' if m.get('direction') == 'beneficiado' else '⚠️'} {esc(m['name'].split(' (')[0])}"
+            for m in ms
+        ]
+        lines.append("<b>Contexto macro:</b> " + " · ".join(parts))
     if tk:
         from urllib.parse import quote
         lines.append(f'🔗 <a href="https://finance.yahoo.com/quote/{quote(str(tk))}">Ver ficha (precio e info)</a>')
