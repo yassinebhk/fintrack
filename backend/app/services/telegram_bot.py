@@ -22,7 +22,7 @@ from app.services.notifications.telegram import TelegramNotifier, html_escape
 from app.services.portfolio import PortfolioService
 
 
-PAGE_URL = "https://fintrack.34-123-238-158.sslip.io"
+PAGE_URL = "https://personalfintrack.duckdns.org"
 PAGE_LINK = f'\n\n🔗 <a href="{PAGE_URL}">Ver más en FinTrack</a>'
 
 # Friendly display names so we never show raw ISINs to the user

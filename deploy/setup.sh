@@ -80,10 +80,8 @@ if ! command -v caddy &>/dev/null; then
   sudo apt-get install -y caddy
 fi
 
-echo "==> 7/9 Generando Caddyfile con la IP pública de esta VM (sslip.io, sin DNS que tocar)"
-PUBLIC_IP="$(curl -s https://ifconfig.me || curl -s https://icanhazip.com)"
-IP_DASHED="$(echo "$PUBLIC_IP" | tr '.' '-')"
-HOSTNAME="fintrack.${IP_DASHED}.sslip.io"
+echo "==> 7/9 Generando Caddyfile con el dominio de FinTrack"
+HOSTNAME="personalfintrack.duckdns.org"
 sudo tee /etc/caddy/Caddyfile > /dev/null <<EOF
 ${HOSTNAME} {
     reverse_proxy localhost:8000

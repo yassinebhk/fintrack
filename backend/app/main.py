@@ -97,7 +97,7 @@ def create_app() -> FastAPI:
         allow_origins=[
             "http://localhost:3000",
             "http://127.0.0.1:3000",
-            "https://fintrack.34-123-238-158.sslip.io",
+            "https://personalfintrack.duckdns.org",
         ],
         allow_credentials=True,
         allow_methods=["*"],
