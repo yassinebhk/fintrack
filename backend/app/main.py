@@ -125,7 +125,13 @@ def create_app() -> FastAPI:
 
         @app.get("/", include_in_schema=False)
         async def index() -> FileResponse:
-            return FileResponse(str(FRONTEND_DIR / "index.html"))
+            # no-cache so the browser/PWA always revalidates index.html and picks up
+            # the latest ?v= asset references (otherwise a cached index keeps loading
+            # stale CSS/JS forever, regardless of the version bumps).
+            return FileResponse(
+                str(FRONTEND_DIR / "index.html"),
+                headers={"Cache-Control": "no-cache, must-revalidate"},
+            )
 
         # Optional favicon fallback (legacy frontend doesn't ship one)
         @app.get("/favicon.ico", include_in_schema=False)
