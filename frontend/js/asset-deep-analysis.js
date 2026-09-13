@@ -5,6 +5,32 @@
  */
 const DEEP_API = (window.API_BASE_URL || 'http://localhost:8000/api');
 
+// Search ANY asset by ticker/ISIN/name → resolve it → run the same deep analysis.
+// No curated library needed: resolution + analysis both use live Yahoo/CoinGecko data.
+async function analyzeAnyAsset() {
+    const input = document.getElementById('assetSearchInput');
+    const msg = document.getElementById('assetSearchMsg');
+    if (!input || !msg) return;
+    const q = (input.value || '').trim();
+    if (!q) { msg.textContent = 'Escribe un ticker, ISIN o nombre.'; msg.style.color = 'var(--negative)'; return; }
+    msg.textContent = 'Buscando…'; msg.style.color = 'var(--text-secondary)';
+    try {
+        const r = await fetch(`${DEEP_API}/positions/resolve?query=${encodeURIComponent(q)}`);
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+            msg.innerHTML = `⚠️ ${d.detail || 'No encontré ese activo. Prueba con el ticker o ISIN.'}`;
+            msg.style.color = 'var(--negative)';
+            return;
+        }
+        msg.innerHTML = `✓ <strong>${d.name}</strong> (${d.symbol})${d.type_label ? ' · ' + d.type_label : ''} — abriendo análisis…`;
+        msg.style.color = 'var(--positive)';
+        openDeepAnalysis(d.symbol, d.name);
+    } catch (e) {
+        msg.textContent = 'No pude buscar ahora mismo; inténtalo de nuevo.';
+        msg.style.color = 'var(--negative)';
+    }
+}
+
 function _ensureDeepModal() {
     let m = document.getElementById('deepAnalysisModal');
     if (m) return m;

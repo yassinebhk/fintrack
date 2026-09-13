@@ -346,6 +346,17 @@
                         <p>Ve la evolución de cada inversión y decide cuándo comprar o vender</p>
                     </section>
 
+                    <!-- Analyze ANY asset (not just held/recommended) -->
+                    <section class="card" style="margin-bottom:16px;">
+                        <h3>🔬 Analiza cualquier activo</h3>
+                        <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">Escribe un ticker, ISIN o nombre (AAPL, «Apple», IE00B4L5Y983, VWCE.DE, BTC…) y te hago el análisis profesional completo — no hace falta que lo tengas ni que te lo hayamos recomendado.</p>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                            <input type="text" id="assetSearchInput" placeholder="Ej. NVDA, Tesla, IE00B4L5Y983, BTC" autocomplete="off" style="flex:1; min-width:220px;" onkeydown="if(event.key==='Enter'){event.preventDefault();analyzeAnyAsset();}">
+                            <button class="btn-primary" onclick="analyzeAnyAsset()">🔬 Analizar</button>
+                        </div>
+                        <div id="assetSearchMsg" style="font-size:13px; margin-top:6px;"></div>
+                    </section>
+
                     <!-- Asset Charts Section -->
                     <section class="asset-analysis-section">
                         <div class="card asset-chart-card">
@@ -1955,7 +1966,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/asset-analysis.js?v=20260912axes"></script>
     <script src="js/backtest.js?v=20260912info"></script>
     <script src="js/opportunities.js?v=20260913macro"></script>
-    <script src="js/asset-deep-analysis.js?v=20260912info"></script>
+    <script src="js/asset-deep-analysis.js?v=20260913search"></script>
     <script src="js/asset-detail.js?v=20260912axes"></script>
     <script src="js/transactions.js?v=20260911d"></script>
     <script src="js/polymarket.js?v=20260912info"></script>
