@@ -414,12 +414,39 @@ class OpportunityService:
         self._cache_at = datetime.now(timezone.utc)
         await self._persist(payload)  # survive redeploys
 
-        # Snapshot the recommendations for out-of-sample tracking (the scorecard).
+        # Snapshot the recommendations for out-of-sample tracking (the scorecard —
+        # this IS the efficacy "lab": each rec's 1m/3m/6m forward return vs benchmark
+        # is measured and feeds back to calibrate future conviction).
         try:
             from app.services.scorecard import snapshot_recommendations
             await snapshot_recommendations(payload)
         except Exception as exc:
             logger.warning("scorecard snapshot failed: {}", exc)
+
+        # Auto-add today's recommended assets to the owner's watchlist (only NEW
+        # tickers, tagged with provenance — never touches manually-added entries).
+        try:
+            from app.auth import get_owner_user_id_cached
+            from app.db import session_scope
+            from app.repositories import WatchlistRepository
+            owner_id = await get_owner_user_id_cached()
+            if owner_id:
+                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                async with session_scope() as s:
+                    repo = WatchlistRepository(s, owner_id)
+                    existing = {w.ticker.upper() for w in await repo.list_all()}
+                    added = 0
+                    for op in opportunities:
+                        tk = (op.get("ticker_or_isin") or "").strip().upper()
+                        if tk and tk not in existing:
+                            await repo.add(tk, name=op.get("name") or tk,
+                                           note=f"auto · recomendado {today}")
+                            existing.add(tk)
+                            added += 1
+                    if added:
+                        logger.info("watchlist auto-add: {} new recommended tickers", added)
+        except Exception as exc:
+            logger.warning("auto-add to watchlist failed: {}", exc)
         return payload
 
     async def _rates_context(self) -> dict:
