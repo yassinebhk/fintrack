@@ -110,6 +110,13 @@ async def get_portfolio_history(
     return {"history": history, "days": days}
 
 
+@router.get("/portfolio/daily-summaries")
+async def get_daily_summaries(
+    days: int = Query(default=120, ge=1, le=365), svc: PortfolioService = Depends(_get_service)
+) -> dict:
+    return {"summaries": await svc.get_daily_summaries(days), "days": days}
+
+
 @router.get("/portfolio/position-history/{ticker}")
 async def get_position_history(
     ticker: str, days: int = Query(default=365, ge=1, le=3650), svc: PortfolioService = Depends(_get_service)

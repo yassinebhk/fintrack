@@ -64,6 +64,10 @@
                     <span class="nav-icon">📈</span>
                     <span class="nav-label">Análisis</span>
                 </li>
+                <li class="nav-item" data-page="daily-summary">
+                    <span class="nav-icon">📅</span>
+                    <span class="nav-label">Resumen diario</span>
+                </li>
                 <li class="nav-item" data-page="goals">
                     <span class="nav-icon">🎯</span>
                     <span class="nav-label">Objetivos</span>
@@ -1554,6 +1558,16 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                     <div id="watchlistContent"></div>
                 </div>
 
+                <div class="page page-daily-summary" id="page-daily-summary">
+                    <section class="manager-header">
+                        <div>
+                            <h2>📅 Resumen diario</h2>
+                            <p>Registro histórico del resumen de cartera (el que te llega a las 8:00): valor, cambio del día y P/L, día a día.</p>
+                        </div>
+                    </section>
+                    <div id="dailySummaryContent"></div>
+                </div>
+
                 <div class="page page-scorecard" id="page-scorecard">
                     <section class="manager-header">
                         <div>
@@ -1947,6 +1961,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/journal.js?v=20260912journal"></script>
     <script src="js/watchlist.js?v=20260912watch"></script>
     <script src="js/scorecard.js?v=20260913eficacia"></script>
+    <script src="js/daily-summary.js?v=20260913daily"></script>
     <script>
         // PWA: register the service worker (installable + offline app shell)
         if ('serviceWorker' in navigator) {
@@ -1955,6 +1970,6 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
             });
         }
     </script>
-    <script src="js/pages.js?v=20260913drawer"></script>
+    <script src="js/pages.js?v=20260913params"></script>
 </body>
 </html>

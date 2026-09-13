@@ -699,6 +699,35 @@ class PortfolioService:
             rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)
         return [{"date": r.snapshot_date.strftime("%Y-%m-%d"), "value": float(r.total_value)} for r in rows]
 
+    async def get_daily_summaries(self, days: int = 120) -> list[dict]:
+        """Historical record of the daily summary: one row per day from snapshots
+        (value, day change, total P/L), enriched with the archived 08:00 summary
+        HTML for the days it was captured. Newest first."""
+        from app.services.portfolio_report import load_daily_summaries
+        async with session_scope() as session:
+            rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)
+        archived = await load_daily_summaries()
+        out: list[dict] = []
+        for r in rows:
+            d = r.snapshot_date.strftime("%Y-%m-%d")
+            value = float(r.total_value)
+            cost = float(r.total_cost)
+            gl = float(r.total_gain_loss)
+            day = float(r.daily_change)
+            prev_base = value - day
+            out.append({
+                "date": d,
+                "total_value": round(value, 2),
+                "total_cost": round(cost, 2),
+                "total_gain_loss": round(gl, 2),
+                "total_gain_loss_pct": round(gl / cost * 100, 2) if cost else 0.0,
+                "daily_change": round(day, 2),
+                "daily_change_pct": round(day / prev_base * 100, 2) if prev_base else 0.0,
+                "html": (archived.get(d) or {}).get("html"),
+            })
+        out.sort(key=lambda x: x["date"], reverse=True)
+        return out
+
     async def get_asset_history(self, ticker: str, asset_type: str, days: int = 365) -> list[dict] | None:
         if asset_type == "crypto":
             # Yahoo first (no rate limit) — see fetch_all_prices for why CoinGecko-first

@@ -9,6 +9,58 @@ from __future__ import annotations
 from loguru import logger
 
 _PIN_KEY = "pinned_daily_summary"
+_SUMMARIES_KEY = "daily_summaries"   # in-app historical archive of the 08:00 summary
+_SUMMARIES_MAX = 180                 # keep ~6 months of daily summaries
+
+
+async def _save_daily_summary(date: str, html: str, p: dict) -> None:
+    """Archive today's summary (rendered HTML + headline numbers) so the app can
+    show a historical record. Keyed by date; capped to the last _SUMMARIES_MAX days."""
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from app.db import session_scope, upsert_insert
+    from app.models import JsonCache
+    record = {
+        "date": date,
+        "html": html,
+        "total_value": p.get("total_value"),
+        "daily_change": p.get("daily_change"),
+        "daily_change_pct": p.get("daily_change_pct"),
+        "total_gain_loss": p.get("total_gain_loss"),
+        "total_gain_loss_pct": p.get("total_gain_loss_pct"),
+    }
+    try:
+        async with session_scope() as s:
+            row = (await s.execute(select(JsonCache).where(JsonCache.key == _SUMMARIES_KEY))).scalar_one_or_none()
+            items = (row.payload or {}).get("items", {}) if row and row.payload else {}
+            items[date] = record
+            if len(items) > _SUMMARIES_MAX:
+                for d in sorted(items)[:-_SUMMARIES_MAX]:
+                    items.pop(d, None)
+            payload = {"items": items}
+            stmt = upsert_insert()(JsonCache).values(
+                key=_SUMMARIES_KEY, payload=payload, updated_at=datetime.now(timezone.utc)
+            ).on_conflict_do_update(
+                index_elements=["key"],
+                set_={"payload": payload, "updated_at": datetime.now(timezone.utc)},
+            )
+            await s.execute(stmt)
+    except Exception as exc:
+        logger.warning("could not archive daily summary: {}", exc)
+
+
+async def load_daily_summaries() -> dict:
+    """Return the archived daily summaries {date: record}."""
+    try:
+        from sqlalchemy import select
+        from app.db import session_scope
+        from app.models import JsonCache
+        async with session_scope() as s:
+            row = (await s.execute(select(JsonCache).where(JsonCache.key == _SUMMARIES_KEY))).scalar_one_or_none()
+        return (row.payload or {}).get("items", {}) if row and row.payload else {}
+    except Exception as exc:
+        logger.warning("could not load daily summaries: {}", exc)
+        return {}
 
 
 async def _asset_trends(svc, positions: list[dict]) -> dict:
@@ -95,6 +147,7 @@ async def send_daily_summary_pinned(force: bool = False) -> dict:
     )[:14]
     trends = await _asset_trends(svc, shown)
     html = build_summary_html(p, excluded, targets, trends) + "\n📌 <i>Resumen diario</i>"
+    await _save_daily_summary(today, html, p)  # archive for the in-app history
     n = TelegramNotifier()
     mid = await n.send_html_return_id(html)
     if not mid:
