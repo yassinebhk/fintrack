@@ -40,7 +40,7 @@ function _ensureDeepModal() {
     m.innerHTML = `
         <div style="max-width:980px; margin:0 auto; background:var(--bg-card,var(--bg-card)); border:1px solid var(--border-primary,var(--border-primary)); border-radius:14px; padding:22px; position:relative;">
             <button id="deepCloseBtn" style="position:absolute; top:12px; right:14px; background:none; border:none; color:var(--text-secondary); font-size:24px; cursor:pointer;" title="Cerrar">×</button>
-            <div id="deepExport" style="position:absolute; top:14px; left:16px;"></div>
+            <div id="deepExport" style="margin:0 0 12px; padding-right:36px;"></div>
             <div id="deepBody"><div style="text-align:center; padding:40px;"><div class="spinner"></div><p class="text-muted" style="margin-top:14px;">Analizando el activo…</p></div></div>
         </div>`;
     document.body.appendChild(m);
