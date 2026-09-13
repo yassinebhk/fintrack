@@ -329,6 +329,22 @@ async def _day_trading_auto_job() -> None:
         logger.error("day trading auto job failed: {}", exc)
 
 
+async def _recommendations_paper_job() -> None:
+    """Daily: open the day's top recommendations as paper trades in the Trading
+    Diario journal (the 'recommendations paper book' — P/L on top of the scorecard).
+    Owner-only; deduped against open positions. Runs after the scan has landed."""
+    try:
+        from app.auth import get_owner_user_id_cached
+        from app.services.daytrading import auto_pick
+        owner_id = await get_owner_user_id_cached()
+        if owner_id is None:
+            return
+        res = await auto_pick.open_recommendations(owner_id)
+        logger.info("recommendations paper book: {}", res)
+    except Exception as exc:
+        logger.error("recommendations paper job failed: {}", exc)
+
+
 async def _intraday_pulse_job() -> None:
     """A couple of times a day on weekdays: push a compact snapshot of how the
     owner's holdings are moving intraday, so short-term add/trim calls have fresh
@@ -536,6 +552,17 @@ def setup_jobs() -> None:
         replace_existing=True, max_instances=1, coalesce=True,
     )
     logger.info("scheduled: day_trading_auto_pick @ 08:15 {}", settings.timezone)
+
+    # Recommendations paper book: open the day's top ideas as paper trades (after
+    # the scan has landed and the momentum auto-pick ran).
+    sched.add_job(
+        _recommendations_paper_job,
+        trigger=CronTrigger(hour=8, minute=25, timezone=settings.timezone),
+        id="recommendations_paper",
+        name="Open the day's top recommendations as paper trades",
+        replace_existing=True, max_instances=1, coalesce=True,
+    )
+    logger.info("scheduled: recommendations_paper @ 08:25 {}", settings.timezone)
 
     # Intraday trading pulse: how the owner's holdings are moving TODAY, twice on
     # weekdays (16:00 catches the US open + EU close; 20:00 catches US midday).

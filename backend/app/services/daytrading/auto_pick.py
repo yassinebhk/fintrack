@@ -178,3 +178,57 @@ async def pick_and_open(user_id: int) -> dict:
             continue
 
     return {"opened": None, "reason": "all candidates vetoed by news or macro caution", "macro": macro}
+
+
+# Wider room for slower ideas so a value/contrarian ETF isn't stopped out on noise
+# (momentum keeps the tight day-trade band).
+_REC_STOPS = {
+    "valor": (8.0, 16.0),
+    "contrarian": (8.0, 16.0),
+}
+_REC_MAX_PER_DAY = 5
+
+
+async def open_recommendations(user_id: int, max_n: int = _REC_MAX_PER_DAY) -> dict:
+    """Open the day's top recommendations as paper trades in the Trading Diario
+    journal — a live 'recommendations paper book' with P/L on top of the scorecard's
+    forward-return tracking. Ranked by conviction, deduped against already-open
+    tickers, type/approach-aware stops. Reads the cached opportunities (never scans)."""
+    payload = await get_opportunity_service().peek_or_start(force=False)
+    opps = payload.get("opportunities") or []
+    if not opps:
+        return {"opened": 0, "reason": "no opportunities cached"}
+
+    open_trades = await journal.list_trades(user_id, status="open")
+    open_tickers = {(t.get("ticker") or "").upper() for t in open_trades}
+
+    conv_rank = {"alta": 3, "media": 2, "baja": 1}
+    ranked = sorted(opps, key=lambda o: conv_rank.get(o.get("conviction", "media"), 2), reverse=True)
+
+    opened, names = 0, []
+    for op in ranked:
+        if opened >= max_n:
+            break
+        tk = (op.get("ticker_or_isin") or "").upper().strip()
+        if not tk or tk in open_tickers:
+            continue
+        approach = (op.get("approach") or "").lower()
+        stop, tp = _REC_STOPS.get(approach, (STOP_LOSS_PCT, TAKE_PROFIT_PCT))
+        thesis = f"Auto-recomendación ({op.get('approach') or 'motor'}): {(op.get('why_now') or '').strip()}"[:500]
+        if len(thesis) < 20:
+            thesis = f"Auto-recomendación del motor cuantitativo: {op.get('name') or tk} ({op.get('kind') or ''})."
+        try:
+            await journal.open_trade(
+                user_id=user_id, ticker=tk, direction="long", thesis=thesis,
+                stake_eur=STAKE_EUR, stop_loss_pct=stop, take_profit_pct=tp,
+                conviction=op.get("conviction", "media"), name=op.get("name") or tk,
+            )
+            open_tickers.add(tk)
+            opened += 1
+            names.append(tk)
+        except Exception as exc:
+            logger.info("open_recommendations: skip {} ({})", tk, str(exc)[:80])
+            continue
+
+    logger.info("open_recommendations: opened {} paper trades {}", opened, names)
+    return {"opened": opened, "tickers": names}
