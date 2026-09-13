@@ -289,7 +289,18 @@ class OpportunityService:
 
         market_regime = next((t.get("market_regime") for t in themes if t.get("market_regime")), "neutral")
         market_breadth = next((t.get("market_breadth") for t in themes if t.get("market_breadth") is not None), None)
-        risk_climate = self._risk_climate(market_breadth, rates_context)
+        # Active oil supply / chokepoint shock in today's headlines → folds into the
+        # risk climate as context (the same detector powers the 5-min alert).
+        oil_shock = None
+        try:
+            from app.services import geo_risk
+            oil_hits = geo_risk.detect(news_items)
+            if oil_hits:
+                cp = next((s.get("chokepoint") for s in oil_hits if s.get("chokepoint")), None)
+                oil_shock = {"count": len(oil_hits), "chokepoint": cp, "top": oil_hits[0].get("title")}
+        except Exception as exc:
+            logger.debug("oil shock detect (climate) failed: {}", exc)
+        risk_climate = self._risk_climate(market_breadth, rates_context, oil_shock)
 
         # Self-training feedback: the engine's own out-of-sample track record (gated —
         # see scorecard.py — so a small/short sample is never used as if it were a
@@ -421,10 +432,11 @@ class OpportunityService:
             return {}
 
     @staticmethod
-    def _risk_climate(breadth: float | None, rates: dict | None) -> dict:
+    def _risk_climate(breadth: float | None, rates: dict | None, oil_shock: dict | None = None) -> dict:
         """Composite risk-on/off climate — beyond the breadth-only regime — from
-        market breadth + VIX + the 10Y-2Y curve. Each stress signal counts once;
-        it's context for the user, not a change to the (validated) scoring tilt."""
+        market breadth + VIX + the 10Y-2Y curve (+ an active oil supply shock).
+        Each stress signal counts once; it's context for the user, not a change to
+        the (validated) scoring tilt."""
         rates = rates or {}
         vix, curve = rates.get("vix"), rates.get("curve_10y_2y")
         score, reasons = 0, []
@@ -438,9 +450,15 @@ class OpportunityService:
             score += 1; reasons.append(f"amplitud débil ({breadth * 100:.0f}%)")
         elif breadth is not None and breadth > 0.60:
             score -= 1; reasons.append(f"amplitud fuerte ({breadth * 100:.0f}%)")
+        if oil_shock and oil_shock.get("count"):
+            cp = oil_shock.get("chokepoint")
+            score += 1; reasons.append(f"riesgo de oferta de petróleo{f' ({cp})' if cp else ''}")
         label = "risk-off" if score >= 2 else "cauto" if score == 1 else "risk-on" if score <= -1 else "neutral"
-        return {"label": label, "score": score, "vix": vix, "curve_10y_2y": curve,
-                "breadth_pct": round(breadth * 100) if breadth is not None else None, "reasons": reasons}
+        out = {"label": label, "score": score, "vix": vix, "curve_10y_2y": curve,
+               "breadth_pct": round(breadth * 100) if breadth is not None else None, "reasons": reasons}
+        if oil_shock and oil_shock.get("count"):
+            out["oil_shock"] = oil_shock
+        return out
 
     def _froth_guard(self, themes: list[dict], opportunities: list[dict]) -> dict:
         """Anti-bubble guard. Detects (1) market euphoria (% of the universe

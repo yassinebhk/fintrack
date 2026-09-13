@@ -24,11 +24,15 @@ RSS_FEEDS = {
         {"url": "https://www.coindesk.com/arc/outboundfeeds/rss/", "source": "CoinDesk", "category": "crypto"},
     ],
     "economy": [
-        {"url": "https://feeds.reuters.com/reuters/businessNews", "source": "Reuters", "category": "economy"},
-        {"url": "https://www.ft.com/rss/home", "source": "Financial Times", "category": "economy"},
+        # Reuters + FT public RSS were retired (dead as of 2026-09) — replaced by CNBC Economy.
+        {"url": "https://www.cnbc.com/id/20910258/device/rss/rss.html", "source": "CNBC", "category": "economy"},
     ],
     "politics": [
-        {"url": "https://feeds.reuters.com/Reuters/worldNews", "source": "Reuters World", "category": "politics"},
+        # Reuters World RSS is dead; use live world/geopolitics feeds (Al Jazeera has
+        # strong Middle-East / oil-chokepoint coverage — key for the oil supply radar).
+        {"url": "https://www.aljazeera.com/xml/rss/all.xml", "source": "Al Jazeera", "category": "politics"},
+        {"url": "https://www.theguardian.com/world/rss", "source": "The Guardian", "category": "politics"},
+        {"url": "https://www.cnbc.com/id/100727362/device/rss/rss.html", "source": "CNBC World", "category": "politics"},
     ],
     "spain": [
         {"url": "https://e00-expansion.uecdn.es/rss/mercados.xml", "source": "Expansión", "category": "economy"},

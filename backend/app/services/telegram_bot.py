@@ -261,8 +261,18 @@ class TelegramBotHandler:
                         froth_line += f"\n{fr['concentration_warning']}"
                     if fr.get("extended_ideas"):
                         froth_line += f"\n🫧 Extendidas: {', '.join(fr['extended_ideas'])}"
+                # Oil supply / chokepoint shock line (folded into risk climate)
+                rk = payload.get("risk_climate") or {}
+                oil = rk.get("oil_shock")
+                oil_line = ""
+                if oil:
+                    cp = oil.get("chokepoint")
+                    oil_line = (
+                        f"\n🛢️ <b>Riesgo de oferta de petróleo</b>{f' ({cp})' if cp else ''}: "
+                        "energía/oro (+) · aerolíneas/consumo/bonos largos y RV amplia (−)."
+                    )
                 await self.notifier.send_html(
-                    f"💡 <b>Oportunidades del día</b>{regime_line}{froth_line}\n\n<i>{payload['market_summary']}</i>"
+                    f"💡 <b>Oportunidades del día</b>{regime_line}{froth_line}{oil_line}\n\n<i>{payload['market_summary']}</i>"
                 )
             # 'What's growing' trend block (winners + shared patterns)
             trends = payload.get("trends") or {}
