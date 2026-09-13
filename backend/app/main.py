@@ -118,7 +118,7 @@ def create_app() -> FastAPI:
     # /api/* → backend (handled by routers above)
     if FRONTEND_DIR.exists():
         # Mount asset subdirectories
-        for sub in ("css", "js", "pages"):
+        for sub in ("css", "js", "pages", "icons"):
             d = FRONTEND_DIR / sub
             if d.exists():
                 app.mount(f"/{sub}", StaticFiles(directory=str(d)), name=sub)
@@ -135,6 +135,22 @@ def create_app() -> FastAPI:
                 if p.exists():
                     return FileResponse(str(p))
             return FileResponse(str(FRONTEND_DIR / "index.html"))
+
+        # PWA: manifest + service worker live at the site root.
+        @app.get("/manifest.webmanifest", include_in_schema=False)
+        async def manifest() -> FileResponse:
+            return FileResponse(
+                str(FRONTEND_DIR / "manifest.webmanifest"),
+                media_type="application/manifest+json",
+            )
+
+        @app.get("/sw.js", include_in_schema=False)
+        async def service_worker() -> FileResponse:
+            return FileResponse(
+                str(FRONTEND_DIR / "sw.js"),
+                media_type="application/javascript",
+                headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+            )
 
         logger.info("frontend mounted from {}", FRONTEND_DIR)
     else:

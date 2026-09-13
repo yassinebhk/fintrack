@@ -1,0 +1,17 @@
+{
+  "name": "FinTrack — Cartera con IA",
+  "short_name": "FinTrack",
+  "description": "Tu cartera de inversión con análisis cuantitativo, oportunidades y radar macro.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F5F1E9",
+  "theme_color": "#2C4A6E",
+  "lang": "es",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
