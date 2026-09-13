@@ -1819,24 +1819,39 @@ function initNavigation() {
                 window.renderDayTrading();
             }
             
-            // Close sidebar on mobile
+            // Close sidebar on mobile (also hide the backdrop)
             if (window.innerWidth <= 900) {
-                document.querySelector('.sidebar').classList.remove('open');
+                closeMobileSidebar();
             }
         });
     });
-    
-    // Mobile menu toggle
+
+    // Mobile menu toggle + backdrop (so the drawer can be closed by tapping outside;
+    // when open it covers the ☰ button, so a backdrop is the only reliable close).
     const menuToggle = document.getElementById('menuToggle');
-    if (menuToggle) {
+    const sidebar = document.querySelector('.sidebar');
+    let backdrop = document.querySelector('.sidebar-backdrop');
+    if (!backdrop && sidebar) {
+        backdrop = document.createElement('div');
+        backdrop.className = 'sidebar-backdrop';
+        document.body.appendChild(backdrop);
+        backdrop.addEventListener('click', closeMobileSidebar);
+    }
+    if (menuToggle && sidebar) {
         menuToggle.addEventListener('click', () => {
-            document.querySelector('.sidebar').classList.toggle('open');
+            const open = sidebar.classList.toggle('open');
+            if (backdrop) backdrop.classList.toggle('show', open);
         });
     }
 
     // --- Hash routing: make URLs like #opportunities or #algoritmos work ---
     window.addEventListener('hashchange', navigateFromHash);
     navigateFromHash();  // honor the hash on initial load
+}
+
+function closeMobileSidebar() {
+    document.querySelector('.sidebar')?.classList.remove('open');
+    document.querySelector('.sidebar-backdrop')?.classList.remove('show');
 }
 
 // Anchors that live inside the (dynamically injected) docs / learn pages.

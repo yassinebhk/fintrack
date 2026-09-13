@@ -3683,7 +3683,28 @@ button.action-card {
     .card-value {
         font-size: 2rem;
     }
+
+    /* Drawer backdrop: tap anywhere outside to close the sidebar (when open it
+       covers the ☰ button, so this is the reliable way to close it). */
+    .sidebar-backdrop.show {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 150;               /* under sidebar (200), over content */
+    }
+
+    /* Use the full screen width on phones (no desktop-sized gutters). */
+    .main {
+        padding: var(--spacing-md);
+        width: 100%;
+        max-width: 100%;
+    }
+    .page { max-width: 100%; }
 }
+
+/* Hidden until toggled open (base state, all viewports). */
+.sidebar-backdrop { display: none; }
 
 @media (max-width: 600px) {
     .main {
