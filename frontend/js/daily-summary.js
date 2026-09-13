@@ -19,6 +19,8 @@ async function loadDailySummary() {
         return;
     }
     el.innerHTML = dailySummaryHtml(items);
+    const ex = document.getElementById('dailySummaryExport');
+    if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('dailySummaryContent', 'resumen-diario');
 }
 
 function dailySummaryHtml(items) {

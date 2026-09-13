@@ -18,6 +18,8 @@ async function loadScorecard() {
     } catch (e) { /* handled below */ }
     if (!data) { el.innerHTML = '<p class="text-muted">No pude cargar el scorecard ahora mismo.</p>'; return; }
     el.innerHTML = scorecardHtml(data);
+    const ex = document.getElementById('scorecardExport');
+    if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('scorecardContent', 'eficacia-recomendaciones');
 }
 
 function scorecardHtml(d) {

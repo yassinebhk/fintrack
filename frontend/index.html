@@ -1563,31 +1563,34 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                 </div>
 
                 <div class="page page-position-review" id="page-position-review">
-                    <section class="manager-header">
+                    <section class="manager-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
                         <div>
                             <h2>🔄 ¿Vender o mantener?</h2>
                             <p>Señal objetiva por posición (mantener / vigilar / reducir / rotar) según el <strong>horizonte</strong> que le pongas, con el porqué. Mira hacia delante, no tu precio de entrada.</p>
                         </div>
+                        <div id="positionReviewExport"></div>
                     </section>
                     <div id="positionReviewContent"></div>
                 </div>
 
                 <div class="page page-daily-summary" id="page-daily-summary">
-                    <section class="manager-header">
+                    <section class="manager-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
                         <div>
                             <h2>📅 Resumen diario</h2>
                             <p>Registro histórico del resumen de cartera (el que te llega a las 8:00): valor, cambio del día y P/L, día a día.</p>
                         </div>
+                        <div id="dailySummaryExport"></div>
                     </section>
                     <div id="dailySummaryContent"></div>
                 </div>
 
                 <div class="page page-scorecard" id="page-scorecard">
-                    <section class="manager-header">
+                    <section class="manager-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
                         <div>
                             <h2>🎯 Eficacia de las recomendaciones</h2>
                             <p>El track record honesto: cómo han rendido las ideas del motor <strong>después</strong> de recomendarlas (out-of-sample), frente a su índice.</p>
                         </div>
+                        <div id="scorecardExport"></div>
                     </section>
                     <div id="scorecardContent"></div>
                 </div>
@@ -1966,16 +1969,17 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/asset-analysis.js?v=20260912axes"></script>
     <script src="js/backtest.js?v=20260912info"></script>
     <script src="js/opportunities.js?v=20260913macro"></script>
-    <script src="js/asset-deep-analysis.js?v=20260913search"></script>
+    <script src="js/asset-deep-analysis.js?v=20260913export"></script>
     <script src="js/asset-detail.js?v=20260912axes"></script>
     <script src="js/transactions.js?v=20260911d"></script>
     <script src="js/polymarket.js?v=20260912info"></script>
     <script src="js/daytrading.js?v=20260912info"></script>
     <script src="js/journal.js?v=20260912journal"></script>
     <script src="js/watchlist.js?v=20260912watch"></script>
-    <script src="js/scorecard.js?v=20260913eficacia"></script>
-    <script src="js/daily-summary.js?v=20260913daily"></script>
-    <script src="js/position-review.js?v=20260913review"></script>
+    <script src="js/export-utils.js?v=20260913export"></script>
+    <script src="js/scorecard.js?v=20260913export"></script>
+    <script src="js/daily-summary.js?v=20260913export"></script>
+    <script src="js/position-review.js?v=20260913export"></script>
     <script>
         // PWA: register the service worker (installable + offline app shell)
         if ('serviceWorker' in navigator) {

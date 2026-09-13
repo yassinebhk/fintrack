@@ -40,6 +40,7 @@ function _ensureDeepModal() {
     m.innerHTML = `
         <div style="max-width:980px; margin:0 auto; background:var(--bg-card,var(--bg-card)); border:1px solid var(--border-primary,var(--border-primary)); border-radius:14px; padding:22px; position:relative;">
             <button id="deepCloseBtn" style="position:absolute; top:12px; right:14px; background:none; border:none; color:var(--text-secondary); font-size:24px; cursor:pointer;" title="Cerrar">×</button>
+            <div id="deepExport" style="position:absolute; top:14px; left:16px;"></div>
             <div id="deepBody"><div style="text-align:center; padding:40px;"><div class="spinner"></div><p class="text-muted" style="margin-top:14px;">Analizando el activo…</p></div></div>
         </div>`;
     document.body.appendChild(m);
@@ -65,6 +66,11 @@ async function openDeepAnalysis(ticker, name) {
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
         body.innerHTML = renderDeepAnalysis(data);
+        const ex = m.querySelector('#deepExport');
+        if (ex && window.exportToolbarHTML) {
+            const safe = String(ticker).replace(/[^A-Za-z0-9._-]/g, '');
+            ex.innerHTML = exportToolbarHTML('deepBody', 'analisis-' + safe);
+        }
     } catch (err) {
         body.innerHTML = `<div class="alert alert-error" style="margin-top:10px;">No pude analizar el activo: ${err.message}</div>`;
     }

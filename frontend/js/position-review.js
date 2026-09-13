@@ -27,6 +27,8 @@ async function loadPositionReview(force = false) {
         return;
     }
     el.innerHTML = reviewHtml(data);
+    const ex = document.getElementById('positionReviewExport');
+    if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('positionReviewContent', 'vender-o-mantener');
 }
 
 function reviewHtml(data) {
