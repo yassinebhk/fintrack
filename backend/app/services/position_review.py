@@ -30,6 +30,65 @@ _OVERWEIGHT_SOFT = 22.0
 _IMMATERIAL_EUR = 30.0     # below this € value → acting is pointless
 _IMMATERIAL_WEIGHT = 1.0   # and below this % of the portfolio
 
+# Holding horizon changes how a technical dip is read: a long-term core holding
+# rides out a drop below its 200d average (that alone is not a sell), while a
+# short-term position is cut faster. The user sets it per position; we infer a
+# sensible default so the review is never horizon-blind.
+_HORIZON_KEY = "position_horizons"
+_HORIZONS = ("largo", "medio", "corto")
+_BROAD_TERMS = ("world", "acwi", "s&p", "sp500", "s&p500", "nasdaq", "all-world",
+                "all world", "msci world", "ftse all", "stoxx", "total market",
+                "global", "aggregate")
+
+
+def _default_horizon(pos: dict) -> str:
+    """Infer the default holding horizon: broad diversified core (world/S&P/Nasdaq/
+    ACWI/aggregate) + gold = largo; other ETFs/funds/stocks = medio; crypto = corto."""
+    t = (pos.get("type") or "").lower()
+    name = f"{pos.get('name', '')} {pos.get('ticker', '')}".lower()
+    if t == "crypto":
+        return "corto"
+    if any(b in name for b in _BROAD_TERMS) or "oro" in name or "gold" in name:
+        return "largo"
+    return "medio"
+
+
+async def get_horizons() -> dict:
+    """User-set holding horizons {TICKER: 'largo'|'medio'|'corto'}."""
+    try:
+        from sqlalchemy import select
+        from app.db import session_scope
+        from app.models import JsonCache
+        async with session_scope() as s:
+            row = (await s.execute(select(JsonCache).where(JsonCache.key == _HORIZON_KEY))).scalar_one_or_none()
+        return (row.payload or {}).get("horizons", {}) if row and row.payload else {}
+    except Exception as exc:
+        logger.debug("get_horizons failed: {}", exc)
+        return {}
+
+
+async def set_horizon(ticker: str, horizon: str) -> dict:
+    horizon = (horizon or "").lower().strip()
+    if horizon not in _HORIZONS:
+        raise ValueError("horizon debe ser 'largo', 'medio' o 'corto'")
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from app.db import session_scope, upsert_insert
+    from app.models import JsonCache
+    tk = (ticker or "").upper().strip()
+    async with session_scope() as s:
+        row = (await s.execute(select(JsonCache).where(JsonCache.key == _HORIZON_KEY))).scalar_one_or_none()
+        horizons = (row.payload or {}).get("horizons", {}) if row and row.payload else {}
+        horizons[tk] = horizon
+        payload = {"horizons": horizons}
+        stmt = upsert_insert()(JsonCache).values(
+            key=_HORIZON_KEY, payload=payload, updated_at=datetime.now(timezone.utc)
+        ).on_conflict_do_update(
+            index_elements=["key"], set_={"payload": payload, "updated_at": datetime.now(timezone.utc)}
+        )
+        await s.execute(stmt)
+    return {"ticker": tk, "horizon": horizon}
+
 
 def _materiality(value_eur: float, weight: float) -> tuple[str, bool]:
     """Return (label, is_immaterial). Immaterial = too little money to matter."""
@@ -70,8 +129,9 @@ async def _asset_metrics(scanner: MarketScanner, ticker: str, asset_type: str) -
             "last_close": last}
 
 
-def _evaluate(pos: dict, m: dict) -> dict:
-    """Pure decision logic. Returns signal + reasons + bias flag."""
+def _evaluate(pos: dict, m: dict, horizon: str = "medio") -> dict:
+    """Pure decision logic. Returns signal + reasons + bias flag, adjusted for the
+    holding horizon (largo/medio/corto)."""
     f = m.get("factors") or {}
     s = m.get("signals") or {}
     above_sma200 = bool(f.get("above_sma200"))
@@ -113,6 +173,21 @@ def _evaluate(pos: dict, m: dict) -> dict:
     else:
         signal = "VIGILAR"
         reasons.append("Señales mixtas; sin tendencia clara.")
+
+    # --- Horizon adjustment (depende de si lo tienes a corto/medio/largo plazo) ---
+    # Concentration-driven REDUCIR is horizon-independent (a risk cap, not a timing
+    # call), so it's never softened below.
+    concentration_reduce = (pos.get("type") not in ("crypto",) and weight >= _OVERWEIGHT)
+    if horizon == "largo" and not concentration_reduce:
+        if signal == "ROTAR":
+            signal = "VIGILAR"
+            reasons.append("🕰️ A LARGO plazo: una caída bajo la media de 200 sesiones no basta para vender — "
+                           "solo rotaría por deterioro del fundamental o por concentración. Se rebaja a VIGILAR.")
+    elif horizon == "corto":
+        if signal == "VIGILAR" and thesis_broken:
+            signal = "REDUCIR"
+            reasons.append("⏱️ A CORTO plazo: con la tendencia rota conviene cortar antes — se sube a REDUCIR "
+                           "(no dejar correr una tesis rota).")
 
     # --- Disposition-effect detection (the bias the user asked to avoid) ---
     bias = None
@@ -195,22 +270,26 @@ async def _compute_review() -> dict:
     portfolio = await PortfolioService(owner_id or 0).calculate_portfolio()
     positions = portfolio.get("positions") or []
     scanner = MarketScanner()
+    horizons = await get_horizons()
 
     reviews = []
     for pos in positions:
         ticker = pos.get("ticker")
         if not ticker:
             continue
+        tk_up = (ticker or "").upper()
+        horizon = horizons.get(tk_up) or _default_horizon(pos)
+        horizon_is_default = tk_up not in horizons
         m = await _asset_metrics(scanner, ticker, pos.get("type", "stock"))
         if not m:
             reviews.append({
                 "ticker": ticker, "name": pos.get("name") or ticker,
                 "signal": "SIN_DATOS", "reasons": ["Sin histórico suficiente para evaluar objetivamente."],
-                "bias_flag": None,
+                "bias_flag": None, "horizon": horizon, "horizon_is_default": horizon_is_default,
                 "pnl_pct": pos.get("gain_loss_pct"), "weight_pct": round(pos.get("weight", 0) or 0, 1),
             })
             continue
-        ev = _evaluate(pos, m)
+        ev = _evaluate(pos, m, horizon)
         value_eur = round(pos.get("market_value_base", 0) or 0, 2)
         invested_eur = round(pos.get("cost_basis", 0) or 0, 2)
         weight = round(pos.get("weight", 0) or 0, 1)
@@ -233,6 +312,8 @@ async def _compute_review() -> dict:
             "type": pos.get("type"),
             "broker": pos.get("broker"),
             "signal": ev["signal"],
+            "horizon": horizon,
+            "horizon_is_default": horizon_is_default,
             "materiality": mat_label,
             "immaterial": immaterial,
             "reasons": reasons,

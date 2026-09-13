@@ -1,79 +1,107 @@
 /**
- * Position review — objective keep/trim/rotate signals per holding.
- * Forward-looking (not based on entry price); flags the disposition effect.
+ * 🔄 ¿Vender o mantener? — objective keep/watch/trim/rotate signal per holding,
+ * horizon-aware (largo/medio/corto) and forward-looking (NOT based on your entry
+ * price), with the reasons why and disposition-effect bias warnings.
  */
-const PR_API = (window.API_BASE_URL || 'http://localhost:8000/api');
+const REVIEW_API = window.API_BASE_URL || '/api';
 
-const PR_SIGNAL = {
-    ROTAR:    { color: 'var(--negative)', emoji: '🔴', label: 'Rotar' },
-    REDUCIR:  { color: 'var(--warning)', emoji: '🟠', label: 'Reducir' },
-    VIGILAR:  { color: '#eab308', emoji: '🟡', label: 'Vigilar' },
-    MANTENER: { color: 'var(--positive)', emoji: '🟢', label: 'Mantener' },
-    SIN_DATOS:{ color: 'var(--text-tertiary)', emoji: '⚪', label: 'Sin datos' },
+const SIGNAL_META = {
+    MANTENER: { emoji: '🟢', label: 'Mantener', color: 'var(--positive)' },
+    VIGILAR:  { emoji: '🟡', label: 'Vigilar',  color: 'var(--warning)' },
+    REDUCIR:  { emoji: '🟠', label: 'Reducir',  color: '#E08A3C' },
+    ROTAR:    { emoji: '🔴', label: 'Rotar / vender', color: 'var(--negative)' },
+    SIN_DATOS:{ emoji: '⚪', label: 'Sin datos', color: 'var(--text-secondary)' },
 };
 
-async function loadPositionReview() {
-    const btn = document.getElementById('btnReviewPositions');
-    const box = document.getElementById('positionReviewContent');
-    if (btn) btn.disabled = true;
-    box.innerHTML = '<div style="padding:18px; text-align:center;"><div class="spinner"></div><p class="text-muted" style="margin-top:10px;">Analizando con señales objetivas…</p></div>';
+async function loadPositionReview(force = false) {
+    const el = document.getElementById('positionReviewContent');
+    if (!el) return;
+    el.innerHTML = '<p class="text-muted">Analizando tus posiciones…</p>';
+    let data = null;
     try {
-        const resp = await fetch(`${PR_API}/positions/review`, { cache: 'no-store' });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
-        renderPositionReview(data);
-    } catch (err) {
-        box.innerHTML = `<div class="alert alert-error">No se pudo analizar: ${err.message}</div>`;
-    } finally {
-        if (btn) btn.disabled = false;
+        const r = await fetch(`${REVIEW_API}/positions/review${force ? '?force=true' : ''}`);
+        if (r.ok) data = await r.json();
+    } catch (e) { /* handled below */ }
+    if (!data || !(data.reviews || []).length) {
+        el.innerHTML = '<p class="text-muted">No pude analizar las posiciones ahora mismo.</p>';
+        return;
     }
+    el.innerHTML = reviewHtml(data);
 }
 
-function renderPositionReview(data) {
-    const box = document.getElementById('positionReviewContent');
-    const reviews = data.reviews || [];
-    if (!reviews.length) { box.innerHTML = '<p class="text-muted">No hay posiciones para revisar.</p>'; return; }
+function reviewHtml(data) {
     const s = data.summary || {};
+    const pct = (v) => (v == null ? '—' : (v >= 0 ? '+' : '') + (+v).toFixed(1) + '%');
+    const cls = (v) => (v == null ? '' : v >= 0 ? 'value-positive' : 'value-negative');
 
-    const att = s.attention_eur || 0;
-    const summary = `<div style="display:flex; gap:10px; flex-wrap:wrap; margin:8px 0 8px;">
-        ${[['ROTAR',s.rotar],['REDUCIR',s.reducir],['VIGILAR',s.vigilar],['MANTENER',s.mantener]].map(([k,n]) => {
-            const c = PR_SIGNAL[k];
-            return `<span style="background:${c.color}22; color:${c.color}; padding:3px 10px; border-radius:12px; font-size:13px;">${c.emoji} ${c.label}: ${n||0}</span>`;
-        }).join('')}
-    </div>
-    <div style="font-size:13px; margin:0 0 14px; padding:8px 12px; background:rgba(198, 71, 60,0.08); border-radius:8px;">
-        💰 <strong>Dinero que de verdad pide atención</strong> (posiciones materiales a rotar/reducir): <strong>${att.toLocaleString('es-ES',{maximumFractionDigits:0})}€</strong>.
-        ${(s.rotar||0) > (s.rotar_material||0) ? `<span class="text-muted"> (${(s.rotar||0)-(s.rotar_material||0)} señal(es) son de importe insignificante — ignóralas.)</span>` : ''}
+    const banner = `<div class="card" style="margin-bottom:16px;">
+        <h3>🔄 ¿Vender o mantener?</h3>
+        <p class="text-muted" style="font-size:13px; margin:6px 0 10px;">
+            Señal por posición mirando <strong>hacia delante</strong> (salud del activo + tu concentración), <strong>no</strong> tu precio de entrada.
+            Depende del <strong>horizonte</strong> que le pongas a cada activo. No es una orden — decide tú.</p>
+        <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:13px;">
+            <span>🔴 Rotar <strong>${s.rotar || 0}</strong></span>
+            <span>🟠 Reducir <strong>${s.reducir || 0}</strong></span>
+            <span>🟡 Vigilar <strong>${s.vigilar || 0}</strong></span>
+            <span>🟢 Mantener <strong>${s.mantener || 0}</strong></span>
+        </div>
     </div>`;
 
-    const cards = reviews.map(r => {
-        const c = PR_SIGNAL[r.signal] || PR_SIGNAL.SIN_DATOS;
+    const cards = data.reviews.map((r) => {
+        const meta = SIGNAL_META[r.signal] || SIGNAL_META.SIN_DATOS;
+        const hz = r.horizon || 'medio';
+        const opt = (v, lbl) => `<option value="${v}"${hz === v ? ' selected' : ''}>${lbl}</option>`;
+        const reasons = (r.reasons || []).map((x) => `<li>${x}</li>`).join('');
+        const bias = r.bias_flag ? `<div style="margin-top:8px; background:rgba(198,71,60,0.10); border:1px solid rgba(198,71,60,0.35); border-radius:8px; padding:8px 12px; font-size:12.5px;">${r.bias_flag}</div>` : '';
         const m = r.metrics || {};
-        const pnlCls = (r.pnl_pct||0) >= 0 ? 'value-positive' : 'value-negative';
-        const metricsRow = m.momentum_pct !== undefined ? `
-            <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-secondary); margin:6px 0;">
-                <span>Tendencia: <strong>${m.above_sma200 ? 'sobre SMA200 📈' : 'bajo SMA200 📉'}</strong></span>
-                <span>Momentum: <strong class="${(m.momentum_pct||0)>=0?'value-positive':'value-negative'}">${m.momentum_pct>=0?'+':''}${m.momentum_pct}%</strong></span>
-                ${m.rsi!=null?`<span>RSI: <strong>${Math.round(m.rsi)}</strong></span>`:''}
-                ${m.drawdown_from_peak_pct!=null?`<span>Desde máximo: <strong class="value-negative">${m.drawdown_from_peak_pct}%</strong></span>`:''}
-                ${m.sharpe!=null?`<span>Sharpe: <strong>${m.sharpe}</strong></span>`:''}
-            </div>` : '';
+        const metricsLine = (r.signal !== 'SIN_DATOS') ? `<div class="text-muted" style="font-size:11.5px; margin-top:8px;">
+            ${m.above_sma200 != null ? (m.above_sma200 ? '📈 sobre media 200' : '📉 bajo media 200') : ''}
+            ${m.rsi != null ? ` · RSI ${Math.round(m.rsi)}` : ''}
+            ${m.momentum_pct != null ? ` · momentum ${pct(m.momentum_pct)}` : ''}
+            ${m.drawdown_from_peak_pct != null ? ` · desde máx ${(+m.drawdown_from_peak_pct).toFixed(0)}%` : ''}
+        </div>` : '';
         const dim = r.immaterial ? 'opacity:0.6;' : '';
-        const matBadge = r.immaterial ? ' <span class="text-muted" style="font-size:11px;">💤 importe insignificante</span>' : '';
-        return `
-        <div class="card" style="margin-bottom:12px; border-left:4px solid ${c.color}; ${dim}">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-                <h4 style="margin:0;">${r.name} <span class="text-muted" style="font-size:12px;">${r.ticker}</span>${matBadge}</h4>
-                <span style="background:${c.color}22; color:${c.color}; padding:3px 12px; border-radius:12px; font-weight:600;">${c.emoji} ${c.label}</span>
+        return `<div class="card" style="margin-bottom:12px; border-left:3px solid ${meta.color}; ${dim}">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
+                <div>
+                    <strong>${meta.emoji} ${meta.label}</strong> ·
+                    ${r.name} <span class="text-muted mono" style="font-size:11px;">${r.ticker}</span>
+                    <div class="text-muted" style="font-size:11.5px; margin-top:2px;">
+                        Peso ${r.weight_pct != null ? r.weight_pct + '%' : '—'}
+                        ${r.pnl_pct != null ? ` · P/L <span class="${cls(r.pnl_pct)}">${pct(r.pnl_pct)}</span>` : ''}
+                        ${r.value_eur != null ? ` · ${(+r.value_eur).toLocaleString('es-ES', { maximumFractionDigits: 0 })} €` : ''}
+                    </div>
+                </div>
+                <label style="font-size:12px; white-space:nowrap;">Horizonte
+                    <select onchange="setHorizon('${(r.ticker + '').replace(/'/g, '')}', this.value)" style="margin-left:4px;">
+                        ${opt('largo', 'Largo')}${opt('medio', 'Medio')}${opt('corto', 'Corto')}
+                    </select>${r.horizon_is_default ? ' <span class="text-muted" style="font-size:10px;">(auto)</span>' : ''}
+                </label>
             </div>
-            <p class="text-muted" style="font-size:12px; margin:4px 0;">Invertido <strong>${(r.invested_eur||0).toLocaleString('es-ES',{maximumFractionDigits:0})}€</strong> → vale <strong>${(r.value_eur||0).toLocaleString('es-ES',{maximumFractionDigits:0})}€</strong> · P&amp;L <span class="mono ${pnlCls}">${(r.pnl_eur||0)>=0?'+':''}${(r.pnl_eur||0).toLocaleString('es-ES',{maximumFractionDigits:0})}€ (${(r.pnl_pct||0)>=0?'+':''}${r.pnl_pct}%)</span> · peso ${r.weight_pct}%</p>
-            ${metricsRow}
-            <ul style="margin:6px 0 0; padding-left:18px; font-size:13px;">${(r.reasons||[]).map(x=>`<li>${x}</li>`).join('')}</ul>
-            ${r.bias_flag ? `<div style="margin-top:8px; background:rgba(201, 154, 62, 0.09); border:1px solid rgba(201, 154, 62, 0.33); border-radius:8px; padding:8px 12px; font-size:13px;">${r.bias_flag}</div>` : ''}
+            ${reasons ? `<ul style="margin:8px 0 0; padding-left:18px; font-size:13px;">${reasons}</ul>` : ''}
+            ${bias}
+            ${metricsLine}
         </div>`;
     }).join('');
 
-    box.innerHTML = summary + cards +
-        `<p class="text-muted" style="font-size:11px; margin-top:10px;">${data.disclaimer || ''}</p>`;
+    return banner + cards;
 }
+
+async function setHorizon(ticker, horizon) {
+    try {
+        await fetch(`${REVIEW_API}/positions/review/horizon`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticker, horizon }),
+        });
+        await loadPositionReview(true); // recompute with the new horizon
+    } catch (e) { /* noop */ }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const link = document.querySelector('[data-page="position-review"]');
+    if (link) link.addEventListener('click', () => setTimeout(loadPositionReview, 150));
+    setTimeout(() => {
+        const p = document.getElementById('page-position-review');
+        if (p && p.classList.contains('active')) loadPositionReview();
+    }, 500);
+});

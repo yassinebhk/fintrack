@@ -64,6 +64,10 @@
                     <span class="nav-icon">📈</span>
                     <span class="nav-label">Análisis</span>
                 </li>
+                <li class="nav-item" data-page="position-review">
+                    <span class="nav-icon">🔄</span>
+                    <span class="nav-label">¿Vender o mantener?</span>
+                </li>
                 <li class="nav-item" data-page="daily-summary">
                     <span class="nav-icon">📅</span>
                     <span class="nav-label">Resumen diario</span>
@@ -1558,6 +1562,16 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                     <div id="watchlistContent"></div>
                 </div>
 
+                <div class="page page-position-review" id="page-position-review">
+                    <section class="manager-header">
+                        <div>
+                            <h2>🔄 ¿Vender o mantener?</h2>
+                            <p>Señal objetiva por posición (mantener / vigilar / reducir / rotar) según el <strong>horizonte</strong> que le pongas, con el porqué. Mira hacia delante, no tu precio de entrada.</p>
+                        </div>
+                    </section>
+                    <div id="positionReviewContent"></div>
+                </div>
+
                 <div class="page page-daily-summary" id="page-daily-summary">
                     <section class="manager-header">
                         <div>
@@ -1962,6 +1976,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/watchlist.js?v=20260912watch"></script>
     <script src="js/scorecard.js?v=20260913eficacia"></script>
     <script src="js/daily-summary.js?v=20260913daily"></script>
+    <script src="js/position-review.js?v=20260913review"></script>
     <script>
         // PWA: register the service worker (installable + offline app shell)
         if ('serviceWorker' in navigator) {
