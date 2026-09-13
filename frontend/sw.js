@@ -3,7 +3,7 @@
  * - Never touches cross-origin (Yahoo/QuickChart/CDNs).
  * - Navigations: network-first, fall back to the cached shell when offline.
  * - Same-origin static assets: stale-while-revalidate (fast + self-updating). */
-const CACHE = 'fintrack-v1';
+const CACHE = 'fintrack-v2';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {

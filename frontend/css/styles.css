@@ -90,6 +90,11 @@ html {
     font-size: 16px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Without this, ANY horizontal overflow inflates the layout viewport on mobile,
+       which defeats the max-width media queries → the desktop layout renders shrunk
+       to fit ("todo pequeño"). Clipping here forces device-width so mobile CSS fires. */
+    overflow-x: hidden;
+    max-width: 100%;
 }
 
 body {
@@ -99,6 +104,7 @@ body {
     line-height: 1.5;
     min-height: 100vh;
     overflow-x: hidden;
+    max-width: 100%;
 }
 
 /* Background — flat, warm, minimal (no glow/tech-dashboard pattern) */
