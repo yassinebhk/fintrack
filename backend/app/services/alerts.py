@@ -189,11 +189,14 @@ class AlertsEngine:
             from app.services import macro_shocks
             shocks = macro_shocks.active_shocks(news)
             if shocks:
+                # NOTE: _deliver_batch HTML-escapes the body, so it must be PLAIN
+                # text (no <b>/<i> tags) and the title must not repeat the severity
+                # emoji (the delivery prepends ⚠️).
                 positions = portfolio.get("positions", [])
                 blocks = []
                 for s in shocks:
                     cp = s.get("chokepoint")
-                    lines = [f"{s['emoji']} <b>{s['name']}</b>" + (f" — {cp}" if cp else "")]
+                    lines = [f"{s['emoji']} {s['name']}" + (f" — {cp}" if cp else "")]
                     for h in s["hits"][:2]:
                         lines.append(f"• {h.get('source','')}: {h.get('title','')}")
                     lines.append(s["note"])
@@ -209,9 +212,9 @@ class AlertsEngine:
                     await self._maybe_create(
                         kind="macro_shock",
                         severity="warning",
-                        title=f"⚠️ Radar macro: {short}",
+                        title=f"Radar macro: {short}",
                         body="\n\n".join(blocks)
-                             + "\n\n<i>Heurístico, no señal cuantitativa — no cambia el ranking.</i>",
+                             + "\n\nHeurístico, no señal cuantitativa — no cambia el ranking.",
                         payload={"themes": [s["key"] for s in shocks]},
                         dedupe_key=f"macro_shock:{keys}:{today_str}",
                     )

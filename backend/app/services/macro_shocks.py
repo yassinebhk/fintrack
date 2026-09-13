@@ -90,7 +90,8 @@ THEMES: list[dict] = [
         "note": "👍 defensa/oro/energía · 👎 RV amplia, viajes/aerolíneas, emergentes y cripto",
         "winners": ["defense", "defensa", "gold", "oro", "energy", "energ", "oil", "petrol"],
         "losers": ["airline", "aerol", "travel", "viaje", "emerging", "emergent", "world", "nasdaq",
-                   "acwi", "crypto", "bitcoin", "btc", "ether", "eth"],
+                   "acwi", "crypto", "bitcoin", "btc", "ether", "eth", "pepe", "doge", "xrp",
+                   "ripple", "bnb", "litecoin", "cardano", "memecoin"],
     },
     {
         "key": "credito", "name": "banca / crédito (estrés financiero)", "emoji": "🏦",
@@ -112,8 +113,17 @@ def _compile(terms: list[str]) -> re.Pattern:
     return re.compile(r"\b(?:" + "|".join(re.escape(t) for t in terms) + r")(?:es|s)?\b", re.I)
 
 
+def _compile_prefix(terms: list[str]) -> re.Pattern:
+    # Word-START (prefix) match: a stem like "energ" matches "energy"/"energía"
+    # (kept from the intentional stemming) but ONLY at a word boundary, so it does
+    # NOT match mid-word (that's what mis-tagged unrelated tickers before).
+    return re.compile(r"\b(?:" + "|".join(re.escape(t) for t in terms) + r")", re.I)
+
+
 for _t in THEMES:
     _t["_re"] = _compile(_t["detect"])
+    _t["_win_re"] = _compile_prefix(_t["winners"])
+    _t["_lose_re"] = _compile_prefix(_t["losers"])
 
 
 def _text(item: dict) -> str:
@@ -153,25 +163,30 @@ def _theme_by_key(key: str) -> dict | None:
 
 
 def _direction(text: str, theme: dict) -> str | None:
-    low = text.lower()
-    if any(t in low for t in theme["winners"]):
+    if theme["_win_re"].search(text):
         return "beneficiado"
-    if any(t in low for t in theme["losers"]):
+    if theme["_lose_re"].search(text):
         return "presionado"
     return None
 
 
 def exposure(positions: list[dict], theme_key: str) -> dict[str, list[dict]]:
-    """Split held positions into likely winners/losers under a given shock theme."""
+    """Split held positions into likely winners/losers under a given shock theme.
+    Deduped by ticker (a name held across two brokers appears once)."""
     theme = _theme_by_key(theme_key)
     out: dict[str, list[dict]] = {"beneficiado": [], "presionado": []}
     if not theme:
         return out
+    seen: set[str] = set()
     for pos in positions or []:
-        text = f"{pos.get('name', '') or ''} {pos.get('ticker', '') or ''}"
+        tk = (pos.get("ticker") or "").upper()
+        if not tk or tk in seen:
+            continue
+        text = f"{pos.get('name', '') or ''} {tk}"
         d = _direction(text, theme)
         if d:
-            out[d].append({"ticker": pos.get("ticker"), "name": pos.get("name") or pos.get("ticker")})
+            seen.add(tk)
+            out[d].append({"ticker": tk, "name": pos.get("name") or tk})
     return out
 
 
