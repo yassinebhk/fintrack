@@ -216,7 +216,7 @@ class TelegramBotHandler:
         except asyncio.CancelledError:
             return
 
-    async def _send_opportunities(self, quiet: bool = False, max_cards: int = 3) -> None:
+    async def _send_opportunities(self, quiet: bool = False, max_cards: int = 5) -> None:
         """Run the market analyst and send today's opportunities.
 
         quiet=True (the daily auto-push) skips the "analizando…" status so the
@@ -291,7 +291,11 @@ class TelegramBotHandler:
                     tl += [f"• {p}" for p in trends["patterns"][:4]]
                 await self.notifier.send_html("\n".join(tl))
             sent_any_chart = False
-            shown = opps[:max_cards]
+            # Push the highest-conviction ideas first so the capped set is the true
+            # "top N" (the analyst returns a balanced mix, not a strict ranking).
+            _conv_rank = {"alta": 3, "media": 2, "baja": 1}
+            ranked = sorted(opps, key=lambda o: _conv_rank.get(o.get("conviction", "media"), 2), reverse=True)
+            shown = ranked[:max_cards]
             for op in shown:
                 caption = render_opportunity_caption(op)
                 if op.get("chart_url"):
