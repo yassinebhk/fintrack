@@ -351,6 +351,10 @@ body::before {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    /* Flex items default to min-width:auto, so a wide/nowrap child (ticker tape,
+       a pill row, a table) would refuse to shrink and push the whole page wider
+       than the screen on mobile. min-width:0 lets it shrink to the viewport. */
+    min-width: 0;
 }
 
 /* ============================================
@@ -454,6 +458,7 @@ body::before {
     padding: var(--spacing-xl);
     max-width: 1600px;
     width: 100%;
+    min-width: 0;   /* same flexbox shrink fix — never exceed the viewport width */
 }
 
 /* Pages */
@@ -565,6 +570,7 @@ body::before {
 .card-change {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;   /* let "Hoy" and "Total" stack on narrow screens instead of overflowing */
     gap: var(--spacing-sm);
     font-family: var(--font-mono);
     font-size: 0.875rem;
