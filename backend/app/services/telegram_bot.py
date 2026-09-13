@@ -216,14 +216,17 @@ class TelegramBotHandler:
         except asyncio.CancelledError:
             return
 
-    async def _send_opportunities(self) -> None:
-        """Run the market analyst and send today's opportunities."""
-        await self.notifier.send_text(
-            "🧠 Estoy analizando el mercado y buscando oportunidades…\n"
-            "Escaneo ~130 activos + noticias y preparo las gráficas. "
-            "Puede tardar 1-2 min la primera vez del día."
-        )
-        thinking = asyncio.create_task(self._keep_thinking())  # keep "typing…" visible
+    async def _send_opportunities(self, quiet: bool = False, max_cards: int = 3) -> None:
+        """Run the market analyst and send today's opportunities.
+
+        quiet=True (the daily auto-push) skips the "analizando…" status so the
+        scheduled digest doesn't add noise; on-demand keeps it as a wait cue.
+        Only the top `max_cards` ideas are pushed with charts — the rest live on
+        the web (linked at the end) to keep the daily message short and focused."""
+        thinking = None
+        if not quiet:
+            await self.notifier.send_text("🧠 Analizando el mercado… (1-2 min)")
+            thinking = asyncio.create_task(self._keep_thinking())  # keep "typing…" visible
         try:
             from app.services.opportunities import (
                 get_opportunity_service,
@@ -232,7 +235,8 @@ class TelegramBotHandler:
             )
 
             payload = await get_opportunity_service().generate()
-            thinking.cancel()  # done thinking → stop the typing indicator
+            if thinking:
+                thinking.cancel()  # done thinking → stop the typing indicator
             opps = payload.get("opportunities") or []
             if not opps:
                 await self.notifier.send_text("No pude generar oportunidades ahora mismo (posible límite de cuota). Reintenta en un rato.")
@@ -287,7 +291,8 @@ class TelegramBotHandler:
                     tl += [f"• {p}" for p in trends["patterns"][:4]]
                 await self.notifier.send_html("\n".join(tl))
             sent_any_chart = False
-            for op in opps:
+            shown = opps[:max_cards]
+            for op in shown:
                 caption = render_opportunity_caption(op)
                 if op.get("chart_url"):
                     await self.notifier.send_chat_action("upload_photo")
@@ -301,12 +306,17 @@ class TelegramBotHandler:
             if not sent_any_chart:
                 await self.notifier.send_html(render_opportunities_telegram(payload))
             else:
-                await self.notifier.send_html(f'🔗 <a href="{PAGE_URL}">Ver todo en FinTrack</a>')
+                rest = len(opps) - len(shown)
+                more = f" · +{rest} más" if rest > 0 else ""
+                await self.notifier.send_html(
+                    f'🔗 <a href="{PAGE_URL}">Ver las {len(opps)} oportunidades completas en FinTrack</a>{more}'
+                )
         except Exception as exc:
             logger.error("telegram opportunities failed: {}", exc)
             await self.notifier.send_text("No pude generar las oportunidades ahora mismo, intenta más tarde.")
         finally:
-            thinking.cancel()  # safety: always stop the indicator
+            if thinking:
+                thinking.cancel()  # safety: always stop the indicator
 
     def _extract_analysis_target(self, text: str) -> str | None:
         """Pull a ticker out of '/analizar SOXX', 'analiza el MU', etc.

@@ -220,8 +220,13 @@ class CreatorsService:
             f"Título: {video_title}\n"
             f"Fuente: {source_label}\n\n"
             f"Contenido:\n{context_text}\n\n"
-            "Devuelve EXACTAMENTE este Markdown. Omite una sección SOLO si no hay nada real que poner "
-            "(no la rellenes con paja):\n"
+            "PRIMERA LÍNEA OBLIGATORIA, exactamente 'ACCIONABLE: si' o 'ACCIONABLE: no':\n"
+            "  · 'si' = hay al menos UNA idea de mercado concreta y útil para un inversor "
+            "(un activo/ticker con postura, un nivel/precio, un sesgo macro operativo o una tesis de inversión clara).\n"
+            "  · 'no' = episodio de hábitos personales, estilo de vida, relaciones, meta/anecdótico u off-topic, "
+            "SIN ninguna idea de mercado accionable.\n"
+            "Después, en las líneas siguientes, devuelve EXACTAMENTE este Markdown. Omite una sección SOLO si no hay "
+            "nada real que poner (no la rellenes con paja):\n"
             "## 📌 Tesis\n"
             "(1-2 frases concretas con el argumento central, sin relleno)\n\n"
             "## 🎯 Ideas accionables\n"
@@ -246,10 +251,21 @@ class CreatorsService:
             md = (resp.text or "").strip()
             if not md:
                 return None
+            # Pull the machine-readable relevance flag off the first line, then drop
+            # it from the body so it never reaches the web/Telegram text.
+            actionable = True
+            parts = md.split("\n", 1)
+            first = parts[0].strip().lower()
+            if first.startswith("accionable:"):
+                val = first.split(":", 1)[1].strip()
+                actionable = not val.startswith("no")
+                md = parts[1].strip() if len(parts) > 1 else ""
+            if not md:
+                return None
             if thin:
                 md += ("\n\n_⚠️ Resumen basado solo en la descripción del vídeo (YouTube bloquea el transcript "
                        "desde el servidor) — limitado. Abre el vídeo para el detalle._")
-            return {"summary_markdown": md, "model": resp.model}
+            return {"summary_markdown": md, "model": resp.model, "actionable": actionable}
         except Exception as exc:
             logger.warning("creators: LLM summary failed: {}", exc)
             self._last_llm_error = str(exc)[:900]  # surfaced in refresh diagnostics
@@ -405,8 +421,10 @@ class CreatorsService:
                     processed.append(item)
                     new_count += 1
                     seen.add(e["id"]); seen_map[key] = list(seen)[-_MAX_SEEN_PER_CHANNEL:]
-                    if deliver:
+                    if deliver and summary.get("actionable", True):
                         await self._notify_newsletter(nl, e, summary["summary_markdown"])
+                    elif deliver:
+                        logger.info("creators: not pushing newsletter {} (no actionable market idea)", e["id"][:60])
             except Exception as exc:
                 logger.error("creators: newsletter {} failed: {}", key, exc)
                 skipped.append({"creator": nl["name"], "reason": f"error: {str(exc)[:80]}"})
@@ -508,8 +526,12 @@ class CreatorsService:
                     new_count += 1
                     seen.add(e["video_id"])
                     seen_map[cid] = list(seen)[-_MAX_SEEN_PER_CHANNEL:]
-                    if deliver:
+                    # Push to Telegram ONLY if the episode carries a real market idea;
+                    # off-topic/lifestyle episodes are still stored (web) but not pushed.
+                    if deliver and summary.get("actionable", True):
                         await self._notify(creator, e, summary["summary_markdown"])
+                    elif deliver:
+                        logger.info("creators: not pushing {} (no actionable market idea)", e["video_id"])
             except Exception as exc:
                 logger.error("creators: channel {} pipeline failed: {}", creator["handle"], exc)
                 skipped.append({"creator": creator["name"], "reason": f"error pipeline: {str(exc)[:80]}"})

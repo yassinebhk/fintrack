@@ -212,7 +212,9 @@ class OpportunityService:
                 logger.info("ingest-scan: background finalize done")
                 if deliver:
                     from app.services.telegram_bot import TelegramBotHandler
-                    await TelegramBotHandler()._send_opportunities()
+                    # Daily auto-push: no "analizando…" status, only the top ideas
+                    # (the rest are on the web) to keep the digest short.
+                    await TelegramBotHandler()._send_opportunities(quiet=True)
                     logger.info("ingest-scan: opportunities delivered to Telegram")
             except Exception as exc:
                 logger.error("ingest-scan: background finalize/deliver failed: {}", exc)
