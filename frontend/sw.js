@@ -3,7 +3,7 @@
  * - Never touches cross-origin (Yahoo/QuickChart/CDNs).
  * - Navigations: network-first, fall back to the cached shell when offline.
  * - Same-origin static assets: stale-while-revalidate (fast + self-updating). */
-const CACHE = 'fintrack-v7';
+const CACHE = 'fintrack-v8';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {
@@ -13,14 +13,13 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('activate', (e) => {
+  // Purge old caches and take control, but DON'T force-reload open windows — that
+  // caused the app to "reload by itself" on every deploy. index.html is served
+  // no-cache, so a normal reload already picks up the latest version.
   e.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
-      // Auto-apply updates: reload any open window once when a new SW takes over,
-      // so a deploy doesn't leave the PWA stuck on a stale version.
-      .then(() => self.clients.matchAll({ type: 'window' }))
-      .then((clients) => clients.forEach((c) => { try { c.navigate(c.url); } catch (e) {} }))
   );
 });
 
