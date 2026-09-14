@@ -143,7 +143,9 @@ class PortfolioService:
 
             position_data.append({
                 "ticker": ticker,
-                "name": pdata.get("name", pos.get("asset_name") or ticker),
+                # Prefer the stored broker/ISIN name; the live-price feed often returns
+                # the raw ISIN for obscure listings, which is unreadable in the tables.
+                "name": pos.get("asset_name") or pdata.get("name") or ticker,
                 "quantity": quantity,
                 "avg_price": avg_price,
                 "current_price": current_price,

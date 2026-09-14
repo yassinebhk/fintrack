@@ -44,15 +44,19 @@ async def get_all() -> list[dict]:
 
 
 async def set_stop(ticker: str, trailing_pct: float, label: str = "",
-                   peak: float | None = None, currency: str = "") -> dict:
+                   peak: float | None = None, currency: str = "",
+                   target_price: float | None = None) -> dict:
     """Create/replace a trailing stop for `ticker`. `peak` seeds the running peak
-    (use the current price). Re-arms it (active=True)."""
+    (use the current price). Optional `target_price` fires a one-off upside alert
+    when reached (the trailing stop stays the real exit). Re-arms it (active=True)."""
     ticker = (ticker or "").upper().strip()
     data = await _load()
     stops = [s for s in data.get("stops", []) if (s.get("ticker") or "").upper() != ticker]
     stop = {"ticker": ticker, "trailing_pct": float(trailing_pct),
             "peak": float(peak) if peak else 0.0, "label": label or ticker,
             "currency": currency, "active": True,
+            "target_price": float(target_price) if target_price else None,
+            "target_hit": False,
             "created_at": datetime.now(timezone.utc).isoformat()}
     stops.append(stop)
     data["stops"] = stops

@@ -297,6 +297,23 @@ class AlertsEngine:
                 stop["peak"] = price
                 peak = price
                 changed = True
+            # Optional upside target: alert ONCE when the price reaches it (informational
+            # — the trailing stop is still the exit; a hard target only notifies).
+            target = float(stop.get("target_price") or 0)
+            if target > 0 and price >= target and not stop.get("target_hit"):
+                label = stop.get("label") or tk
+                res = await self._maybe_create(
+                    kind="target_reached", severity="info",
+                    title=f"🎯 Objetivo alcanzado: {tk} en {price:.2f} {cur}",
+                    body=(f"{label}: ha llegado a tu objetivo de {target:.2f} {cur} (precio {price:.2f} {cur}). "
+                          f"Valora tomar beneficios o dejar correr con el trailing stop. (Análisis, no recomendación.)"),
+                    payload={"ticker": tk, "price": price, "target_price": target},
+                    dedupe_key=f"target_reached:{tk}",
+                )
+                if res:
+                    created.append(res)
+                stop["target_hit"] = True
+                changed = True
             pct = float(stop.get("trailing_pct") or 12)
             if peak > 0 and price <= peak * (1 - pct / 100.0):
                 drop = (price - peak) / peak * 100

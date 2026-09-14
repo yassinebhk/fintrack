@@ -151,7 +151,9 @@ function renderManagerPositions(positions) {
     }
 
     tbody.innerHTML = positions.map(pos => {
-        const assetName = getAssetName(pos.ticker) || pos.ticker;
+        // Prefer the stored asset name (from the broker/ISIN resolution) so ISIN-
+        // registered positions show their real name, not a cryptic "IE000...".
+        const assetName = pos.asset_name || getAssetName(pos.ticker) || pos.ticker;
 
         return `
         <tr>
