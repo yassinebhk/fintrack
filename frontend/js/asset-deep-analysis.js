@@ -82,6 +82,12 @@ const _CRITERION_LABEL = {
     infravaloracion: 'Infravaloración', reversion: 'Reversión a la media',
     sobreventa: 'Sobreventa (RSI)', calidad: 'Calidad (Sharpe)',
     consistencia: 'Consistencia (% meses positivos)',
+    // Fundamentales (solo acciones)
+    calidad_fund: 'Calidad (ROE/márgenes)', crecimiento: 'Crecimiento (ventas/BPA)',
+    valoracion_fund: 'Valoración (PER/PB, sector)', solidez: 'Solidez (deuda)',
+    insider: 'Insiders (compras directivos)',
+    // Renta fija
+    carry_bono: 'Carry real (yield−inflación, ajust. tipos)',
 };
 const _CRITERION_GLOSSARY_KEY = {
     momentum: 'momentum_criterio', regimen: 'regimen_200d', riesgo: 'riesgo_score',
@@ -89,6 +95,9 @@ const _CRITERION_GLOSSARY_KEY = {
     infravaloracion: 'infravaloracion_criterio', reversion: 'reversion_media',
     sobreventa: 'tecnico_rsi_macd', calidad: 'riesgo_score',
     consistencia: 'momentum_consistencia',
+    calidad_fund: 'roe', crecimiento: 'crec_ventas', valoracion_fund: 'per', solidez: 'debt_ratio',
+    insider: 'insider_sentiment',
+    carry_bono: 'yield_bono',
 };
 const _SENT_EMOJI = { bullish: '🟢', bearish: '🔴', neutral: '⚪' };
 

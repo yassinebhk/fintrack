@@ -9,6 +9,7 @@ from datetime import datetime
 
 from loguru import logger
 
+from app.services.market.finnhub import FinnhubClient
 from app.services.market.yahoo_finance import YahooFinanceService
 
 
@@ -33,6 +34,7 @@ THEMES: dict[str, dict] = {
 class MarketScanner:
     def __init__(self) -> None:
         self.yahoo = YahooFinanceService()
+        self.finnhub = FinnhubClient()
 
     async def _analyze_ticker(
         self, ticker: str, name: str, desc: str, sem: asyncio.Semaphore | None = None,
@@ -113,6 +115,9 @@ class MarketScanner:
                     result["fundamentals"] = fund
                     if fund.get("sector"):
                         result["sector"] = fund["sector"]
+                insider = await self.finnhub.get_insider_sentiment(ticker)
+                if insider:
+                    result["insider_sentiment"] = insider
             elif fetch_fundamentals and ("bono" in dl or "renta fija" in dl or "bond" in dl):
                 bond = await self.yahoo.get_bond_metrics(ticker)
                 if bond:

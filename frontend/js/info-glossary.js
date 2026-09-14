@@ -42,6 +42,11 @@ const INFO_GLOSSARY = {
         what: 'Cuánta deuda tiene la empresa en relación con sus activos, su patrimonio o su beneficio, según el ratio mostrado.',
         read: 'Más bajo = más solidez financiera, aguanta mejor una crisis o subida de tipos. Muy alto no es automáticamente malo, pero añade riesgo si el negocio se tuerce.',
     },
+    insider_sentiment: {
+        title: 'Insiders (compras de directivos)',
+        what: 'El MSPR (Monthly Share Purchase Ratio) de Finnhub: resume si los directivos e insiders de la empresa compraron o vendieron más acciones propias en el último mes reportado, en una escala de -100 (venta neta fuerte) a +100 (compra neta fuerte).',
+        read: 'Compra neta de insiders (positivo) es una señal de que la propia directiva —quien mejor conoce el negocio— piensa que la acción está barata o que el futuro es mejor de lo que refleja el precio. Venta neta (negativo) no siempre es mala señal (puede ser diversificación, ejercicio de opciones, necesidad de liquidez), así que pesa poco por sí sola: se usa como un factor más dentro de la tesis de valor, nunca como señal única.',
+    },
 
     // ---------- Risk & performance ----------
     margen: {

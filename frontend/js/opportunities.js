@@ -146,6 +146,7 @@ const CRITERION_LABEL = {
     crecimiento: 'Crecimiento (ventas/BPA)',
     valoracion_fund: 'Valoración (PER/PB, sector)',
     solidez: 'Solidez (deuda)',
+    insider: 'Insiders (compras directivos)',
     // Renta fija
     carry_bono: 'Carry real (yield−inflación, ajust. tipos)',
 };
@@ -169,6 +170,7 @@ const _CRIT_GLOSSARY_KEY = {
     infravaloracion: 'infravaloracion_criterio', reversion: 'reversion_media',
     sobreventa: 'tecnico_rsi_macd', calidad: 'riesgo_score', consistencia: 'momentum_consistencia',
     calidad_fund: 'roe', crecimiento: 'crec_ventas', valoracion_fund: 'per', solidez: 'debt_ratio',
+    insider: 'insider_sentiment',
     carry_bono: 'yield_bono',
 };
 
@@ -212,6 +214,7 @@ function renderDecision(op) {
 
     // Fundamentales (solo acciones): los ratios reales que justifican la tesis.
     const fu = op.fundamentals;
+    const ins = op.insider_sentiment;
     let fundBlock = '';
     if (fu) {
         const pct = v => (v == null ? null : (v * 100).toFixed(0) + '%');
@@ -222,6 +225,12 @@ function renderDecision(op) {
             ['Deuda/eq.', num(fu.debt_to_equity), 'debt_ratio'],
             ['Div.', fu.div_yield == null ? null : (+fu.div_yield).toFixed(1) + '%', 'dividend_yield'],
         ].filter(([, v]) => v != null);
+        if (ins && ins.mspr != null) {
+            const mspr = +ins.mspr;
+            rows.push(['Insiders' + (ins.month ? ` (${ins.month})` : ''),
+                (mspr >= 0 ? '+' : '') + mspr.toFixed(0) + (mspr >= 20 ? ' 🟢' : mspr <= -20 ? ' 🔴' : ''),
+                'insider_sentiment']);
+        }
         const chips = rows.map(([k, v, gk]) => `<span style="background:rgba(43,40,34,0.05); border-radius:6px; padding:2px 7px; font-size:11.5px; white-space:nowrap;">${k}${infoIcon(gk)} <strong>${v}</strong></span>`).join(' ');
         fundBlock = `<div style="margin:6px 0 8px;">
             <div style="font-size:11px; color:var(--text-secondary); margin-bottom:4px;">🏢 Fundamentales${fu.sector ? ` · <span class="text-muted">${fu.sector}</span>` : ''}</div>

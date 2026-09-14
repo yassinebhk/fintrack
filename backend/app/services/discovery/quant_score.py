@@ -149,17 +149,21 @@ _VALUE_WEIGHTS = {
 
 # --- Fundamental factors (STOCKS ONLY) --------------------------------------
 # Stocks carry a `fundamentals` dict (from yfinance); ETFs / funds / bonds /
-# crypto do not. We score four judge-groups cross-sectionally AMONG STOCKS —
+# crypto do not. We score judge-groups cross-sectionally AMONG STOCKS —
 # valuation normalized WITHIN sector (a bank's PER isn't comparable to a tech's),
 # the rest globally — and blend them into the price-based theses ONLY for stocks:
-#   value_score    += valoración (barata) + solidez (balance sano)
+#   value_score    += valoración (barata) + solidez (balance sano) + insider (compras de directivos)
 #   momentum_score += calidad (ROE/márgenes/FCF) + crecimiento (ventas/BPA)
 # so a fundamentally strong company rises in the very rankings that feed the
 # recommendations, the scorecard and the decision frame — and can be justified.
+# Insider sentiment (Finnhub MSPR) is a VALUE signal, not momentum: net insider
+# buying is a bet management itself thinks the stock is mispriced/cheap right
+# now, which is conceptually the same claim the valuation judges make — it does
+# not say anything about price trend.
 _FUND_BLEND = 0.40    # fundamentals' share of a stock's thesis score (price = 0.60)
 _FUND_W = {           # weight of each group WITHIN the fundamental block
-    "valoracion": 0.55, "solidez": 0.45,     # -> value thesis
-    "calidad": 0.60, "crecimiento": 0.40,    # -> momentum thesis
+    "valoracion": 0.45, "solidez": 0.35, "insider": 0.20,  # -> value thesis
+    "calidad": 0.60, "crecimiento": 0.40,                  # -> momentum thesis
 }
 _MIN_STOCKS_FOR_FUND = 3   # need a real cross-section for z-scores to mean anything
 
@@ -220,7 +224,8 @@ def _avg_present(cols: list[list]) -> list[float]:
 
 def _fundamental_factors(stocks: list[dict]) -> dict[str, dict]:
     """Per-stock fundamental group z-scores: valoración (sector-relative, cheaper=
-    better), calidad, crecimiento, solidez. Missing fields are simply skipped."""
+    better), calidad, crecimiento, solidez, insider (net director buying, Finnhub
+    MSPR). Missing fields are simply skipped."""
     if len(stocks) < _MIN_STOCKS_FOR_FUND:
         return {}
     sectors = [s.get("sector") or "—" for s in stocks]
@@ -250,9 +255,13 @@ def _fundamental_factors(stocks: list[dict]) -> dict[str, dict]:
         neg(_zscore_opt(col("debtToEquity"))),
         _zscore_opt(col("currentRatio")),
     ])
+    insider = _avg_present([  # net insider buying (MSPR) = management confidence
+        _zscore_opt([(s.get("insider_sentiment") or {}).get("mspr") for s in stocks]),
+    ])
     return {
         s["ticker"]: {"valoracion": valoracion[i], "calidad": calidad[i],
-                      "crecimiento": crecimiento[i], "solidez": solidez[i]}
+                      "crecimiento": crecimiento[i], "solidez": solidez[i],
+                      "insider": insider[i]}
         for i, s in enumerate(stocks)
     }
 
@@ -421,9 +430,10 @@ def score_universe(items: list[dict]) -> list[dict]:
             mom_parts["crecimiento"] = _FUND_BLEND * _FUND_W["crecimiento"] * fz["crecimiento"]
             val_parts["valoracion_fund"] = _FUND_BLEND * _FUND_W["valoracion"] * fz["valoracion"]
             val_parts["solidez"] = _FUND_BLEND * _FUND_W["solidez"] * fz["solidez"]
+            val_parts["insider"] = _FUND_BLEND * _FUND_W["insider"] * fz["insider"]
             it["fundamental_score"] = round(
                 mom_parts["calidad_fund"] + mom_parts["crecimiento"]
-                + val_parts["valoracion_fund"] + val_parts["solidez"], 3)
+                + val_parts["valoracion_fund"] + val_parts["solidez"] + val_parts["insider"], 3)
         elif it["ticker"] in bondz:
             # Bonds: momentum unchanged; VALUE gets a modest risk-adjusted carry tilt.
             cz = bondz[it["ticker"]]

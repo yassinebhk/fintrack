@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     fred_api_key: str = ""
     etherscan_api_key: str = ""
     alpha_vantage_api_key: str = ""
+    finnhub_api_key: str = ""
 
     # Database
     database_url: str = Field(
