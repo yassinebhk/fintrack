@@ -8,6 +8,9 @@ name: opportunities-scan
 # Required GitHub Secrets (same as the transcripts workflow):
 #   FINTRACK_INGEST_SECRET  — same value as CREATORS_INGEST_SECRET in Render env
 #   FINTRACK_API_URL        — e.g. https://fintrack-front.onrender.com/api
+#   FINNHUB_API_KEY         — same value as FINNHUB_API_KEY in backend/.env
+#                             (optional data provider: insider sentiment judge —
+#                             without it that judge just silently doesn't vote)
 
 on:
   schedule:
@@ -38,6 +41,7 @@ jobs:
           API_URL: ${{ secrets.FINTRACK_API_URL }}
           INGEST_SECRET: ${{ secrets.FINTRACK_INGEST_SECRET }}
           DATABASE_URL: "sqlite+aiosqlite:///./scan.db"
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: |
           cd backend
           python <<'PY'

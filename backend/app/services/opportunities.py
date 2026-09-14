@@ -809,6 +809,10 @@ class OpportunityService:
                     "div_yield": fund.get("dividendYield"),
                 }
                 opp["fundamental_score"] = t.get("fundamental_score")
+            # Insider sentiment (stocks only) — Finnhub MSPR, net director buying/selling.
+            insider = t.get("insider_sentiment")
+            if insider:
+                opp["insider_sentiment"] = insider
             # Bonds (fixed income) — yield, real yield, duration bucket, rate sensitivity.
             bond = t.get("bond")
             if bond:
