@@ -140,6 +140,7 @@ const CRITERION_LABEL = {
     reversion: 'Reversión a la media',
     sobreventa: 'Sobreventa (RSI)',
     calidad: 'Calidad (Sharpe)',
+    consistencia: 'Consistencia (% meses positivos)',
     // Fundamentales (solo acciones)
     calidad_fund: 'Calidad (ROE/márgenes)',
     crecimiento: 'Crecimiento (ventas/BPA)',
@@ -162,6 +163,15 @@ function assetLinks(op) {
     </div>`;
 }
 
+const _CRIT_GLOSSARY_KEY = {
+    momentum: 'momentum_criterio', regimen: 'regimen_200d', riesgo: 'riesgo_score',
+    tecnico: 'tecnico_rsi_macd', volatilidad: 'volatilidad',
+    infravaloracion: 'infravaloracion_criterio', reversion: 'reversion_media',
+    sobreventa: 'tecnico_rsi_macd', calidad: 'riesgo_score', consistencia: 'momentum_consistencia',
+    calidad_fund: 'roe', crecimiento: 'crec_ventas', valoracion_fund: 'per', solidez: 'debt_ratio',
+    carry_bono: 'yield_bono',
+};
+
 function renderBreakdown(op) {
     const bd = op.score_breakdown;
     if (!bd || !Object.keys(bd).length) return '';
@@ -171,7 +181,7 @@ function renderBreakdown(op) {
         const pos = v >= 0;
         const barColor = pos ? 'var(--positive)' : 'var(--negative)';
         return `<div style="display:flex; align-items:center; gap:8px; margin:3px 0; font-size:12px;">
-            <span style="flex:0 0 150px; color:var(--text-secondary);">${CRITERION_LABEL[k] || k}</span>
+            <span style="flex:0 0 150px; color:var(--text-secondary);">${CRITERION_LABEL[k] || k}${typeof infoIcon === 'function' ? infoIcon(_CRIT_GLOSSARY_KEY[k]) : ''}</span>
             <span style="flex:1; background:rgba(43, 40, 34, 0.05); border-radius:4px; height:10px; position:relative;">
                 <span style="position:absolute; left:0; top:0; height:10px; width:${pct}%; background:${barColor}; border-radius:4px;"></span>
             </span>
@@ -408,7 +418,9 @@ function renderOpportunities(data) {
     const rcx = data.rates_context || {};
     const fmtP = (v) => (v == null ? '—' : v + '%');
     const inverted = rcx.curve_10y_2y != null && rcx.curve_10y_2y < 0;
-    const ratesBanner = (rcx.nominal_10y != null || rcx.real_10y != null) ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:rgba(43,40,34,0.04); border:1px solid rgba(43,40,34,0.12); font-size:13px;">🏦 <strong>Contexto de tipos (EE.UU.):</strong> 10Y <strong>${fmtP(rcx.nominal_10y)}</strong> · 10Y real ${fmtP(rcx.real_10y)} · inflación implícita ${fmtP(rcx.breakeven_inflation)} · 2Y ${fmtP(rcx.two_y)} · curva 10Y-2Y <strong style="color:${inverted ? 'var(--negative)' : 'var(--positive)'};">${rcx.curve_10y_2y == null ? '—' : (rcx.curve_10y_2y > 0 ? '+' : '') + rcx.curve_10y_2y}</strong>${inverted ? ' (invertida ⚠️)' : ''}<br><span class="text-muted" style="font-size:11px;">Marco para renta fija: el <strong>yield real</strong> (yield − inflación) es lo que de verdad ganas; una curva invertida suele avisar de recesión.</span></div>` : '';
+    const euRates = rcx.euro_area || {};
+    const euBlock = (euRates.nominal_10y != null || euRates.ecb_deposit_rate != null) ? `<br>🇪🇺 <strong>Zona euro:</strong> depósito BCE <strong>${fmtP(euRates.ecb_deposit_rate)}</strong> · refinanciación ${fmtP(euRates.ecb_refi_rate)} · bono 10Y ${fmtP(euRates.nominal_10y)} · HICP interanual ${fmtP(euRates.hicp_yoy)} · 10Y real ${fmtP(euRates.real_10y)}` : '';
+    const ratesBanner = (rcx.nominal_10y != null || rcx.real_10y != null || euRates.nominal_10y != null) ? `<div style="margin-bottom:12px; padding:8px 14px; border-radius:8px; background:rgba(43,40,34,0.04); border:1px solid rgba(43,40,34,0.12); font-size:13px;">🏦 <strong>Contexto de tipos (EE.UU.):</strong> 10Y <strong>${fmtP(rcx.nominal_10y)}</strong> · 10Y real ${fmtP(rcx.real_10y)} · inflación implícita ${fmtP(rcx.breakeven_inflation)} · 2Y ${fmtP(rcx.two_y)} · curva 10Y-2Y <strong style="color:${inverted ? 'var(--negative)' : 'var(--positive)'};">${rcx.curve_10y_2y == null ? '—' : (rcx.curve_10y_2y > 0 ? '+' : '') + rcx.curve_10y_2y}</strong>${inverted ? ' (invertida ⚠️)' : ''}${euBlock}<br><span class="text-muted" style="font-size:11px;">Marco para renta fija: el <strong>yield real</strong> (yield − inflación) es lo que de verdad ganas; una curva invertida suele avisar de recesión.</span></div>` : '';
 
     const rk = data.risk_climate || {};
     const rkColor = rk.label === 'risk-off' ? 'var(--negative)' : rk.label === 'cauto' ? 'var(--warning)' : rk.label === 'risk-on' ? 'var(--positive)' : 'var(--text-secondary)';

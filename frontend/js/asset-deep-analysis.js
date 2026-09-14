@@ -81,12 +81,14 @@ const _CRITERION_LABEL = {
     tecnico: 'Técnico (RSI/MACD)', volatilidad: 'Volatilidad (EWMA)',
     infravaloracion: 'Infravaloración', reversion: 'Reversión a la media',
     sobreventa: 'Sobreventa (RSI)', calidad: 'Calidad (Sharpe)',
+    consistencia: 'Consistencia (% meses positivos)',
 };
 const _CRITERION_GLOSSARY_KEY = {
     momentum: 'momentum_criterio', regimen: 'regimen_200d', riesgo: 'riesgo_score',
     tecnico: 'tecnico_rsi_macd', volatilidad: 'volatilidad',
     infravaloracion: 'infravaloracion_criterio', reversion: 'reversion_media',
     sobreventa: 'tecnico_rsi_macd', calidad: 'riesgo_score',
+    consistencia: 'momentum_consistencia',
 };
 const _SENT_EMOJI = { bullish: '🟢', bearish: '🔴', neutral: '⚪' };
 

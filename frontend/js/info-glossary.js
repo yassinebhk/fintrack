@@ -94,6 +94,11 @@ const INFO_GLOSSARY = {
         what: 'Uno de los "jueces" del motor: la tendencia de un precio muy alejado de su media histórica a "volver" hacia ella con el tiempo.',
         read: 'Puntuación alta = el activo está inusualmente lejos de su media reciente, lo que este juez interpreta como una probabilidad mayor de corrección hacia ese promedio.',
     },
+    momentum_consistencia: {
+        title: 'Consistencia del momentum (% meses positivos)',
+        what: 'Qué porcentaje de los últimos ~12 meses cerró en positivo. Dos activos pueden compartir el mismo retorno a 1 año, pero uno lo logró subiendo mes a mes de forma constante y el otro con uno o dos saltos erráticos — este juez distingue ambos casos, cosa que el retorno bruto no puede.',
+        read: 'Más alto (cerca del 100%) = subida sostenida y constante, históricamente más fiable. Más bajo = el retorno vino de pocos meses muy buenos — más frágil, más propenso a revertirse de golpe. Basado en Gray & Vogel, "Quantitative Momentum".',
+    },
     riesgo_score: {
         title: 'Riesgo (puntuación compuesta)',
         what: 'Combina varias señales (volatilidad, caídas históricas, concentración, deuda...) en un único número para comparar activos de un vistazo.',

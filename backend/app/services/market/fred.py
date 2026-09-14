@@ -26,6 +26,13 @@ SERIES = {
     "T10YIE":   {"label": "Inflación implícita 10Y (breakeven)", "unit": "%", "freq": "daily"},
     "VIXCLS":   {"label": "VIX", "unit": "índice", "freq": "daily"},
     "DEXUSEU":  {"label": "USD/EUR spot", "unit": "ratio", "freq": "daily"},
+    # Eurozone series (all mirror official ECB/Eurostat releases onto FRED, so
+    # this is the same client/cache/fallback as the US series above — no
+    # separate ECB or Eurostat API client needed).
+    "ECBDFR":                {"label": "Tipo de depósito BCE", "unit": "%", "freq": "daily"},
+    "ECBMRRFR":              {"label": "Tipo de refinanciación BCE", "unit": "%", "freq": "daily"},
+    "IRLTLT01EZM156N":       {"label": "Bono 10Y zona euro", "unit": "%", "freq": "monthly"},
+    "CP0000EZ19M086NEST":    {"label": "HICP zona euro (índice)", "unit": "índice 2015=100", "freq": "monthly"},
 }
 
 
@@ -121,6 +128,58 @@ class FREDClient:
             "previous_value": prev_value,
             "change": (value - prev_value) if prev_value is not None else None,
         }
+
+    async def get_yoy_pct(self, series_id: str) -> float | None:
+        """Year-over-year % change for an index series (e.g. HICP) — neither
+        get_latest() path returns this directly (the keyed API would need a
+        separate `units=pc1` request, the public CSV fallback has no server-side
+        transformation at all), so this fetches enough history and computes it
+        client-side: works identically whether or not FRED_API_KEY is set."""
+        cache_key = f"{series_id}:yoy"
+        if self._fresh(cache_key):
+            return self._cache[cache_key]["value"]
+        try:
+            rows = await self._fetch_history(series_id, min_points=15)
+        except Exception as exc:
+            logger.warning("FRED YoY fetch failed for {}: {}", series_id, exc)
+            return None
+        if len(rows) < 13:
+            return None
+        latest_val = rows[-1][1]
+        # ~12 months back; monthly series so index -13 is the closest match.
+        year_ago_val = rows[-13][1]
+        if not year_ago_val:
+            return None
+        yoy = round((latest_val - year_ago_val) / year_ago_val * 100, 2)
+        self._cache[cache_key] = {"value": yoy}
+        self._cache_expiry[cache_key] = datetime.now() + self._ttl
+        return yoy
+
+    async def _fetch_history(self, series_id: str, min_points: int = 15) -> list[tuple[str, float]]:
+        """Oldest-to-newest (date, value) pairs, at least `min_points` of them
+        when the series has that much history. Used only by get_yoy_pct()."""
+        if self.api_key:
+            url = f"{self.BASE_URL}/series/observations"
+            params = {
+                "series_id": series_id, "api_key": self.api_key, "file_type": "json",
+                "sort_order": "desc", "limit": max(min_points, 24),
+            }
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(url, params=params)
+                resp.raise_for_status()
+                obs = resp.json().get("observations", [])
+            pairs = [(o["date"], float(o["value"])) for o in obs if o.get("value") not in (".", "", None)]
+            return list(reversed(pairs))  # oldest -> newest
+        params = {"id": series_id}
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(self.FRAPH_URL, params=params)
+            resp.raise_for_status()
+            text = resp.text
+        reader = csv.DictReader(io.StringIO(text))
+        rows = [r for r in reader if r.get(series_id) not in (".", "", None)]
+        date_key = "DATE" if rows and "DATE" in rows[0] else "observation_date"
+        pairs = [(r[date_key], float(r[series_id])) for r in rows]
+        return pairs[-max(min_points, 24):]  # already oldest -> newest
 
     async def snapshot(self) -> list[dict]:
         """Returns the curated set of US macro indicators with their latest values."""

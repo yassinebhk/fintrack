@@ -68,7 +68,7 @@ function scorecardHtml(d) {
             <td>${k}</td>
             <td class="text-right mono">${v.n}</td>
             <td class="text-right mono">${v.hit_rate_pct}%</td>
-            <td class="text-right mono ${cls(v.avg)}">${pct(v.avg)}</td>
+            <td class="text-right mono ${cls(v.expectancy)}">${pct(v.expectancy)}</td>
         </tr>`).join('');
         return `<div class="card" style="margin-bottom:16px; flex:1; min-width:280px;">
             <h3>${title}</h3>
@@ -79,6 +79,8 @@ function scorecardHtml(d) {
         </div>`;
     };
     const breakdowns = `<div style="display:flex; gap:16px; flex-wrap:wrap;">
+        ${bd(d.by_approach_1m, '🎛️ Por enfoque (1m)', 'Madura ~3x más rápido que el de 3m — primera señal de alerta')}
+        ${bd(d.by_conviction_1m, '💪 Por convicción (1m)', '¿Aciertan más las de convicción alta?')}
         ${bd(d.by_approach_3m, '🎛️ Por enfoque (3m)', 'Momentum vs valor/contrarian')}
         ${bd(d.by_conviction_3m, '💪 Por convicción (3m)', '¿Aciertan más las de convicción alta?')}
     </div>`;

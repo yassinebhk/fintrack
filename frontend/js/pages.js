@@ -46,7 +46,9 @@ async function loadLiveDocsStatus() {
                 html += ` (rentabilidad media ${m1.return.avg >= 0 ? '+' : ''}${m1.return.avg}%, ${m1.return.hit_rate_pct}% de aciertos; `
                     + `frente a su benchmark: ${m1.alpha_vs_benchmark.hit_rate_pct}% de aciertos)`;
             }
-            html += `.<br>A 3 meses (el horizonte que de verdad activa el autoentrenamiento): `
+            html += `.<br>El autoentrenamiento se activa por enfoque en cuanto su horizonte de 1 o de 3 meses `
+                + `reúne ≥30 recomendaciones repartidas en ≥90 días — lo que llegue primero. `
+                + `A 3 meses (el horizonte original, más lento): `
                 + `<strong>${d.horizons?.ret_3m?.return?.n ?? 0}</strong> evaluadas todavía.<br>`;
             html += gatedBuckets.length
                 ? `<strong style="color:var(--accent-primary);">${gatedBuckets.length} enfoque(s) ya han cruzado el filtro anti-ruido</strong> y están influyendo en la convicción de nuevas ideas.`
@@ -656,6 +658,48 @@ const pageContent = {
         </p>
         <p>La idea global: cada activo pasa por <strong>varios "jueces" independientes</strong> (momentum, riesgo, técnico, régimen, volatilidad, reversión). Cada juez emite un voto numérico; los votos se combinan en dos puntuaciones — <strong>MOMENTUM</strong> (lo fuerte que sube con calidad) y <strong>VALOR</strong> (lo castigado pero sano) — y puedes ver el voto de cada juez en el desglose de cada idea. Vamos juez por juez.</p>
 
+        <h3>📋 Tabla-resumen de todos los parámetros</h3>
+        <p class="text-muted" style="font-size:13px; margin:0 0 10px;">De un vistazo, para compartir con quien quiera entender el sistema completo sin leer todo lo de abajo. Cada juez es un z-score (comparación contra el resto del universo escaneado ese día), no un umbral fijo.</p>
+        <div class="table-container">
+        <table class="data-table">
+            <thead><tr><th>Parámetro</th><th>Qué mide</th><th>Cómo se interpreta</th><th>Aplica a</th></tr></thead>
+            <tbody>
+                <tr><td colspan="4"><strong>Tesis MOMENTUM</strong></td></tr>
+                <tr><td>Momentum</td><td>Media de retornos a 1/3/6/12 meses</td><td>Más alto = mejor</td><td>Todos</td></tr>
+                <tr><td>Régimen</td><td>Distancia del precio a su media de 200 sesiones</td><td>Más alto (por encima) = mejor</td><td>Todos</td></tr>
+                <tr><td>Riesgo</td><td>Ratio de Sharpe (~1 año)</td><td>Más alto = mejor</td><td>Todos</td></tr>
+                <tr><td>Técnico</td><td>RSI14 + señal MACD + cruce SMA50/200</td><td>Más alto = mejor</td><td>Todos</td></tr>
+                <tr><td>Volatilidad</td><td>Volatilidad EWMA anualizada</td><td>Más baja = mejor</td><td>Todos</td></tr>
+                <tr><td>Consistencia <span class="text-muted" style="font-size:11px;">(nuevo)</span></td><td>% de los últimos ~12 meses que cerró en positivo</td><td>Más alto (subida suave) = mejor</td><td>Todos</td></tr>
+                <tr><td colspan="4"><strong>Tesis VALOR / CONTRARIAN</strong></td></tr>
+                <tr><td>Infravaloración</td><td>Posición en el rango de 52 semanas</td><td>Más bajo (cerca del mínimo) = mejor</td><td>Todos</td></tr>
+                <tr><td>Reversión a la media</td><td>Desviaciones típicas por debajo de su media de 50 sesiones</td><td>Más bajo (más lejos) = mejor</td><td>Todos</td></tr>
+                <tr><td>Sobreventa</td><td>RSI14</td><td>Más bajo = mejor</td><td>Todos</td></tr>
+                <tr><td>Calidad</td><td>Mismo Sharpe, aplicado a la tesis valor</td><td>Más alto = mejor</td><td>Todos</td></tr>
+                <tr><td colspan="4"><strong>Fundamentales (mezcla 40% con el precio)</strong></td></tr>
+                <tr><td>Valoración</td><td>PER + P/B + PEG, comparado dentro del propio sector</td><td>Más bajo = mejor</td><td>Solo acciones</td></tr>
+                <tr><td>Solidez</td><td>Deuda/recursos propios + ratio de liquidez corriente</td><td>Deuda baja + liquidez alta = mejor</td><td>Solo acciones</td></tr>
+                <tr><td>Calidad fundamental</td><td>ROE + margen operativo + FCF yield</td><td>Más alto = mejor</td><td>Solo acciones</td></tr>
+                <tr><td>Crecimiento</td><td>Crecimiento de ventas + de beneficios</td><td>Más alto = mejor</td><td>Solo acciones</td></tr>
+                <tr><td colspan="4"><strong>Renta fija</strong></td></tr>
+                <tr><td>Carry real</td><td>Yield real menos la sensibilidad a tipos (duración)</td><td>Más alto = mejor</td><td>Solo bonos/ETF bonos</td></tr>
+                <tr><td colspan="4"><strong>Contexto macro (inclina pesos, no puntúa un activo)</strong></td></tr>
+                <tr><td>Amplitud de mercado</td><td>% del universo por encima de su SMA200</td><td>&gt;55% alcista, &lt;45% bajista</td><td>Global</td></tr>
+                <tr><td>Curva de tipos 10Y-2Y</td><td>Diferencia de tipos entre plazos (FRED)</td><td>Negativa = invertida = aviso de recesión</td><td>Global</td></tr>
+                <tr><td>VIX + clima de riesgo</td><td>Volatilidad de mercado + señales combinadas</td><td>Etiqueta: risk-off/cauto/neutral/risk-on</td><td>Global</td></tr>
+                <tr><td colspan="4"><strong>Filtros anti-ruido (no cambian el ranking)</strong></td></tr>
+                <tr><td>Mínimo de histórico</td><td>≥30 sesiones para poder puntuar</td><td>Filtra activos sin datos suficientes</td><td>Todos</td></tr>
+                <tr><td>Termómetro de euforia</td><td>% del universo con RSI≥70</td><td>Alta/media/baja</td><td>Global</td></tr>
+                <tr><td>Aviso "extendido"</td><td>RSI≥78 y ≥40% sobre su SMA200</td><td>Señal de cuidado, no descarta la idea</td><td>Por activo</td></tr>
+                <tr><td colspan="4"><strong>Marco de decisión (ya con la idea recomendada)</strong></td></tr>
+                <tr><td>Riesgo de la idea</td><td>Volatilidad, máx. drawdown y Sharpe propios</td><td>Contexto para dimensionar</td><td>Por activo</td></tr>
+                <tr><td>Tamaño sugerido</td><td>2% / volatilidad anual, ajustado por correlación con tu cartera</td><td>Entre 1% y 6% de la cartera</td><td>Por activo</td></tr>
+                <tr><td>Expectancy (OOS)</td><td>Resultado real histórico de esa tesis (scorecard)</td><td>"En validación" hasta tener muestra suficiente</td><td>Por tesis</td></tr>
+                <tr><td>Horizonte</td><td>Ventana temporal típica de la tesis</td><td>Momentum 1-3m · Valor 6-18m · Contrarian 3-12m</td><td>Por tesis</td></tr>
+            </tbody>
+        </table>
+        </div>
+
         <h3>① Momentum multi-periodo (estilo HQM)</h3>
         <p><strong>Qué mide:</strong> la fuerza de la tendencia combinando varios horizontes.<br>
         <strong>Intuición:</strong> es la anomalía más documentada de las finanzas (Jegadeesh &amp; Titman, 1993): lo que ha subido de forma sostenida tiende a seguir subiendo a medio plazo. Usamos varios plazos (1, 3, 6 y 12 meses) para premiar la tendencia <em>sostenida</em> y no un pico de un solo mes.</p>
@@ -666,6 +710,21 @@ Ejemplo A (sostenido):  +5% (1m), +18% (3m), +30% (6m), +45% (1a)
 Ejemplo B (espejismo):  +20% (1m), +2% (3m), −5% (6m), −10% (1a)
         → (20+2−5−10)/4 = +1,75%    subida reciente sin base ✘</pre>
         <p><strong>Qué decide:</strong> es el principal motor de la tesis MOMENTUM.</p>
+
+        <h3>①bis Consistencia del momentum + freno anti-crash <span class="text-muted" style="font-size:12px; font-weight:normal;">(añadido 14-sep-2026)</span></h3>
+        <p style="background:rgba(201, 154, 62, 0.09); border-left:3px solid var(--warning); padding:10px 14px; border-radius:6px;">
+            <strong>Por qué se añadió esto:</strong> con datos reales recuperados del histórico (526 recomendaciones, 237 evaluadas a 1 mes), encontramos que la tesis MOMENTUM tenía alfa media <strong>-5,22%</strong> y que su propia puntuación correlacionaba <strong>negativamente (-0,56)</strong> con el resultado real — cuanto más alta la puntuaba el motor, peor le iba después. Investigamos por qué y encontramos la explicación académica exacta.
+        </p>
+        <p><strong>1) Consistencia (Gray &amp; Vogel, "Quantitative Momentum"):</strong> mide qué % de los últimos ~12 meses cerró en positivo, no solo el retorno total. Dos activos pueden compartir el mismo +24,5% a 1 año, pero uno subió mes a mes de forma suave y el otro con uno o dos saltos erráticos — el segundo es históricamente más frágil.</p>
+        <pre class="diagram-box">Activo A: +2%,+3%,+1%,+2%,+3%,+2%,+1%,+2%,+3%,+2%,+1%,+2% cada mes → 12/12 meses positivos (100%)
+Activo B: +40%,-8%,-5%,+3%,-10%,+2%,-6%,+1%,-4%,+3%,-2%,+30% → 6/12 meses positivos (50%)
+Mismo retorno total aprox., pero A es momentum "sano" y B es momentum "de saltos" — mucho más propenso a revertirse de golpe.</pre>
+        <p><strong>2) Freno por volatilidad de mercado (Barroso &amp; Santa-Clara 2015; Daniel &amp; Moskowitz 2016, NBER):</strong> está documentado que las carteras de momentum "se hunden" (momentum crash) justo después de una caída fuerte de mercado, cuando el rebote favorece a los valores que más habían caído (que la estrategia no tiene) más que a los que venían subiendo (que sí tiene). La solución probada: reducir el peso de toda la tesis momentum cuando la volatilidad reciente del mercado escaneado es alta, no solo penalizar la volatilidad de cada activo por separado (que ya hacíamos).</p>
+        <pre class="diagram-box">Volatilidad mediana del universo escaneado ese día:
+  ≥ 45% (alta)     → peso de la tesis momentum ×0,60 (se reduce mucho)
+  30%-45% (media)  → peso ×0,85 (se reduce algo)
+  &lt; 30% (normal)   → peso ×1,00 (sin cambio)</pre>
+        <p><strong>Qué decide:</strong> la consistencia entra como un juez más dentro de MOMENTUM (peso 0,12). El freno de volatilidad se aplica a la tesis completa, después de sumar todos los jueces — así "alta convicción" deja de basarse solo en la magnitud de la puntuación cuando el contexto de mercado es precisamente el que históricamente rompe esa tesis.</p>
 
         <h3>② Métricas de riesgo ajustado (librería empyrical, de Quantopian)</h3>
         <p><strong>Qué miden:</strong> no basta con cuánto sube algo, sino <em>cuánto riesgo</em> asumes para ese retorno.</p>
@@ -770,6 +829,7 @@ en medio                                → NEUTRAL</pre>
             <li><strong>Sensibilidad a tipos</strong> (beta a 3 años) — cuánto se mueve el ETF cuando se mueven los tipos. Un bono a 20 años (beta alta) es una montaña rusa; uno a 1-3 años (beta baja) es tranquilo.</li>
         </ul>
         <p>Arriba de Recomendaciones verás un <strong>banner de contexto de tipos</strong>: 10Y nominal y real, inflación implícita, y la <strong>curva 10Y−2Y</strong> — si es negativa, la curva está "invertida", una señal clásica de recesión.</p>
+        <p><strong>🇪🇺 Zona euro <span class="text-muted" style="font-size:12px; font-weight:normal;">(añadido 14-sep-2026)</span>:</strong> el mismo banner incluye ahora el equivalente europeo, para no depender solo de datos de EE.UU. cuando también tienes activos europeos: <strong>tipo de depósito del BCE</strong> (su tipo de referencia real desde 2022, más relevante hoy que el de refinanciación clásico), <strong>tipo de refinanciación</strong>, <strong>bono a 10 años de la zona euro</strong>, <strong>inflación HICP interanual</strong> (calculada por FinTrack a partir del índice de Eurostat, ya que ni Eurostat ni el BCE la publican ya calculada en interanual) y su correspondiente <strong>yield real europeo</strong>. Todo sale de FRED, que refleja directamente las publicaciones oficiales del BCE y Eurostat — no hemos añadido ningún proveedor de datos nuevo.</p>
         <p><strong>Cómo puntúa:</strong> a los bonos de <strong>grado de inversión y de gobierno</strong> les damos un empujón modesto en la tesis VALOR por su <strong>carry real ajustado al riesgo</strong>: más yield real (yield − inflación) es mejor, pero <em>penalizando</em> el que solo se consigue asumiendo mucha sensibilidad a tipos (duración larga). Así no premiamos a ciegas al bono que más paga.</p>
         <p><strong>Honestidad — sus límites:</strong> (1) NO apostamos a si los tipos subirán o bajarán (apuesta macro de alto riesgo). (2) Los bonos <strong>"high yield" (basura) y de mercados emergentes se excluyen del scoring de carry</strong>: su yield alto <em>es</em> compensación por riesgo de crédito/impago, que no podemos medir con estos datos — puntuarlos por yield solo sacaría a flote lo más arriesgado. Se siguen mostrando con su yield crudo para que tú juzgues. (3) Los bonos <strong>individuales del Estado</strong> tienen datos retail muy limitados; la cobertura buena es en ETFs de bonos (sobre todo de EE.UU.).</p>
 
@@ -1124,6 +1184,7 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
             <tbody>
                 <tr><td><strong>Alpha</strong></td><td>El retorno de más (o de menos) que obtuvo una recomendación frente a su propio benchmark. Alpha +7% = ganó 7 puntos más que el índice con el que se compara. Ver <a href="#autoentrenamiento">Autoentrenamiento</a>.</td></tr>
                 <tr><td><strong>Bollinger %B</strong></td><td>Indicador técnico que sitúa el precio dentro de su banda de volatilidad reciente (cerca del techo o del suelo). Ver <a href="#algoritmos">algoritmos ③</a>.</td></tr>
+                <tr><td><strong>Consistencia del momentum</strong></td><td>% de los últimos ~12 meses que un activo cerró en positivo. Premia la subida suave y sostenida frente a la subida a saltos, aunque el retorno total sea el mismo. Ver <a href="#algoritmos">algoritmos ①bis</a>.</td></tr>
                 <tr><td><strong>Convicción</strong></td><td>Etiqueta (alta/media/baja) que acompaña cada recomendación, según lo fuerte que sea su puntuación combinada.</td></tr>
                 <tr><td><strong>Curva de tipos (10Y-2Y)</strong></td><td>La diferencia entre el interés del bono a 10 años y el de 2 años. Si es negativa ("invertida"), el corto plazo paga más que el largo — señal clásica que suele anticipar recesión. Ver <a href="#algoritmos">algoritmos ⑫</a>.</td></tr>
                 <tr><td><strong>Drawdown</strong></td><td>La peor caída porcentual desde el punto más alto alcanzado, no desde que empezaste. Mide el "dolor" máximo real.</td></tr>
@@ -1139,6 +1200,7 @@ Peso de cada uno = su (1/volatilidad) ÷ esa suma total × 100</pre>
                 <tr><td><strong>LLM</strong></td><td><em>Large Language Model</em>: el tipo de IA (Gemini, Groq...) que redacta texto a partir de datos que se le pasan, sin "pensar" como un humano.</td></tr>
                 <tr><td><strong>MACD</strong></td><td>Indicador técnico que detecta cambios de tendencia mediante el cruce de dos medias móviles. Ver <a href="#algoritmos">algoritmos ③</a>.</td></tr>
                 <tr><td><strong>Momentum</strong></td><td>La fuerza de una tendencia: lo que ha subido de forma sostenida tiende a seguir subiendo a medio plazo. Ver <a href="#algoritmos">algoritmos ①</a>.</td></tr>
+                <tr><td><strong>Momentum crash</strong></td><td>Fenómeno documentado (Daniel &amp; Moskowitz 2016): las carteras de momentum se hunden justo después de una caída fuerte de mercado, cuando el rebote favorece a los valores que más habían caído. Por eso escalamos el peso de la tesis momentum según la volatilidad reciente. Ver <a href="#algoritmos">algoritmos ①bis</a>.</td></tr>
                 <tr><td><strong>Paper trading</strong></td><td>Simular una inversión con precios reales, calculando ganancias y pérdidas reales, pero sin mover ni un euro de verdad. Ver <a href="#motor-sistematico">El motor sistemático</a>.</td></tr>
                 <tr><td><strong>p-valor</strong></td><td>La probabilidad de que un resultado se deba a pura casualidad. Por debajo de 0,10 se considera un indicio razonable de que no es azar. Ver <a href="#autoentrenamiento">Autoentrenamiento</a>.</td></tr>
                 <tr><td><strong>PEG</strong></td><td>El PER dividido entre el crecimiento esperado de beneficios. Ajusta lo "cara" que está una acción por lo que crece: un PEG ~1 se considera razonable. Ver <a href="#algoritmos">algoritmos ⑪</a>.</td></tr>

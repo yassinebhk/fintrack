@@ -99,6 +99,21 @@ def compute_factors(closes: list[float]) -> dict:
     except Exception:
         mean_rev_z = 0.0
 
+    # --- Momentum consistency (Gray & Vogel, "Quantitative Momentum"): % of
+    # the last ~12 months that closed positive. Two names can share the exact
+    # same 12-month return while one climbed smoothly and the other got there
+    # via one or two erratic spikes — the raw multi-period momentum figure
+    # above can't tell them apart, but the smooth one is the historically
+    # better-behaved (less crash-prone) momentum name. `closes` carries no
+    # dates, so ~21 trading days stands in for a calendar month.
+    try:
+        recent = rets.iloc[-min(252, len(rets)):]
+        legs = [recent.iloc[i:i + 21] for i in range(0, len(recent), 21)]
+        leg_rets = [float((1 + leg).prod() - 1) for leg in legs if len(leg) >= 15]
+        momentum_consistency = float(np.mean([1.0 if r > 0 else 0.0 for r in leg_rets])) if len(leg_rets) >= 3 else None
+    except Exception:
+        momentum_consistency = None
+
     return {
         "momentum": round(momentum, 4),
         "sharpe": round(sharpe, 2),
@@ -110,17 +125,19 @@ def compute_factors(closes: list[float]) -> dict:
         "dist_sma200": round(dist_sma200, 4),
         "ewma_vol": round(ewma_vol, 3),
         "mean_rev_z": round(mean_rev_z, 3),
+        "momentum_consistency": round(momentum_consistency, 3) if momentum_consistency is not None else None,
     }
 
 
 # Each "judge" votes via a cross-sectional z-score; weights say how much its vote
 # counts toward each thesis. Transparent on purpose — you can read why something ranks.
 _MOMENTUM_WEIGHTS = {
-    "momentum": 0.28,      # multi-period trend (HQM)
-    "regimen": 0.22,       # absolute momentum: above its 200d trend
-    "riesgo": 0.20,        # risk-adjusted return (Sharpe)
-    "tecnico": 0.15,       # RSI/MACD/trend confirmation
-    "volatilidad": 0.15,   # prefer lower (EWMA) volatility
+    "momentum": 0.22,        # multi-period trend (HQM)
+    "regimen": 0.20,         # absolute momentum: above its 200d trend
+    "riesgo": 0.18,          # risk-adjusted return (Sharpe)
+    "tecnico": 0.13,         # RSI/MACD/trend confirmation
+    "volatilidad": 0.15,     # prefer lower (EWMA) volatility
+    "consistencia": 0.12,    # Gray & Vogel: % of the last ~12 months positive
 }
 _VALUE_WEIGHTS = {
     "infravaloracion": 0.30,  # low in its 52w range
@@ -338,6 +355,7 @@ def score_universe(items: list[dict]) -> list[dict]:
         "mean_rev": _zscore(f("mean_rev_z")),
         "rsi": _zscore([(it.get("signals") or {}).get("rsi", 50) for it in valid]),
         "tecnico": _zscore([_tech_raw(it.get("signals") or {}) for it in valid]),
+        "consistencia": _zscore(f("momentum_consistency")),
     }
 
     # Market regime from breadth: share of the universe above its own 200d trend.
@@ -348,6 +366,27 @@ def score_universe(items: list[dict]) -> list[dict]:
         regime, mom_tilt, val_tilt = "bajista", 0.85, 1.10
     else:
         regime, mom_tilt, val_tilt = "neutral", 1.0, 1.0
+
+    # Momentum-crash guard (Barroso & Santa-Clara 2015; Daniel & Moskowitz 2016,
+    # NBER w20439): momentum strategies crash specifically when recent realized
+    # volatility is elevated — after a drawdown, high-beta "losers" become the
+    # cheapest/most-oversold names and rebound faster than the strategy's
+    # low-beta "winners," handing momentum an unintended negative-beta tilt right
+    # when the market snaps back. The documented fix is to scale momentum
+    # EXPOSURE down when recent vol is high, not just penalize each stock's own
+    # volatility (which we already did, and which does nothing for this
+    # market-wide effect). Proxy: cross-sectional median of the same EWMA vol
+    # already computed per item — thresholds are standard equity vol regimes
+    # (long-run market average ~15-20%, "elevated/crisis" >~35-45%), a
+    # provisional calibration pending our own live track record.
+    median_vol = float(np.median([v for v in f("ewma_vol") if v is not None])) if valid else 0.0
+    if median_vol >= 0.45:
+        vol_guard, vol_regime = 0.60, "alta"
+    elif median_vol >= 0.30:
+        vol_guard, vol_regime = 0.85, "moderada"
+    else:
+        vol_guard, vol_regime = 1.0, "normal"
+    mom_tilt *= vol_guard
 
     # Fundamental judges for the stocks that carry a `fundamentals` dict (blended
     # into the theses below; ETFs/funds/bonds/crypto are untouched — price-only).
@@ -361,6 +400,7 @@ def score_universe(items: list[dict]) -> list[dict]:
             "riesgo": _MOMENTUM_WEIGHTS["riesgo"] * z["sharpe"][i],
             "tecnico": _MOMENTUM_WEIGHTS["tecnico"] * z["tecnico"][i],
             "volatilidad": _MOMENTUM_WEIGHTS["volatilidad"] * (-z["ewma_vol"][i]),
+            "consistencia": _MOMENTUM_WEIGHTS["consistencia"] * z["consistencia"][i],
         }
         price_val = {
             "infravaloracion": _VALUE_WEIGHTS["infravaloracion"] * (-z["range"][i]),
@@ -408,9 +448,15 @@ def score_universe(items: list[dict]) -> list[dict]:
         it.setdefault("breakdown", {})
 
     items.sort(key=lambda x: x.get("momentum_score", 0), reverse=True)
-    logger.info("ensemble scoring done for {} items (regime={}, breadth={:.0%})", len(valid), regime, breadth)
+    logger.info(
+        "ensemble scoring done for {} items (regime={}, breadth={:.0%}, vol_regime={}, "
+        "median_vol={:.0%}, momentum_guard={:.2f}x)",
+        len(valid), regime, breadth, vol_regime, median_vol, vol_guard,
+    )
     # stash the regime where the caller (scanner/service) can read it off any item
     for it in valid:
         it["market_regime"] = regime
         it["market_breadth"] = round(breadth, 3)
+        it["momentum_vol_regime"] = vol_regime
+        it["momentum_vol_guard"] = vol_guard
     return items

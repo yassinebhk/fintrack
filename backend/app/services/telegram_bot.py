@@ -564,7 +564,7 @@ class TelegramBotHandler:
                 lines.append("\n<b>Por enfoque (3m):</b>")
                 for k, v in ba.items():
                     if v:
-                        lines.append(f"• {k}: {v['avg']:+.1f}% · aciertos {v['hit_rate_pct']:.0f}% (n={v['n']})")
+                        lines.append(f"• {k}: {v['expectancy']:+.1f}% · aciertos {v['hit_rate_pct']:.0f}% (n={v['n']})")
             lines.append("\n<i>Es el rendimiento DESPUÉS de recomendar, no promesa futura. "
                          "Necesita historial para ser significativo.</i>")
             await self.notifier.send_html("\n".join(lines) + PAGE_LINK)

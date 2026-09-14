@@ -464,10 +464,25 @@ class OpportunityService:
             ten, two = await val("DGS10"), await val("DGS2")
             real, be = await val("DFII10"), await val("T10YIE")
             vix = await val("VIXCLS")
+
+            # Eurozone backdrop (mirrors ECB/Eurostat via FRED, same client/cache
+            # as above) — closes the "solo EE.UU." gap for a user who also holds
+            # European assets. Best-effort, same pattern as the US block.
+            ecb_deposit, ecb_mrr = await val("ECBDFR"), await val("ECBMRRFR")
+            eu_10y = await val("IRLTLT01EZM156N")
+            eu_hicp_yoy = await fred.get_yoy_pct("CP0000EZ19M086NEST")
+            eu_real_10y = (
+                round(eu_10y - eu_hicp_yoy, 2) if (eu_10y is not None and eu_hicp_yoy is not None) else None
+            )
+
             return {
                 "nominal_10y": ten, "real_10y": real, "breakeven_inflation": be,
                 "two_y": two, "vix": vix,
                 "curve_10y_2y": round(ten - two, 2) if (ten is not None and two is not None) else None,
+                "euro_area": {
+                    "ecb_deposit_rate": ecb_deposit, "ecb_refi_rate": ecb_mrr,
+                    "nominal_10y": eu_10y, "hicp_yoy": eu_hicp_yoy, "real_10y": eu_real_10y,
+                },
             }
         except Exception as exc:
             logger.warning("rates context fetch failed: {}", exc)

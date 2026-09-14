@@ -173,24 +173,14 @@ async def summary() -> dict:
         label = {"ret_1m": "1 mes", "ret_3m": "3 meses", "ret_6m": "6 meses"}[field]
         horizons[field] = {"label": label, "return": ret_stats, "alpha_vs_benchmark": exc_stats}
 
-    # Breakdown by approach / conviction at the 3-month horizon (most meaningful).
-    def breakdown(attr: str) -> dict:
-        out: dict = {}
-        groups: dict[str, list[float]] = {}
-        for r in rows:
-            key = getattr(r, attr) or "—"
-            if r.ret_3m is not None:
-                groups.setdefault(key, []).append(r.ret_3m)
-        for k, v in groups.items():
-            out[k] = _agg(v)
-        return out
-
     return {
         "total_recommendations_tracked": total,
         "evaluated_any": sum(1 for r in rows if r.ret_1m is not None),
         "horizons": horizons,
-        "by_approach_3m": breakdown("approach"),
-        "by_conviction_3m": breakdown("conviction"),
+        "by_approach_3m": _bucket_stats(rows, "approach", "ret_3m"),
+        "by_conviction_3m": _bucket_stats(rows, "conviction", "ret_3m"),
+        "by_approach_1m": _bucket_stats(rows, "approach", "ret_1m"),
+        "by_conviction_1m": _bucket_stats(rows, "conviction", "ret_1m"),
         "feedback_gate": await feedback_context(rows),
         "note": (
             "Rendimiento de las ideas DESPUÉS de recomendarlas (out-of-sample). "
@@ -200,16 +190,20 @@ async def summary() -> dict:
     }
 
 
-def _bucket_stats(rows: list[RecommendationTrack], attr: str) -> dict:
-    """Group by `attr` (approach/conviction) at the 3-month horizon and gate each
-    group on (n >= MIN_N_FEEDBACK and date span >= MIN_SPAN_DAYS_FEEDBACK) — the
-    anti-noise threshold. Ungated groups still get a real n/span so the caller can
-    show honest progress ("12/30"), never silence."""
+def _bucket_stats(rows: list[RecommendationTrack], attr: str, ret_field: str = "ret_3m") -> dict:
+    """Group by `attr` (approach/conviction) at the given return horizon and gate
+    each group on (n >= MIN_N_FEEDBACK and date span >= MIN_SPAN_DAYS_FEEDBACK) —
+    the same anti-noise threshold regardless of horizon, so a faster-maturing
+    ret_1m bucket earns trust exactly as hard as the original ret_3m one; it just
+    gets there sooner because 1-month-old recommendations accumulate faster.
+    Ungated groups still get a real n/span so the caller can show honest
+    progress ("12/30"), never silence."""
     groups: dict[str, list[tuple[date, float]]] = {}
     for r in rows:
-        if r.ret_3m is not None:
+        val = getattr(r, ret_field)
+        if val is not None:
             key = getattr(r, attr) or "—"
-            groups.setdefault(key, []).append((r.rec_date, r.ret_3m))
+            groups.setdefault(key, []).append((r.rec_date, val))
 
     out: dict = {}
     for key, pairs in groups.items():
@@ -240,7 +234,29 @@ def _bucket_stats(rows: list[RecommendationTrack], attr: str) -> dict:
             "p_value": round(p_value, 3) if p_value is not None else None,
             "gated": gated,
             "significant": bool(gated and p_value is not None and p_value < 0.10),
+            "horizon": ret_field.replace("ret_", ""),  # "1m" / "3m" / "6m"
         }
+    return out
+
+
+def _effective_bucket_stats(rows: list[RecommendationTrack], attr: str) -> dict:
+    """The single, decision-relevant view per bucket: prefer the 3-month horizon
+    once it clears the anti-noise gate (the slower, originally-designed signal),
+    fall back to the 1-month horizon if THAT clears the gate first (recs mature
+    into ret_1m ~3x sooner, so it's the earlier-warning signal for exactly the
+    momentum thesis's own stated 1-3 month holding window) — otherwise report
+    the (ungated) 3-month view so callers still see honest progress ("12/30")
+    rather than nothing."""
+    b3, b1 = _bucket_stats(rows, attr, "ret_3m"), _bucket_stats(rows, attr, "ret_1m")
+    out: dict = {}
+    for key in set(b3) | set(b1):
+        s3, s1 = b3.get(key), b1.get(key)
+        if s3 and s3["gated"]:
+            out[key] = s3
+        elif s1 and s1["gated"]:
+            out[key] = s1
+        else:
+            out[key] = s3 or s1
     return out
 
 
@@ -256,7 +272,7 @@ async def feedback_context(rows: list[RecommendationTrack] | None = None) -> dic
     if rows is None:
         async with session_scope() as s:
             rows = (await s.execute(select(RecommendationTrack))).scalars().all()
-    fb = {"by_approach": _bucket_stats(rows, "approach"), "by_conviction": _bucket_stats(rows, "conviction")}
+    fb = {"by_approach": _effective_bucket_stats(rows, "approach"), "by_conviction": _effective_bucket_stats(rows, "conviction")}
     for group_name, buckets in fb.items():
         for key, stats in buckets.items():
             marker = f"{group_name}:{key}"
@@ -287,8 +303,8 @@ def render_feedback_for_prompt(fb: dict) -> str:
             if stats["gated"]:
                 any_gated = True
                 lines.append(
-                    f"- {tag}: n={stats['n']} en {stats['span_days']}d — mediana {stats['median']:+.1f}% a 3m, "
-                    f"{stats['hit_rate_pct']:.0f}% de aciertos"
+                    f"- {tag}: n={stats['n']} en {stats['span_days']}d — mediana {stats['median']:+.1f}% "
+                    f"a {stats.get('horizon', '3m')}, {stats['hit_rate_pct']:.0f}% de aciertos"
                     + (", diferencia de 0 estadísticamente significativa" if stats["significant"] else ", sin significancia estadística clara")
                     + "."
                 )
