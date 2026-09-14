@@ -186,7 +186,10 @@ _REC_STOPS = {
     "valor": (8.0, 16.0),
     "contrarian": (8.0, 16.0),
 }
-_REC_MAX_PER_DAY = 5
+# Track EVERY recommended idea in the paper book (the user wants to see them all
+# evolve, not just the top few). The curated opportunities list is small (~<20),
+# and dedup against open tickers keeps it from re-opening the same name.
+_REC_MAX_PER_DAY = 30
 
 
 async def open_recommendations(user_id: int, max_n: int = _REC_MAX_PER_DAY) -> dict:
