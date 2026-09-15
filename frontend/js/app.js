@@ -25,6 +25,7 @@ window.API_BASE_URL = CONFIG.API_BASE_URL;
 
 // State
 let portfolioData = null;
+let riskByTicker = {}; // ticker -> annualized vol % (3m realized), from /portfolio/risk-analysis
 let charts = {
     portfolio: null,
     type: null,
@@ -377,7 +378,7 @@ function updatePositionsTable(positions) {
     if (!tbody) return;
     
     if (!positions || positions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" class="loading-row">No hay posiciones</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="loading-row">No hay posiciones</td></tr>';
         return;
     }
     
@@ -449,6 +450,7 @@ function updatePositionsTable(positions) {
                 ${formatPercent(pos.day_change_pct)}
             </td>
             <td class="text-right mono">${formatNumber(pos.weight)}%</td>
+            <td class="text-right mono">${riskByTicker[pos.ticker] != null ? formatNumber(riskByTicker[pos.ticker]) + '%' : '—'}</td>
         </tr>
     `}).join('');
 
@@ -760,7 +762,7 @@ function createBlockChart(data, targets) {
 function exportToCSV() {
     if (!portfolioData || !portfolioData.positions) return;
     
-    const headers = ['Ticker', 'Nombre', 'Tipo', 'Broker', 'Cantidad', 'Precio Medio', 'Precio Actual', 'Valor', 'P/L', 'P/L %', 'Peso %'];
+    const headers = ['Ticker', 'Nombre', 'Tipo', 'Broker', 'Cantidad', 'Precio Medio', 'Precio Actual', 'Valor', 'P/L', 'P/L %', 'Peso %', 'Volatilidad %'];
     const rows = portfolioData.positions.map(p => [
         p.ticker,
         p.name,
@@ -772,7 +774,8 @@ function exportToCSV() {
         p.market_value,
         p.gain_loss,
         p.gain_loss_pct,
-        p.weight
+        p.weight,
+        riskByTicker[p.ticker] != null ? riskByTicker[p.ticker] : ''
     ]);
     
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -833,9 +836,16 @@ async function loadDashboard() {
 
         loadIntegrationsStatus();
 
-        // Fetch portfolio data
-        portfolioData = await fetchPortfolio();
-        
+        // Fetch portfolio data + per-position realized volatility in parallel — the
+        // latter already existed for the Análisis page's risk/return scatter
+        // (1h-cached server-side), just wasn't surfaced on the main table until now.
+        const [pd, riskResp] = await Promise.all([
+            fetchPortfolio(),
+            fetch(`${CONFIG.API_BASE_URL}/portfolio/risk-analysis`).catch(() => null),
+        ]);
+        portfolioData = pd;
+        riskByTicker = (riskResp && riskResp.ok) ? ((await riskResp.json()).risk_by_ticker || {}) : {};
+
         // Update UI
         updateSummary(portfolioData);
         updateKPIs(portfolioData.kpis);

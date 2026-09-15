@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from app.auth import get_current_user
 from app.db import session_scope
 from app.models.user import User
-from app.repositories import WatchlistRepository
+from app.repositories import PositionRepository, TransactionRepository, WatchlistRepository
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 
@@ -81,6 +81,31 @@ async def list_watchlist(current_user: User = Depends(get_current_user)) -> dict
 
     rows = await asyncio.gather(*[one(e) for e in entries])
     return {"items": rows}
+
+
+@router.post("/import-history")
+async def import_history(current_user: User = Depends(get_current_user)) -> dict:
+    """One-off (repeatable) action: seed the watchlist with every ticker you've
+    ever bought — current holdings AND fully-exited ones — so past ideas stay
+    trackable without re-adding them by hand. Never touches an entry you already
+    have (including one you deliberately removed and don't want back): it only
+    ADDS tickers missing from the watchlist, never runs automatically."""
+    async with session_scope() as s:
+        wl_repo = WatchlistRepository(s, current_user.id)
+        tx_repo = TransactionRepository(s, current_user.id)
+        pos_repo = PositionRepository(s, current_user.id)
+        candidates: dict[str, str] = {}
+        for t in await tx_repo.list_all():
+            candidates.setdefault(t.ticker, "")
+        for p in await pos_repo.list_all():
+            candidates.setdefault(p.ticker, p.asset_name or "")
+        existing = {e.ticker for e in await wl_repo.list_all()}
+        added = []
+        for ticker, name in candidates.items():
+            if ticker not in existing:
+                await wl_repo.add(ticker, name)
+                added.append(ticker)
+        return {"added": added, "count": len(added)}
 
 
 @router.post("", status_code=201)

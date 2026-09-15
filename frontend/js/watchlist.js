@@ -30,6 +30,11 @@ function watchlistFormHtml() {
             <button class="btn-primary" id="wSubmit">Añadir</button>
         </div>
         <span id="wMsg" style="font-size:13px;"></span>
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(43,40,34,0.08);">
+            <button class="btn-secondary" id="wImportHistory">📥 Importar mi histórico de inversiones</button>
+            <span class="text-muted" style="font-size:11.5px; margin-left:8px;">Añade todo lo que ya has comprado alguna vez (actual o vendido) que aún no esté aquí — no toca lo que ya tengas ni lo que hayas quitado antes.</span>
+            <span id="wImportMsg" style="font-size:13px; display:block; margin-top:4px;"></span>
+        </div>
     </div>`;
 }
 
@@ -58,6 +63,30 @@ function watchlistListHtml(items) {
 }
 
 function wireWatchlistForm() {
+    const importBtn = document.getElementById('wImportHistory');
+    if (importBtn) {
+        importBtn.onclick = async () => {
+            const msg = document.getElementById('wImportMsg');
+            importBtn.disabled = true;
+            if (msg) { msg.textContent = 'Revisando tu histórico…'; msg.style.color = 'var(--text-secondary)'; }
+            try {
+                const r = await fetch(`${WATCHLIST_API}/watchlist/import-history`, { method: 'POST' });
+                if (!r.ok) throw new Error();
+                const data = await r.json();
+                if (msg) {
+                    msg.textContent = data.count > 0
+                        ? `✓ Añadidos ${data.count}: ${data.added.join(', ')}`
+                        : 'Ya estaba todo — no había nada nuevo que añadir.';
+                    msg.style.color = 'var(--positive)';
+                }
+                await loadWatchlist();
+            } catch (e) {
+                if (msg) { msg.textContent = 'No se pudo importar el histórico.'; msg.style.color = 'var(--negative)'; }
+                importBtn.disabled = false;
+            }
+        };
+    }
+
     const btn = document.getElementById('wSubmit');
     if (!btn) return;
     btn.onclick = async () => {
