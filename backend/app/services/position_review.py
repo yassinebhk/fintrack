@@ -129,6 +129,25 @@ async def _asset_metrics(scanner: MarketScanner, ticker: str, asset_type: str) -
             "last_close": last}
 
 
+def _thesis_detail(f: dict, s: dict) -> str:
+    """Extra concrete evidence for a broken/weakening thesis, beyond the headline
+    sentence — a user shouldn't have to take "la tesis ya no la sostiene" on faith
+    when the engine already computed the numbers that back it up."""
+    bits = []
+    dist200 = f.get("dist_sma200")
+    if dist200 is not None:
+        bits.append(f"{abs(dist200 * 100):.0f}% por debajo de su media de 200 sesiones")
+    if s.get("macd_signal") == "bajista":
+        bits.append("MACD confirma en bajista (no es solo un indicador contradiciendo a otro)")
+    consistency = f.get("momentum_consistency")
+    if consistency is not None and consistency < 0.5:
+        bits.append(f"solo {consistency * 100:.0f}% de los últimos ~12 meses cerró en positivo — no es un susto puntual, es una tendencia de fondo")
+    sharpe = f.get("sharpe")
+    if sharpe is not None and sharpe < 0:
+        bits.append(f"Sharpe negativo ({sharpe:.1f}): el riesgo que asumes ni siquiera está compensado por el retorno")
+    return (" " + " · ".join(bits) + ".") if bits else ""
+
+
 def _evaluate(pos: dict, m: dict, horizon: str = "medio") -> dict:
     """Pure decision logic. Returns signal + reasons + bias flag, adjusted for the
     holding horizon (largo/medio/corto)."""
@@ -156,11 +175,14 @@ def _evaluate(pos: dict, m: dict, horizon: str = "medio") -> dict:
         reasons.append(f"Concentración alta: pesa {weight:.0f}% de tu cartera (riesgo de concentración, no por tu ganancia).")
     elif thesis_broken and risk_high:
         signal = "ROTAR"
-        reasons.append(f"Tendencia rota (bajo su media de 200 sesiones) y momentum negativo, con caída {dd_peak:.0f}% desde su máximo. La tesis ya no la sostiene.")
+        reasons.append(
+            f"Tendencia rota (bajo su media de 200 sesiones) y momentum negativo, con caída {dd_peak:.0f}% "
+            f"desde su máximo. La tesis ya no la sostiene.{_thesis_detail(f, s)}"
+        )
     elif thesis_broken or risk_watch:
         signal = "VIGILAR"
         if thesis_broken:
-            reasons.append("Tendencia debilitada: por debajo de su media de 200 sesiones y momentum negativo.")
+            reasons.append(f"Tendencia debilitada: por debajo de su media de 200 sesiones y momentum negativo.{_thesis_detail(f, s)}")
         if risk_watch:
             reasons.append(f"Caída {dd_peak:.0f}% desde su máximo reciente; vigila el riesgo.")
     elif thesis_intact:

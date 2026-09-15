@@ -42,6 +42,18 @@ engine = create_async_engine(
     _settings.async_database_url,
     echo=False,
     pool_pre_ping=True,
+    # Default pool (size=5, overflow=10 -> 15 total) was too small: a single
+    # "Análisis" page load fans out ~6 concurrent requests, each holding its
+    # connection checked out for the whole duration of that endpoint's slow,
+    # sequential Yahoo Finance calls (several seconds) rather than just the
+    # brief DB work — enough on its own to exhaust the pool and 500 even
+    # unrelated requests (confirmed live: sqlalchemy.exc.TimeoutError,
+    # "QueuePool limit of size 5 overflow 10 reached", which took down
+    # /api/portfolio itself, not just the slow widgets). Postgres allows 100
+    # connections and this app never had more than ~15 open even while
+    # failing, so this has ample headroom without touching Postgres config.
+    pool_size=15,
+    max_overflow=25,
     connect_args=_connect_args,
 )
 

@@ -637,12 +637,19 @@ async function loadBenchmarkChart() {
 async function loadRiskAndCorrelation() {
     try {
         const resp = await fetch(`${ASSET_API}/portfolio/risk-analysis`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         renderRiskDistribution(data.risk_distribution || {});
         renderCorrelationMatrix(data.correlation || {});
         renderRiskReturnScatter(data.risk_by_ticker || {}, data.return_by_ticker || {}, data.weight_by_ticker || {});
     } catch (err) {
         console.error('risk/correlation load failed:', err);
+        // A failed request must never look like "genuinely no data" (0.0% reads as
+        // a real, calmer-than-expected risk profile, not as "couldn't load this").
+        const errMsg = '<p class="text-muted">No se pudo calcular ahora mismo — reintenta en un momento.</p>';
+        const corrEl = document.getElementById('correlationMatrix');
+        if (corrEl) corrEl.innerHTML = errMsg;
+        document.querySelectorAll('#riskLow, #riskMedium, #riskHigh').forEach(el => { el.textContent = '—'; });
     }
 }
 
