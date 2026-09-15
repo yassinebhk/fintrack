@@ -63,7 +63,16 @@ async function openDeepAnalysis(ticker, name) {
     try {
         const nameParam = name ? `?name=${encodeURIComponent(name)}` : '';
         const resp = await fetch(`${DEEP_API}/assets/${encodeURIComponent(ticker)}/deep-analysis${nameParam}`, { cache: 'no-store' });
-        const data = await resp.json();
+        // A 502/empty body (e.g. the backend mid-restart during a deploy) has no
+        // JSON to parse — read as text first so that shows a clear "try again in a
+        // few seconds" instead of a cryptic "Unexpected end of JSON input".
+        const raw = await resp.text();
+        let data;
+        try { data = raw ? JSON.parse(raw) : {}; } catch (e) {
+            throw new Error(resp.status === 502
+                ? 'El servidor se está reiniciando — prueba de nuevo en unos segundos.'
+                : `Respuesta inesperada del servidor (HTTP ${resp.status}).`);
+        }
         if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
         body.innerHTML = renderDeepAnalysis(data);
         const ex = m.querySelector('#deepExport');
