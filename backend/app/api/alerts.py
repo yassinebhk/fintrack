@@ -7,8 +7,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
 from app.db import get_session
 from app.models.alert import Alert
+from app.models.user import User
 from app.services.alerts import AlertsEngine
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
@@ -24,13 +26,13 @@ class TrailingStopIn(BaseModel):
 
 
 @router.get("/trailing-stops")
-async def list_trailing_stops() -> dict:
+async def list_trailing_stops(current_user: User = Depends(get_current_user)) -> dict:
     from app.services import trailing_stops as ts
     return {"stops": await ts.get_all()}
 
 
 @router.post("/trailing-stop")
-async def set_trailing_stop(payload: TrailingStopIn) -> dict:
+async def set_trailing_stop(payload: TrailingStopIn, current_user: User = Depends(get_current_user)) -> dict:
     from app.services import trailing_stops as ts
     stop = await ts.set_stop(payload.ticker, payload.trailing_pct,
                              payload.label, payload.peak, payload.currency)
@@ -42,6 +44,7 @@ async def list_alerts(
     status: str | None = None,
     limit: int = 50,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ) -> list[dict]:
     stmt = select(Alert).order_by(Alert.triggered_at.desc()).limit(limit)
     if status:
@@ -66,13 +69,13 @@ async def list_alerts(
 
 
 @router.post("/evaluate")
-async def evaluate() -> dict:
+async def evaluate(current_user: User = Depends(get_current_user)) -> dict:
     created = await _engine.evaluate()
     return {"created": created, "count": len(created)}
 
 
 @router.post("/{alert_id}/ack")
-async def ack(alert_id: int, session: AsyncSession = Depends(get_session)) -> dict:
+async def ack(alert_id: int, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)) -> dict:
     row = await session.get(Alert, alert_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Alert not found")

@@ -113,7 +113,11 @@ async def pdf_import(
 
 
 @router.get("/syncs")
-async def list_syncs(limit: int = 20, session: AsyncSession = Depends(get_session)) -> list[dict]:
+async def list_syncs(
+    limit: int = 20,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
     stmt = select(BrokerSync).order_by(BrokerSync.started_at.desc()).limit(limit)
     result = await session.execute(stmt)
     rows = list(result.scalars().all())

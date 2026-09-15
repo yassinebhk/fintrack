@@ -1,8 +1,10 @@
 """User-facing report/display preferences."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from app.auth import get_current_user
+from app.models.user import User
 from app.services import allocation, report_prefs
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -17,22 +19,22 @@ class TargetsIn(BaseModel):
 
 
 @router.get("/report-excluded")
-async def get_report_excluded() -> dict:
+async def get_report_excluded(current_user: User = Depends(get_current_user)) -> dict:
     return {"excluded": sorted(await report_prefs.get_excluded())}
 
 
 @router.put("/report-excluded")
-async def put_report_excluded(payload: ExcludedIn) -> dict:
+async def put_report_excluded(payload: ExcludedIn, current_user: User = Depends(get_current_user)) -> dict:
     saved = await report_prefs.set_excluded(payload.tickers)
     return {"message": "actualizado", **saved}
 
 
 @router.get("/allocation-targets")
-async def get_allocation_targets() -> dict:
+async def get_allocation_targets(current_user: User = Depends(get_current_user)) -> dict:
     return {"targets": await allocation.get_targets(), "blocks": allocation.BLOCKS}
 
 
 @router.put("/allocation-targets")
-async def put_allocation_targets(payload: TargetsIn) -> dict:
+async def put_allocation_targets(payload: TargetsIn, current_user: User = Depends(get_current_user)) -> dict:
     saved = await allocation.set_targets(payload.targets)
     return {"message": "actualizado", "targets": saved}

@@ -2,9 +2,11 @@
 
 from datetime import date, datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
+from app.auth import get_current_user
+from app.models.user import User
 from app.services.briefing import BriefingService
 
 router = APIRouter(prefix="/api/briefings", tags=["briefings"])
@@ -12,7 +14,7 @@ _service = BriefingService()
 
 
 @router.get("/today")
-async def get_today() -> dict:
+async def get_today(current_user: User = Depends(get_current_user)) -> dict:
     today = date.today()
     existing = await _service.get_briefing(today)
     if existing:
@@ -21,7 +23,7 @@ async def get_today() -> dict:
 
 
 @router.get("/{target_date}")
-async def get_by_date(target_date: str) -> dict:
+async def get_by_date(target_date: str, current_user: User = Depends(get_current_user)) -> dict:
     try:
         target = datetime.strptime(target_date, "%Y-%m-%d").date()
     except ValueError as exc:
@@ -33,7 +35,7 @@ async def get_by_date(target_date: str) -> dict:
 
 
 @router.post("/generate")
-async def generate(force: bool = False) -> dict:
+async def generate(force: bool = False, current_user: User = Depends(get_current_user)) -> dict:
     try:
         return await _service.generate_today(force=force)
     except Exception as exc:
