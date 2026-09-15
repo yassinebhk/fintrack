@@ -30,6 +30,8 @@ let charts = {
     type: null,
     broker: null,
     currency: null,
+    block: null,
+    sector: null,
     benchmark: null
 };
 let currentPeriod = 30;
@@ -728,6 +730,32 @@ function createDoughnutChart(canvasId, data, legendId) {
     }
 }
 
+// "Reparto" (objetivo vs real) — same 5 blocks as the daily summary's text table
+// (Núcleo/Oro/Temático/Cripto/Estable), but as a chart. Draws the real weights via
+// the shared doughnut renderer, then overwrites the legend to also show each
+// block's target and how far off it is (*  >=5pp, ** >=10pp — matches
+// allocation.py's format_reparto() flagging so the two views never disagree).
+function createBlockChart(data, targets) {
+    createDoughnutChart('blockChart', data, 'blockLegend');
+    const legendEl = document.getElementById('blockLegend');
+    if (!legendEl) return;
+    const labels = Object.keys(data);
+    legendEl.innerHTML = labels.map((label, i) => {
+        const real = data[label].weight || 0;
+        const tgt = targets[label];
+        const diff = tgt != null ? real - tgt : null;
+        const flag = diff == null ? '' : (Math.abs(diff) >= 10 ? ' **' : (Math.abs(diff) >= 5 ? ' *' : ''));
+        const tgtText = tgt != null ? ` <span class="text-muted" style="font-size:11px;">(obj. ${Math.round(tgt)}%)</span>` : '';
+        return `
+            <div class="legend-item">
+                <span class="legend-color" style="background: ${CONFIG.CHART_COLORS[i]}"></span>
+                <span class="legend-label">${label}</span>
+                <span class="legend-value">${formatNumber(real)}%${tgtText}${flag}</span>
+            </div>
+        `;
+    }).join('');
+}
+
 // Export to CSV
 function exportToCSV() {
     if (!portfolioData || !portfolioData.positions) return;
@@ -827,7 +855,17 @@ async function loadDashboard() {
         if (portfolioData.by_currency && Object.keys(portfolioData.by_currency).length > 0) {
             createDoughnutChart('currencyChart', portfolioData.by_currency, 'currencyLegend');
         }
-        
+        if (portfolioData.by_block && Object.keys(portfolioData.by_block).length > 0) {
+            createBlockChart(portfolioData.by_block, portfolioData.block_targets || {});
+        }
+        const sectorCard = document.getElementById('sectorCard');
+        if (portfolioData.by_sector && Object.keys(portfolioData.by_sector).length > 0) {
+            if (sectorCard) sectorCard.hidden = false;
+            createDoughnutChart('sectorChart', portfolioData.by_sector, 'sectorLegend');
+        } else if (sectorCard) {
+            sectorCard.hidden = true;
+        }
+
         // Fetch and create history chart
         const historyData = await fetchHistory(365);
         if (historyData.history && historyData.history.length > 0) {

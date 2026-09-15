@@ -16,6 +16,7 @@ from loguru import logger
 from app.config import get_settings
 from app.db import session_scope
 from app.repositories import PositionRepository, SnapshotRepository, TransactionRepository
+from app.services import allocation
 from app.services.market import CoinGeckoService, ExchangeRateService, YahooFinanceService
 
 
@@ -159,6 +160,7 @@ class PortfolioService:
                 "type": asset_type,
                 "currency": currency,
                 "broker": broker,
+                "block": allocation.BLOCK_LABEL[allocation.classify(ticker)],
                 "weight": 0.0,
             })
             total_value += market_value_base
@@ -172,6 +174,9 @@ class PortfolioService:
         by_type = await self._aggregate(position_data, "type", total_value, include_cost=True)
         by_broker = await self._aggregate(position_data, "broker", total_value, include_count=True)
         by_currency = await self._aggregate(position_data, "currency", total_value)
+        by_block = await self._aggregate(position_data, "block", total_value)
+        by_sector = await self._aggregate_stock_sectors(position_data)
+        block_targets = {allocation.BLOCK_LABEL[k]: v for k, v in (await allocation.get_targets()).items()}
 
         total_gain_loss = total_value - total_cost
         total_gain_loss_pct = (total_gain_loss / total_cost * 100) if total_cost > 0 else 0.0
@@ -192,6 +197,9 @@ class PortfolioService:
             "by_type": by_type,
             "by_broker": by_broker,
             "by_currency": by_currency,
+            "by_block": by_block,
+            "by_sector": by_sector,
+            "block_targets": block_targets,
             "kpis": kpis,
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
@@ -226,6 +234,32 @@ class PortfolioService:
                 gl = agg[k]["value"] - cost
                 agg[k]["gain_loss"] = gl
                 agg[k]["gain_loss_pct"] = round((gl / cost * 100) if cost > 0 else 0.0, 2)
+        return agg
+
+    async def _aggregate_stock_sectors(self, positions: list[dict]) -> dict:
+        """Sector breakdown, INDIVIDUAL STOCKS ONLY (funds/ETFs/bonds/crypto don't
+        have a single sector). Weight is relative to the stock sleeve, not the whole
+        portfolio, so it answers "of what I hold in individual stocks, how spread
+        across sectors am I" rather than a tiny slice of the total pie.
+
+        get_fundamentals() is normally reserved for the daily scan (slow, network-
+        heavy), but a real portfolio only holds a handful of individual stocks, and
+        the client caches each ticker's fundamentals for 12h — so this stays cheap
+        on every request after the first one following a restart."""
+        stocks = [p for p in positions if p["type"] == "stock"]
+        if not stocks:
+            return {}
+        stock_total = sum(p["market_value_base"] for p in stocks)
+        if stock_total <= 0:
+            return {}
+        agg: dict[str, dict] = {}
+        for p in stocks:
+            fund = await self.yahoo.get_fundamentals(p["ticker"])
+            sector = (fund or {}).get("sector") or "Sin clasificar"
+            agg.setdefault(sector, {"value": 0.0})
+            agg[sector]["value"] += p["market_value_base"]
+        for k in agg:
+            agg[k]["weight"] = round(agg[k]["value"] / stock_total * 100, 2)
         return agg
 
     async def _persist_snapshot(
@@ -903,6 +937,9 @@ class PortfolioService:
             "by_type": {},
             "by_broker": {},
             "by_currency": {},
+            "by_block": {},
+            "by_sector": {},
+            "block_targets": {},
             "kpis": {},
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }

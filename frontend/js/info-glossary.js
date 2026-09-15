@@ -441,6 +441,16 @@ const INFO_GLOSSARY = {
         what: 'El número de activos distintos que tienes actualmente en cartera.',
         read: 'Más posiciones no siempre es mejor diversificación si están muy correlacionadas entre sí (p.ej. varias acciones del mismo sector).',
     },
+    reparto_bloques: {
+        title: 'Reparto (objetivo vs real)',
+        what: 'Tu cartera dividida en 5 bloques estratégicos: Núcleo (fondos/ETFs diversificados), Oro, Temático (apuestas tácticas por sector/acción), Cripto y Estable (efectivo/bonos a corto). Cada bloque tiene un % objetivo que tú defines.',
+        read: 'La leyenda muestra el % real y, entre paréntesis, el objetivo. Un * significa que te desvías ≥5 puntos porcentuales, ** que te desvías ≥10. La recomendación siempre es corregir con aportaciones nuevas hacia el bloque más por debajo de su objetivo, no vendiendo lo que ya tienes.',
+    },
+    reparto_sector: {
+        title: 'Acciones por sector',
+        what: 'De lo que tienes invertido en acciones individuales (no fondos/ETFs/bonos/cripto), qué % cae en cada sector económico (tecnología, salud, financiero...), según la clasificación de Yahoo Finance.',
+        read: 'Útil para detectar concentración oculta: puedes tener 4 acciones distintas y aun así estar muy expuesto a un solo sector si todas pertenecen a él.',
+    },
     tu_posicion: {
         title: 'Tu posición',
         what: 'Cuántas unidades (acciones, participaciones o monedas) de este activo tienes actualmente.',

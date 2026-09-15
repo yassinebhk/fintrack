@@ -21,8 +21,20 @@ async function loadJournal() {
         const r = await fetch(`${JOURNAL_API}/journal`);
         if (r.ok) entries = (await r.json()).entries || [];
     } catch (e) { /* still render the form */ }
-    el.innerHTML = journalFormHtml() + journalStatsHtml(entries) + journalListHtml(entries);
+    el.innerHTML = journalIntroHtml() + journalFormHtml() + journalStatsHtml(entries) + journalListHtml(entries);
     wireJournalForm();
+}
+
+function journalIntroHtml() {
+    return `<div class="card" style="margin-bottom:16px;">
+        <h3>📔 ¿Para qué sirve esto?</h3>
+        <p class="text-muted" style="font-size:13px; margin:6px 0 0;">
+            Es un cuaderno de razonamiento, no una orden real: <strong>no mueve dinero</strong>.
+            La idea es escribir tu <strong>tesis</strong> (por qué compras/vendes/esperas) <em>antes</em> de saber
+            cómo termina, y más tarde volver a anotar el <strong>resultado</strong> y la <strong>lección</strong> aprendida.
+            Ese hábito — tesis → resultado → lección — es lo que más mejora la calidad de tus decisiones con el tiempo,
+            porque te obliga a comparar lo que pensabas con lo que de verdad pasó.</p>
+    </div>`;
 }
 
 function journalFormHtml() {

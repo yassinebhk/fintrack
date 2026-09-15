@@ -289,6 +289,22 @@
                             </div>
                             <div class="distribution-legend" id="currencyLegend"></div>
                         </div>
+
+                        <div class="card card-distribution">
+                            <h3>Reparto (objetivo vs real)<button type="button" class="info-icon" data-info-key="reparto_bloques" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></h3>
+                            <div class="distribution-chart">
+                                <canvas id="blockChart"></canvas>
+                            </div>
+                            <div class="distribution-legend" id="blockLegend"></div>
+                        </div>
+
+                        <div class="card card-distribution" id="sectorCard" hidden>
+                            <h3>Acciones por sector<button type="button" class="info-icon" data-info-key="reparto_sector" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></h3>
+                            <div class="distribution-chart">
+                                <canvas id="sectorChart"></canvas>
+                            </div>
+                            <div class="distribution-legend" id="sectorLegend"></div>
+                        </div>
                     </section>
 
 
@@ -1525,7 +1541,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                     <section class="manager-header">
                         <div>
                             <h2>💡 Oportunidades de inversión</h2>
-                            <p>Tu analista IA rastrea el mercado cada día y te trae ideas con su tesis</p>
+                            <p>Tu analista IA rastrea el mercado cada día y te trae ideas con su tesis — <a href="#algoritmos">¿en qué se basa esto?</a></p>
                         </div>
                         <button class="btn-primary" onclick="loadOpportunities(true)" id="oppRefreshBtn">🔄 Buscar oportunidades</button>
                     </section>
@@ -1928,6 +1944,18 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                             <button class="chart-btn" data-filter="economy">Economía</button>
                             <button class="chart-btn" data-filter="politics">Política</button>
                         </div>
+                        <details style="margin-top:10px;">
+                            <summary style="cursor:pointer; font-size:12.5px; color:var(--text-secondary);">📡 ¿De dónde sale esto exactamente?</summary>
+                            <div style="margin-top:8px; font-size:12.5px; color:var(--text-secondary);">
+                                Son titulares en bruto de RSS de medios financieros reales — no los redacta ni resume la IA, solo los clasifica por categoría e impacto:
+                                <ul style="margin:6px 0 0 18px; padding:0;">
+                                    <li><strong>Acciones:</strong> Bloomberg, CNBC, Yahoo Finance</li>
+                                    <li><strong>Crypto:</strong> Cointelegraph, CoinDesk</li>
+                                    <li><strong>Economía:</strong> CNBC, Expansión, El Economista</li>
+                                    <li><strong>Política/geopolítica:</strong> Al Jazeera, The Guardian, CNBC World</li>
+                                </ul>
+                            </div>
+                        </details>
                     </section>
                     
                     <div class="news-grid" id="newsGrid">
@@ -1959,8 +1987,8 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="js/info-glossary.js?v=20260914finnhub"></script>
-    <script src="js/app.js?v=20260912axes"></script>
+    <script src="js/info-glossary.js?v=20260915repartos"></script>
+    <script src="js/app.js?v=20260915repartos"></script>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260912blue"></script>
     <script src="js/news.js?v=20260530a"></script>
@@ -1974,7 +2002,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/transactions.js?v=20260911d"></script>
     <script src="js/polymarket.js?v=20260912info"></script>
     <script src="js/daytrading.js?v=20260912info"></script>
-    <script src="js/journal.js?v=20260912journal"></script>
+    <script src="js/journal.js?v=20260915repartos"></script>
     <script src="js/watchlist.js?v=20260912watch"></script>
     <script src="js/export-utils.js?v=20260913export"></script>
     <script src="js/scorecard.js?v=20260914tune"></script>
