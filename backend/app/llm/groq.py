@@ -1,4 +1,4 @@
-"""Groq client (Llama 3.3 70B) — fallback when Gemini quota is exhausted."""
+"""Groq client (GPT-OSS 120B) — fallback when Gemini quota is exhausted."""
 
 import json
 
@@ -17,7 +17,10 @@ class GroqClient:
         self.api_key = api_key or settings.groq_api_key
         if not self.api_key:
             raise RuntimeError("GROQ_API_KEY missing")
-        self.default_model = "llama-3.3-70b-versatile"
+        # Groq decommissioned llama-3.3-70b-versatile (404 model_not_found, confirmed
+        # live 2026-09-15). gpt-oss-120b is verified working on this account — same
+        # model already used as the Cerebras fallback (see Settings.cerebras_model).
+        self.default_model = "openai/gpt-oss-120b"
 
     async def generate(
         self,
