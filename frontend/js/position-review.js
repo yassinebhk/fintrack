@@ -31,6 +31,43 @@ async function loadPositionReview(force = false) {
     if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('positionReviewContent', 'vender-o-mantener');
 }
 
+// Real, inspectable breakdown of every factor the engine computed for this
+// asset (same underlying metrics as Oportunidades) — the headline sentence
+// above stays short on purpose; this is for someone who wants to check the
+// numbers themselves instead of taking the sentence on faith.
+function _detailedMetricsHtml(m) {
+    if (!m) return '';
+    const gi = (key) => (typeof infoIcon === 'function' ? infoIcon(key) : '');
+    const pctFmt = (v, d = 1) => (v == null ? '—' : (v >= 0 ? '+' : '') + (+v).toFixed(d) + '%');
+    const numFmt = (v, d = 2) => (v == null ? '—' : (+v).toFixed(d));
+    const macdLabel = m.macd_signal === 'alcista' ? '🟢 Alcista' : m.macd_signal === 'bajista' ? '🔴 Bajista' : (m.macd_signal || '—');
+    const trendLabel = m.above_sma200 == null ? '—'
+        : (m.above_sma200 ? '📈 Sobre' : '📉 Bajo') + (m.dist_sma200_pct != null ? ` (${pctFmt(m.dist_sma200_pct)})` : '');
+    const cells = [
+        ['Tendencia (vs media 200d)', trendLabel, 'regimen_200d'],
+        ['Momentum multi-periodo', pctFmt(m.momentum_pct), 'momentum_criterio'],
+        ['Consistencia (12m)', m.momentum_consistency_pct != null ? m.momentum_consistency_pct + '% meses en positivo' : '—', 'momentum_consistencia'],
+        ['RSI', m.rsi != null ? Math.round(m.rsi) : '—', 'tecnico_rsi_macd'],
+        ['MACD', macdLabel, 'tecnico_rsi_macd'],
+        ['Sharpe', numFmt(m.sharpe), 'sharpe'],
+        ['Sortino', numFmt(m.sortino), 'sortino'],
+        ['Volatilidad (EWMA)', pctFmt(m.volatility_pct), 'volatilidad'],
+        ['Máx. drawdown histórico', pctFmt(m.max_drawdown_pct), 'max_drawdown'],
+        ['Caída desde máximo actual', pctFmt(m.drawdown_from_peak_pct), 'drawdown_historico'],
+        ['Reversión a la media (z, 50d)', numFmt(m.mean_rev_z), 'reversion_media'],
+        ['Posición en rango 52 sem.', m.range_pos_pct != null ? m.range_pos_pct + '%' : '—', 'infravaloracion_criterio'],
+    ];
+    return `<details style="margin-top:10px; padding-top:8px; border-top:1px solid rgba(43,40,34,0.08);">
+        <summary style="cursor:pointer; font-size:12.5px; color:var(--text-secondary);">🔍 Análisis detallado (todos los factores)</summary>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:8px; margin-top:8px;">
+            ${cells.map(([label, val, gk]) => `<div style="background:rgba(43,40,34,0.03); border-radius:8px; padding:8px 10px;">
+                <div style="font-size:11px; color:var(--text-secondary);">${label}${gi(gk)}</div>
+                <div style="font-size:14px; font-weight:600; margin-top:2px;">${val}</div>
+            </div>`).join('')}
+        </div>
+    </details>`;
+}
+
 function reviewHtml(data) {
     const s = data.summary || {};
     const pct = (v) => (v == null ? '—' : (v >= 0 ? '+' : '') + (+v).toFixed(1) + '%');
@@ -83,6 +120,7 @@ function reviewHtml(data) {
             ${reasons ? `<ul style="margin:8px 0 0; padding-left:18px; font-size:13px;">${reasons}</ul>` : ''}
             ${bias}
             ${metricsLine}
+            ${r.signal !== 'SIN_DATOS' ? _detailedMetricsHtml(m) : ''}
         </div>`;
     }).join('');
 

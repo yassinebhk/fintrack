@@ -227,14 +227,32 @@ def _evaluate(pos: dict, m: dict, horizon: str = "medio") -> dict:
                 "'asegurar la ganancia' también es efecto disposición — cortar a los ganadores que "
                 "siguen subiendo. Si reduces, que sea por concentración/riesgo, no por el verde.")
 
+    dist200 = f.get("dist_sma200")
+    consistency = f.get("momentum_consistency")
+    vol = f.get("ewma_vol") if f.get("ewma_vol") is not None else f.get("volatility")
+    hist_dd = f.get("max_drawdown")
+    range_pos = f.get("range_pos")
+
     return {"signal": signal, "reasons": reasons, "bias_flag": bias,
+            # Full factor set already computed for this asset (same engine as
+            # Oportunidades) — a real breakdown to inspect, not just the headline
+            # sentence above. None where an asset lacks enough history for that
+            # one factor (e.g. momentum_consistency needs >=3 legs).
             "metrics": {
                 "above_sma200": above_sma200,
+                "dist_sma200_pct": round(dist200 * 100, 1) if dist200 is not None else None,
                 "momentum_pct": round(momentum * 100, 1),
+                "momentum_consistency_pct": round(consistency * 100, 0) if consistency is not None else None,
                 "rsi": rsi,
                 "trend": trend,
+                "macd_signal": s.get("macd_signal"),
                 "drawdown_from_peak_pct": dd_peak,
+                "max_drawdown_pct": round(hist_dd * 100, 1) if hist_dd is not None else None,
                 "sharpe": f.get("sharpe"),
+                "sortino": f.get("sortino"),
+                "volatility_pct": round(vol * 100, 1) if vol is not None else None,
+                "mean_rev_z": f.get("mean_rev_z"),
+                "range_pos_pct": round(range_pos * 100, 0) if range_pos is not None else None,
                 "weight_pct": round(weight, 1),
             }}
 
