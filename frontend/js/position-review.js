@@ -19,7 +19,7 @@ async function loadPositionReview(force = false) {
     el.innerHTML = '<p class="text-muted">Analizando tus posiciones…</p>';
     let data = null;
     try {
-        const r = await fetch(`${REVIEW_API}/positions/review${force ? '?force=true' : ''}`);
+        const r = await fetch(`${REVIEW_API}/positions/review${force ? '?force=true' : ''}`, { cache: 'no-store' });
         if (r.ok) data = await r.json();
     } catch (e) { /* handled below */ }
     if (!data || !(data.reviews || []).length) {
