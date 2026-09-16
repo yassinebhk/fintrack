@@ -26,6 +26,25 @@ CRYPTO_MOVE_CRIT_PCT = 15.0
 DRAWDOWN_THRESHOLD_PCT = -15.0
 DEDUPE_WINDOW_HOURS = 24
 
+# Public app URL for deep-links in push alerts. The frontend hash router honors
+# #asset/<ticker> (opens that asset's detail) and #<page> (e.g. #news).
+APP_URL = "https://personalfintrack.duckdns.org"
+
+
+def _asset_link(ticker: str) -> str:
+    return f"{APP_URL}/#asset/{(ticker or '').upper()}"
+
+
+def _friendly_label(ticker: str, name_by_tk: dict, fallback: str = "") -> str:
+    """A label the user recognizes: 'Name (TICKER)', or just the ticker when we
+    have no better name. Tickers like 'FGRIX' mean nothing to the user alone."""
+    tk = (ticker or "").upper()
+    nm = (name_by_tk.get(tk) or fallback or "").strip()
+    if not nm or nm.upper() == tk:
+        return tk
+    nm = (nm[:28] + "…") if len(nm) > 29 else nm
+    return f"{nm} ({tk})"
+
 
 def _is_crypto(asset_type: str | None, ticker: str) -> bool:
     if (asset_type or "").lower() in ("crypto", "cryptocurrency", "coin"):
@@ -56,6 +75,9 @@ class AlertsEngine:
         portfolio = await (await self._get_portfolio_service()).calculate_portfolio()
         created: list[dict] = []
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # ticker → human name, so alerts can show 'Fidelity… (FGRIX)' not 'FGRIX'.
+        self._name_by_tk = {(p.get("ticker") or "").upper(): (p.get("name") or p.get("ticker") or "")
+                            for p in portfolio.get("positions", [])}
 
         from app.services.report_prefs import get_excluded
         excluded = await get_excluded()
@@ -77,6 +99,8 @@ class AlertsEngine:
                     payload={"daily_change_pct": daily_pct, "total_value": portfolio.get("total_value"),
                              "direction": "up" if up else "down"},
                     dedupe_key=f"portfolio_move:{'up' if up else 'down'}:{today_str}",
+                    link=f"{APP_URL}/#dashboard",
+                    link_text="Ver tu cartera",
                 )
             )
 
@@ -141,6 +165,8 @@ class AlertsEngine:
                     ),
                     payload={"max_drawdown_pct": max_dd, "since": kpis.get("max_drawdown_date")},
                     dedupe_key="drawdown_threshold",
+                    link=f"{APP_URL}/#analysis",
+                    link_text="Ver análisis de riesgo",
                 )
             )
 
@@ -166,18 +192,21 @@ class AlertsEngine:
                 title = it.get("title", "")
                 url = it.get("url", "")
                 lines.append(f"• {src}: {title}" + (f"\n  {url}" if url else ""))
+            label = _friendly_label(ticker, self._name_by_tk)
             body = (
-                f"{len(items)} titulares bajistas sobre {ticker} hoy:\n\n" + "\n".join(lines)
+                f"{len(items)} titulares bajistas sobre {label} hoy:\n\n" + "\n".join(lines)
             )
             created.append(
                 await self._maybe_create(
                     kind="news_bearish",
                     severity="warning",
-                    title=f"📰 {len(items)} noticias bajistas sobre {ticker}",
+                    title=f"📰 {len(items)} noticias bajistas sobre {label}",
                     body=body,
                     payload={"ticker": ticker, "count": len(items),
                              "urls": [it.get("url") for it in top]},
                     dedupe_key=f"news_bearish:{ticker}:{today_str}",  # max 1/asset/day
+                    link=_asset_link(ticker),
+                    link_text="Ver el activo en detalle",
                 )
             )
 
@@ -228,6 +257,8 @@ class AlertsEngine:
                                "tus recomendaciones ni el ranking.",
                         payload={"themes": [s["key"] for s in shocks]},
                         dedupe_key=f"macro_shock:{keys}:{today_str}",
+                        link=f"{APP_URL}/#news",
+                        link_text="Ver noticias en la app",
                     )
                 )
         except Exception as exc:
@@ -246,7 +277,13 @@ class AlertsEngine:
         blocks = []
         for a in alerts:
             em = severity_emoji.get(a["severity"], "🔔")
-            blocks.append(f"{em} <b>{esc(a['title'])}</b>\n{esc(a['body'])}")
+            block = f"{em} <b>{esc(a['title'])}</b>\n{esc(a['body'])}"
+            # Deep-link into the app (built after escaping so the <a> tag survives).
+            link = a.get("link")
+            if link:
+                lt = a.get("link_text") or "Ver en la app"
+                block += f'\n🔎 <a href="{esc(link)}">{esc(lt)} →</a>'
+            blocks.append(block)
         header = "🔔 <b>Alertas</b>" if len(alerts) > 1 else ""
         html = "\n\n".join([header] + blocks) if header else blocks[0]
         delivered = await self.telegram.send_html(html)
@@ -312,14 +349,16 @@ class AlertsEngine:
             # — the trailing stop is still the exit; a hard target only notifies).
             target = float(stop.get("target_price") or 0)
             if target > 0 and price >= target and not stop.get("target_hit"):
-                label = stop.get("label") or tk
+                label = _friendly_label(tk, getattr(self, "_name_by_tk", {}), fallback=stop.get("label") or "")
                 res = await self._maybe_create(
                     kind="target_reached", severity="info",
-                    title=f"🎯 Objetivo alcanzado: {tk} en {price:.2f} {cur}",
-                    body=(f"{label}: ha llegado a tu objetivo de {target:.2f} {cur} (precio {price:.2f} {cur}). "
+                    title=f"🎯 Objetivo alcanzado: {label} en {price:.2f} {cur}",
+                    body=(f"{label} ha llegado a tu objetivo de {target:.2f} {cur} (precio {price:.2f} {cur}). "
                           f"Valora tomar beneficios o dejar correr con el trailing stop. (Análisis, no recomendación.)"),
                     payload={"ticker": tk, "price": price, "target_price": target},
                     dedupe_key=f"target_reached:{tk}",
+                    link=_asset_link(tk),
+                    link_text="Ver el activo en detalle",
                 )
                 if res:
                     created.append(res)
@@ -328,16 +367,18 @@ class AlertsEngine:
             pct = float(stop.get("trailing_pct") or 12)
             if peak > 0 and price <= peak * (1 - pct / 100.0):
                 drop = (price - peak) / peak * 100
-                label = stop.get("label") or tk
+                label = _friendly_label(tk, getattr(self, "_name_by_tk", {}), fallback=stop.get("label") or "")
                 res = await self._maybe_create(
                     kind="trailing_stop", severity="critical",
-                    title=f"🔻 Señal de venta: {tk} {drop:.1f}% desde máximo",
+                    title=f"🔻 Señal de venta: {label} {drop:.1f}% desde máximo",
                     body=(f"{label}: precio {price:.2f} {cur}, ha caído {drop:.1f}% desde su máximo de "
                           f"{peak:.2f} {cur} (stop dinámico {pct:.0f}%). El movimiento se ha girado — "
                           f"valora vender. (Análisis, no recomendación.)"),
                     payload={"ticker": tk, "price": price, "peak": peak,
                              "trailing_pct": pct, "drop_from_peak_pct": round(drop, 2)},
                     dedupe_key=f"trailing_stop:{tk}",
+                    link=_asset_link(tk),
+                    link_text="Ver el activo en detalle",
                 )
                 if res:
                     created.append(res)
@@ -383,29 +424,34 @@ class AlertsEngine:
                 continue
             rsi, above = sig.get("rsi"), sig.get("above_sma200")
             name = e.name or tk
+            # Lead with a name the user recognizes; only show the ticker in
+            # parentheses (and skip it entirely when the name IS the ticker).
+            label = name if name.upper() == tk else f"{name} ({tk})"
             cond = title = body = None
             if rsi is not None and rsi < 30:
                 cond = "oversold"
-                title = f"🟢 {tk}: caída fuerte, posible rebote (técnico)"
+                title = f"🟢 {label}: caída fuerte, posible rebote (técnico)"
                 body = (f"{name} ha caído mucho (RSI {rsi:.0f} de 100 = muy sobrevendido). "
                         f"Cuando algo está así de castigado a veces rebota, pero también puede "
                         f"seguir bajando — no es garantía.\n"
                         f"➡ Qué hacer: nada obligatorio. Es solo un aviso de que, si pensabas "
-                        f"entrar o añadir {tk} (lo tienes en tu watchlist), ahora está "
+                        f"entrar o añadir {name} (lo tienes en tu watchlist), ahora está "
                         f"técnicamente barato.")
             elif above and rsi is not None and rsi < 42:
                 cond = "pullback"
-                title = f"🟢 {tk}: retroceso dentro de tendencia alcista (técnico)"
+                title = f"🟢 {label}: retroceso dentro de tendencia alcista (técnico)"
                 body = (f"{name} sigue en tendencia alcista (por encima de su media de 200 días) "
                         f"pero ha hecho una pausa/retroceso (RSI {rsi:.0f}). Ese tipo de recorte "
                         f"a veces es un punto de entrada en tendencia, aunque no es garantía.\n"
-                        f"➡ Qué hacer: nada obligatorio. Míralo solo si pensabas añadir {tk} "
+                        f"➡ Qué hacer: nada obligatorio. Míralo solo si pensabas añadir {name} "
                         f"(lo tienes en tu watchlist).")
             if cond:
                 res = await self._maybe_create(
                     kind="setup", severity="info", title=title, body=body,
                     payload={"ticker": tk, "rsi": rsi, "above_sma200": above, "setup": cond},
                     dedupe_key=f"setup:{tk}:{cond}",
+                    link=f"{APP_URL}/#asset/{tk}",
+                    link_text=f"Ver {name} en detalle",
                 )
                 if res:
                     created.append(res)
@@ -452,14 +498,17 @@ class AlertsEngine:
             ptxt = f"{float(price):.6g} {currency or ''}".strip()
         except Exception:
             ptxt = "-"
+        label = _friendly_label(ticker, getattr(self, "_name_by_tk", {}), fallback=name)
         return await self._maybe_create(
             kind="asset_move",
             severity=severity,
-            title=f"{'📈' if up else '📉'} {ticker} {'sube' if up else 'cae'} {pct:+.2f}% hoy",
+            title=f"{'📈' if up else '📉'} {label} {'sube' if up else 'cae'} {pct:+.2f}% hoy",
             body=f"{name}{ctx}: {ptxt} ({pct:+.2f}% intradía{wtxt}).",
             payload={"ticker": ticker, "day_change_pct": round(pct, 2),
                      "direction": "up" if up else "down", "source": source},
             dedupe_key=f"asset_move:{ticker}:{'up' if up else 'down'}",
+            link=_asset_link(ticker),
+            link_text="Ver el activo en detalle",
         )
 
     async def _maybe_create(
@@ -471,6 +520,8 @@ class AlertsEngine:
         body: str,
         payload: dict,
         dedupe_key: str,
+        link: str | None = None,
+        link_text: str | None = None,
     ) -> dict | None:
         """Create an alert if no equivalent one exists within DEDUPE_WINDOW_HOURS."""
         cutoff = datetime.now(timezone.utc) - timedelta(hours=DEDUPE_WINDOW_HOURS)
@@ -507,4 +558,6 @@ class AlertsEngine:
             "severity": severity,
             "title": title,
             "body": body,
+            "link": link,
+            "link_text": link_text,
         }
