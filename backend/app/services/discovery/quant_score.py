@@ -39,6 +39,21 @@ def _zscore(values: list[float]) -> list[float]:
     return [float(x) if not np.isnan(x) else 0.0 for x in z]
 
 
+def _clean(x):
+    """NaN/Inf aren't valid JSON (the GH Actions scan crashes trying to serialize
+    one: "Out of range float values are not JSON compliant: nan") — a handful of
+    pathological tickers (e.g. a frozen/degenerate price series) can produce one
+    in an otherwise-guarded formula. Map it to None instead, which the existing
+    z-score machinery (_zscore/_zscore_opt, via np.nanmean/nanstd) already treats
+    as "missing data" and correctly ignores — semantically the same thing."""
+    if x is None or isinstance(x, bool):
+        return x
+    try:
+        return x if np.isfinite(x) else None
+    except TypeError:
+        return x
+
+
 def compute_factors(closes: list[float]) -> dict:
     """Per-asset objective factors from a price series."""
     s = pd.Series([c for c in closes if c is not None], dtype=float)
@@ -115,17 +130,17 @@ def compute_factors(closes: list[float]) -> dict:
         momentum_consistency = None
 
     return {
-        "momentum": round(momentum, 4),
-        "sharpe": round(sharpe, 2),
-        "sortino": round(sortino, 2),
-        "max_drawdown": round(max_dd, 3),
-        "volatility": round(vol, 3),
-        "range_pos": round(range_pos, 3),
+        "momentum": _clean(round(momentum, 4)),
+        "sharpe": _clean(round(sharpe, 2)),
+        "sortino": _clean(round(sortino, 2)),
+        "max_drawdown": _clean(round(max_dd, 3)),
+        "volatility": _clean(round(vol, 3)),
+        "range_pos": _clean(round(range_pos, 3)),
         "above_sma200": above_sma200,
-        "dist_sma200": round(dist_sma200, 4),
-        "ewma_vol": round(ewma_vol, 3),
-        "mean_rev_z": round(mean_rev_z, 3),
-        "momentum_consistency": round(momentum_consistency, 3) if momentum_consistency is not None else None,
+        "dist_sma200": _clean(round(dist_sma200, 4)),
+        "ewma_vol": _clean(round(ewma_vol, 3)),
+        "mean_rev_z": _clean(round(mean_rev_z, 3)),
+        "momentum_consistency": _clean(round(momentum_consistency, 3)) if momentum_consistency is not None else None,
     }
 
 

@@ -45,8 +45,25 @@ jobs:
         run: |
           cd backend
           python <<'PY'
-          import os, asyncio, httpx
+          import math, os, asyncio, httpx
           from app.services.discovery.market_scanner import MarketScanner
+
+          def _sanitize(obj):
+              """NaN/Inf anywhere in the payload crash json.dumps() outright
+              ("Out of range float values are not JSON compliant: nan") — this
+              silently broke the scan for 2 days straight (2026-09-15/16) before
+              a single pathological ticker was tracked down. Belt-and-suspenders:
+              recursively scrub the whole payload right before sending, on top of
+              fixing the specific known source, so a NEW stray NaN anywhere in
+              the scoring pipeline degrades that one field instead of killing the
+              entire day's scan."""
+              if isinstance(obj, float):
+                  return obj if math.isfinite(obj) else None
+              if isinstance(obj, dict):
+                  return {k: _sanitize(v) for k, v in obj.items()}
+              if isinstance(obj, list):
+                  return [_sanitize(v) for v in obj]
+              return obj
 
           async def main():
               sc = MarketScanner()
@@ -65,7 +82,7 @@ jobs:
               r = httpx.post(
                   f"{api}/opportunities/ingest-scan",
                   params={"secret": secret},
-                  json={"themes": themes, "crypto": crypto},
+                  json=_sanitize({"themes": themes, "crypto": crypto}),
                   timeout=180,
               )
               print("ingest-scan ->", r.status_code, r.text[:300])
