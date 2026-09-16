@@ -1,12 +1,13 @@
-"""Web search via Google News RSS — real, current news headlines, NO API key.
+"""Web search via keyless news RSS — real, current news headlines, NO API key.
 
-Keyless and free: Google News exposes a public RSS search endpoint, so there's
-no third-party signup or key to manage. Graceful by design: on any error search()
-returns [] and the caller simply produces no brief — nothing else breaks.
+Two independent, keyless, free sources so one being throttled doesn't zero out
+coverage: Google News RSS (primary, has a `when:Nd` recency operator) with a
+fallback to Bing News RSS (different host — survives a Google rate-flag). Graceful
+by design: if both fail, search() returns [] and the caller simply produces no
+brief — nothing else breaks.
 
-We use the `when:Nd` query operator so the results are both recent and sorted by
-date. Each result is {title, url, content}; the headline itself is the substance
-(the LLM is told to use ONLY what's here), annotated with publisher + date.
+Each result is {title, url, content}; the headline itself is the substance (the
+LLM is told to use ONLY what's here), annotated with publisher/snippet + date.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import re
 import urllib.parse
+from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 
 import httpx
@@ -21,12 +23,13 @@ from loguru import logger
 from xml.etree import ElementTree as ET
 
 _GNEWS_URL = "https://news.google.com/rss/search"
+_BING_URL = "https://www.bing.com/news/search"
 _UA = "Mozilla/5.0 (compatible; FinTrack/1.0; +https://personalfintrack.duckdns.org)"
 _TAG_RE = re.compile(r"<[^>]+>")
 
 
 def enabled() -> bool:
-    # No API key needed — Google News RSS is keyless and free.
+    # No API key needed — both sources are keyless and free.
     return True
 
 
@@ -34,31 +37,29 @@ def _clean(text: str | None) -> str:
     return re.sub(r"\s+", " ", _TAG_RE.sub(" ", text or "")).strip()
 
 
-async def search(query: str, max_results: int = 8, days: int = 30) -> list[dict]:
-    """Return recent news [{title, url, content}] for `query` from Google News
-    RSS, or [] on any failure. `days` restricts to the last N days (server-side
-    via the `when:` operator, so results come back recent and date-sorted)."""
-    q = f"{query} when:{max(int(days), 1)}d"
-    params = {"q": q, "hl": "en-US", "gl": "US", "ceid": "US:en"}
-    url = f"{_GNEWS_URL}?{urllib.parse.urlencode(params)}"
-    root = None
+async def _fetch_xml(url: str, label: str, query: str) -> ET.Element | None:
+    """GET an RSS URL and parse it, retrying transient/throttled responses."""
     for attempt in range(3):
         try:
             async with httpx.AsyncClient(timeout=25.0, headers={"User-Agent": _UA},
                                          follow_redirects=True) as client:
                 r = await client.get(url)
             if r.status_code == 200:
-                root = ET.fromstring(r.content)
-                break
-            # 429/5xx = throttled/transient → back off and retry
-            logger.warning("gnews search {} -> HTTP {} (attempt {})", query[:50], r.status_code, attempt + 1)
+                return ET.fromstring(r.content)
+            logger.warning("{} search {} -> HTTP {} (attempt {})", label, query[:50], r.status_code, attempt + 1)
         except Exception as exc:
-            logger.warning("gnews search error for {} (attempt {}): {}", query[:50], attempt + 1, exc)
+            logger.warning("{} search error for {} (attempt {}): {}", label, query[:50], attempt + 1, exc)
         if attempt < 2:
             await asyncio.sleep(2.0 * (attempt + 1))
+    return None
+
+
+async def _search_gnews(query: str, max_results: int, days: int) -> list[dict]:
+    q = f"{query} when:{max(int(days), 1)}d"
+    params = {"q": q, "hl": "en-US", "gl": "US", "ceid": "US:en"}
+    root = await _fetch_xml(f"{_GNEWS_URL}?{urllib.parse.urlencode(params)}", "gnews", query)
     if root is None:
         return []
-
     out: list[dict] = []
     for item in root.findall(".//item"):
         title = _clean(item.findtext("title"))
@@ -81,3 +82,47 @@ async def search(query: str, max_results: int = 8, days: int = 30) -> list[dict]
         if len(out) >= max_results:
             break
     return out
+
+
+async def _search_bing(query: str, max_results: int, days: int) -> list[dict]:
+    """Fallback source (different host from Google). Bing News RSS has no recency
+    operator, so we filter by pubDate client-side (keeping undated items)."""
+    params = {"q": query, "format": "rss"}
+    root = await _fetch_xml(f"{_BING_URL}?{urllib.parse.urlencode(params)}", "bing", query)
+    if root is None:
+        return []
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max(int(days), 1))
+    out: list[dict] = []
+    for item in root.findall(".//item"):
+        title = _clean(item.findtext("title"))
+        if not title:
+            continue
+        link = (item.findtext("link") or "").strip()
+        when = ""
+        pub = item.findtext("pubDate")
+        if pub:
+            try:
+                dt = parsedate_to_datetime(pub)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                if dt < cutoff:
+                    continue
+                when = dt.date().isoformat()
+            except Exception:
+                pass
+        desc = _clean(item.findtext("description"))[:200]
+        content = " · ".join(x for x in [desc, when] if x)
+        out.append({"title": title, "url": link, "content": content})
+        if len(out) >= max_results:
+            break
+    return out
+
+
+async def search(query: str, max_results: int = 8, days: int = 30) -> list[dict]:
+    """Return recent news [{title, url, content}] for `query`, or [] on failure.
+    Google News first (recency-filtered); Bing News as fallback when Google is
+    empty/throttled, so a rate-flag on one host doesn't kill coverage."""
+    results = await _search_gnews(query, max_results, days)
+    if results:
+        return results
+    return await _search_bing(query, max_results, days)
