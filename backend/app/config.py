@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     etherscan_api_key: str = ""
     alpha_vantage_api_key: str = ""
     finnhub_api_key: str = ""
+    tavily_api_key: str = ""   # web search for catalyst/environment briefs (optional)
 
     # Database
     database_url: str = Field(

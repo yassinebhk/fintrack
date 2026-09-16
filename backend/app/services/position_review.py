@@ -311,6 +311,13 @@ async def _compute_review() -> dict:
     positions = portfolio.get("positions") or []
     scanner = MarketScanner()
     horizons = await get_horizons()
+    # Web-grounded environment/catalyst briefs (fundamental context the technical
+    # signal lacks); loaded once, looked up per holding. Empty if not configured.
+    try:
+        from app.services import catalyst_briefs as _cb
+        briefs = await _cb._load()
+    except Exception:
+        briefs = {}
 
     reviews = []
     for pos in positions:
@@ -359,6 +366,7 @@ async def _compute_review() -> dict:
             "reasons": reasons,
             "bias_flag": bias_flag,
             "metrics": ev["metrics"],
+            "catalyst_brief": briefs.get(tk_up),   # web-grounded environment context
             # P&L + amounts shown as CONTEXT (and used for materiality, not as the driver):
             "pnl_pct": round(pos.get("gain_loss_pct", 0) or 0, 2),
             "pnl_eur": pnl_eur,

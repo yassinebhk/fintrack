@@ -329,6 +329,35 @@ async def _day_trading_auto_job() -> None:
         logger.error("day trading auto job failed: {}", exc)
 
 
+async def _catalyst_briefs_job() -> None:
+    """Daily: refresh web-grounded catalyst/environment briefs for the owner's
+    holdings + the day's recommendations. No-op if web search isn't configured."""
+    try:
+        from app.services import catalyst_briefs as cb
+        if not cb.websearch.enabled():
+            return
+        from app.auth import get_owner_user_id_cached
+        from app.db import session_scope
+        from app.repositories import PositionRepository
+        from app.services.opportunities import get_opportunity_service
+        owner = await get_owner_user_id_cached()
+        if owner is None:
+            return
+        assets: dict[str, dict] = {}
+        async with session_scope() as s:
+            for p in await PositionRepository(s, owner).list_all():
+                assets[p.ticker.upper()] = {"ticker": p.ticker.upper(), "name": p.asset_name or p.ticker}
+        payload = await get_opportunity_service().peek_or_start(force=False)
+        for op in (payload.get("opportunities") or []):
+            tk = (op.get("ticker_or_isin") or "").upper()
+            if tk:
+                assets.setdefault(tk, {"ticker": tk, "name": op.get("name") or tk})
+        res = await cb.refresh_briefs(list(assets.values()))
+        logger.info("catalyst briefs: {}", res)
+    except Exception as exc:
+        logger.error("catalyst briefs job failed: {}", exc)
+
+
 async def _recommendations_paper_job() -> None:
     """Daily: open the day's top recommendations as paper trades in the Trading
     Diario journal (the 'recommendations paper book' — P/L on top of the scorecard).
@@ -563,6 +592,16 @@ def setup_jobs() -> None:
         replace_existing=True, max_instances=1, coalesce=True,
     )
     logger.info("scheduled: recommendations_paper @ 08:25 {}", settings.timezone)
+
+    # Web-grounded catalyst/environment briefs for holdings + recommendations.
+    sched.add_job(
+        _catalyst_briefs_job,
+        trigger=CronTrigger(hour=8, minute=40, timezone=settings.timezone),
+        id="catalyst_briefs",
+        name="Refresh web catalyst/environment briefs (holdings + recs)",
+        replace_existing=True, max_instances=1, coalesce=True,
+    )
+    logger.info("scheduled: catalyst_briefs @ 08:40 {}", settings.timezone)
 
     # Intraday trading pulse: how the owner's holdings are moving TODAY, twice on
     # weekdays (16:00 catches the US open + EU close; 20:00 catches US midday).

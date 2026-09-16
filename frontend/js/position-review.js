@@ -68,6 +68,20 @@ function _detailedMetricsHtml(m) {
     </details>`;
 }
 
+// Web-grounded environment/catalyst brief (the fundamental context the technical
+// signal lacks). Collapsible; shows the verdict, the LLM's sourced summary, links.
+function _catalystBriefHtml(b) {
+    if (!b) return '';
+    const vcolor = b.verdict === 'favorable' ? 'var(--positive)' : b.verdict === 'adverso' ? 'var(--negative)' : 'var(--warning)';
+    const body = (b.summary_md || '').replace(/</g, '&lt;');
+    const srcs = (b.sources || []).map((s) => `<a href="${s.url}" target="_blank" rel="noopener" style="color:var(--info);">${(s.title || 'fuente').slice(0, 60)}</a>`).join(' · ');
+    const when = b.generated_at ? b.generated_at.slice(0, 10) : '';
+    return `<details style="margin-top:8px;">
+        <summary style="cursor:pointer; font-size:12.5px;">🌐 Entorno / catalizadores (web) — <span style="color:${vcolor}; font-weight:600; text-transform:uppercase;">${b.verdict || '—'}</span></summary>
+        <div style="white-space:pre-wrap; font-size:12.5px; line-height:1.5; margin-top:6px; background:rgba(43,40,34,0.03); border-radius:8px; padding:10px;">${body}${srcs ? `<div style="margin-top:8px; font-size:11px;">Fuentes: ${srcs}</div>` : ''}<div class="text-muted" style="font-size:10px; margin-top:4px;">Búsqueda web · ${when}</div></div>
+    </details>`;
+}
+
 function reviewHtml(data) {
     const s = data.summary || {};
     const pct = (v) => (v == null ? '—' : (v >= 0 ? '+' : '') + (+v).toFixed(1) + '%');
@@ -119,6 +133,7 @@ function reviewHtml(data) {
             </div>
             ${reasons ? `<ul style="margin:8px 0 0; padding-left:18px; font-size:13px;">${reasons}</ul>` : ''}
             ${bias}
+            ${_catalystBriefHtml(r.catalyst_brief)}
             ${metricsLine}
             ${r.signal !== 'SIN_DATOS' ? _detailedMetricsHtml(m) : ''}
         </div>`;
