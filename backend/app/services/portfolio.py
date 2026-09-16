@@ -800,11 +800,32 @@ class PortfolioService:
             asset_type = "stock"
 
         if not txs:
-            # No per-trade record exists (common for Kraken: its API only returns
-            # actual buy/sell orders, not coins that arrived by deposit/transfer —
-            # the live position is still real, just not reconstructable over time).
-            live_qty = float(pos.iloc[0]["quantity"]) if not pos.empty else 0.0
-            return {"ticker": ticker_up, "history": [], "current_quantity": live_qty, "has_transactions": False}
+            # No per-trade record exists (common for TR/MyInvestor/Kraken deposits:
+            # positions imported as holdings, not as executed orders). Rather than
+            # leave the chart empty, synthesize a flat-holding history from the live
+            # position so EVERY asset is populated: quantity held constant, value =
+            # qty * market price over time, cost basis = qty * avg price (total put
+            # in). It's an approximation (we don't know the exact buy dates), which
+            # we flag with synthetic=True so the UI can say so.
+            if pos.empty:
+                return {"ticker": ticker_up, "history": [], "current_quantity": 0.0, "has_transactions": False}
+            live_qty = float(pos.iloc[0]["quantity"])
+            avg_price = float(pos.iloc[0].get("avg_price") or 0)
+            if live_qty <= 0:
+                return {"ticker": ticker_up, "history": [], "current_quantity": live_qty, "has_transactions": False}
+            price_hist = await self.get_asset_history(ticker_up, asset_type, days=days) or []
+            cost_flat = round(live_qty * avg_price, 2)
+            history = [
+                {
+                    "date": h["date"],
+                    "quantity": round(live_qty, 8),
+                    "value": round(live_qty * (h.get("close") or h.get("price") or 0), 2),
+                    "cost_basis": cost_flat,
+                }
+                for h in sorted(price_hist, key=lambda h: h["date"])
+            ]
+            return {"ticker": ticker_up, "history": history, "current_quantity": round(live_qty, 8),
+                    "has_transactions": False, "synthetic": True}
 
         first_date = txs[0].executed_at.date()
         span_days = max(days, (datetime.now(timezone.utc).date() - first_date).days + 1)

@@ -737,22 +737,26 @@ async function performImport() {
             throw new Error(result.detail || 'Error en la importación');
         }
 
-        // Show result
+        // Show result — two shapes: a transaction ledger (Revolut export) or a
+        // positions snapshot. (Note: the backend doesn't return a positions list,
+        // so never dereference result.positions here.)
+        const isLedger = result.transactions_imported !== undefined;
+        const summary = isLedger
+            ? `Se importaron <strong>${result.transactions_imported}</strong> transacciones y se reconstruyeron `
+              + `<strong>${result.positions_updated}</strong> posiciones desde <strong>${result.broker}</strong>.`
+              + (result.skipped ? `<br><span class="text-muted" style="font-size:12px;">${result.skipped} filas omitidas (ingresos, dividendos o comisiones — no son compras/ventas).</span>` : '')
+            : `Se importaron <strong>${result.positions_imported}</strong> posiciones desde <strong>${result.broker}</strong>.`;
         document.getElementById('importResult').innerHTML = `
             <div class="import-success">
                 <span style="font-size: 4rem;">✅</span>
                 <h4>¡Importación exitosa!</h4>
-                <p>Se importaron <strong>${result.positions_imported}</strong> posiciones desde <strong>${result.broker}</strong></p>
-                <div class="imported-list">
-                    ${result.positions.slice(0, 5).map(p => 
-                        `<div class="imported-item">${p.ticker}: ${p.quantity} unidades</div>`
-                    ).join('')}
-                    ${result.positions.length > 5 ? `<div class="imported-item">... y ${result.positions.length - 5} más</div>` : ''}
-                </div>
+                <p>${summary}</p>
             </div>
         `;
 
-        showToast(`${result.positions_imported} posiciones importadas correctamente`, 'success');
+        showToast(isLedger
+            ? `${result.transactions_imported} transacciones importadas`
+            : `${result.positions_imported} posiciones importadas`, 'success');
     } catch (error) {
         document.getElementById('importResult').innerHTML = `
             <div class="import-error">

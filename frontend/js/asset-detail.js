@@ -235,6 +235,16 @@ async function loadAssetDetailPositionChart(ticker) {
                 },
             },
         });
+        const oldNote = document.getElementById('assetDetailPosNote');
+        if (oldNote) oldNote.remove();
+        if (data.synthetic) {
+            const p = document.createElement('p');
+            p.id = 'assetDetailPosNote';
+            p.className = 'text-muted';
+            p.style.cssText = 'font-size:11px; margin-top:6px;';
+            p.textContent = 'Histórico aproximado: no hay compras individuales registradas, se asume la posición actual mantenida durante el periodo. Importa tu histórico de transacciones para verlo exacto.';
+            wrapper.appendChild(p);
+        }
     } catch (err) {
         console.error('asset detail position chart failed:', err);
         wrapper.innerHTML = '<p class="text-muted" style="padding:20px; color:var(--negative);">No se pudo cargar el histórico de tu posición.<br>' + _RETRY_BTN + '</p>';
@@ -254,15 +264,35 @@ async function loadAssetDetailTransactions(ticker) {
         const txs = await resp.json();
         if (!resp.ok) throw new Error(txs.detail || `HTTP ${resp.status}`);
         if (!Array.isArray(txs) || !txs.length) {
-            let msg = 'Sin aportaciones registradas para este activo.';
+            // No per-trade record. If the position exists, show a single derived
+            // row (current holding) so the section isn't empty, plus a note. The
+            // real per-trade breakdown needs a transaction-history import.
+            const fmt0 = (n, d = 2) => (n || 0).toLocaleString('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d });
             try {
                 const posResp = await assetDetailFetch(`${ASSET_DETAIL_API}/portfolio`);
                 const portfolio = await posResp.json();
-                if (portfolio.positions?.some(p => p.ticker === ticker)) {
-                    msg = 'Tienes esta posición, pero no hay compras individuales registradas — probablemente llegó por depósito/transferencia en vez de una compra ejecutada en el propio broker, que solo registra operaciones reales.';
+                const pos = portfolio.positions?.find(p => p.ticker === ticker);
+                if (pos) {
+                    const qty = pos.quantity || 0;
+                    const avg = pos.avg_price || (pos.cost_basis && qty ? pos.cost_basis / qty : 0);
+                    const cur = pos.currency || 'EUR';
+                    tbody.innerHTML = `
+                        <tr>
+                            <td>—</td>
+                            <td>📦 Posición actual</td>
+                            <td class="text-right mono">${fmt0(qty, 6)}</td>
+                            <td class="text-right mono">${fmt0(avg)} ${cur}</td>
+                            <td class="text-right mono">${fmt0(qty * avg)} ${cur}</td>
+                            <td>${pos.broker || '—'}</td>
+                        </tr>
+                        <tr><td colspan="6" class="text-muted" style="padding:10px 8px; font-size:11px;">
+                            Resumen derivado de tu posición actual — no hay compras individuales registradas.
+                            Importa tu histórico de transacciones (p. ej. el export de Revolut) para ver cada aportación con su fecha y precio.
+                        </td></tr>`;
+                    return;
                 }
-            } catch (e) { /* keep generic message */ }
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted" style="padding:20px;">${msg}</td></tr>`;
+            } catch (e) { /* fall through to generic message */ }
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted" style="padding:20px;">Sin aportaciones registradas para este activo.</td></tr>`;
             return;
         }
         const typeLabel = { buy: '🟢 Compra', sell: '🔴 Venta', dividend: '💰 Dividendo' };
