@@ -194,7 +194,8 @@ function _newsBlock(news, sentiment, sources) {
     const items = news.slice(0, 10).map(n => {
         const e = _SENT_EMOJI[n.impact] || '⚪';
         const t = (n.title || '').replace(/</g, '&lt;');
-        return `<li style="margin:4px 0;">${e} <a href="${n.url}" target="_blank" rel="noopener" style="color:var(--info);">${t}</a> <span class="text-muted" style="font-size:11px;">(${n.source})</span></li>`;
+        const macroTag = n.category === 'economy' ? ' <span class="text-muted" style="font-size:10px; border:1px solid rgba(43,40,34,0.2); border-radius:4px; padding:0 4px;" title="Contexto de mercado general, no una noticia específica de este activo">🌐 macro</span>' : '';
+        return `<li style="margin:4px 0;">${e} <a href="${n.url}" target="_blank" rel="noopener" style="color:var(--info);">${t}</a>${macroTag} <span class="text-muted" style="font-size:11px;">(${n.source})</span></li>`;
     }).join('');
     return sentBar + `<ul style="margin:0; padding-left:20px; font-size:13px;">${items}</ul>`;
 }

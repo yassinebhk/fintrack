@@ -266,7 +266,21 @@ class NewsService:
         except Exception as exc:
             logger.warning("LLM sentiment classification failed, keeping keyword heuristic: {}", exc)
 
+    _MACRO_CONTEXT_CAP = 3
+
     async def get_news_for_asset(self, ticker: str, limit: int = 10) -> list[dict]:
+        """Ticker-specific headlines, plus a few of the most recent macro/economy
+        ones as background context.
+
+        ASSET_PATTERNS/impactedAssets is a curated ~18-ticker keyword match — a
+        Fed rate decision or an inflation print almost never mentions a specific
+        holding by name, so on its own this method would show it for NOBODY,
+        even though it is exactly the kind of thing a real analyst weighs
+        alongside stock-specific news for every position. Folding in the latest
+        economy headlines (deduped against the asset-specific ones, capped so
+        they can't crowd out real ticker news) benefits every caller of this
+        method: the deep-analysis narrative, the position-news alert job, and
+        day-trading's auto-pick reasoning."""
         all_news = await self.get_news("all", 100)
         upper = ticker.upper()
         related = [
@@ -275,4 +289,9 @@ class NewsService:
             or upper.lower() in n["title"].lower()
             or upper.lower() in n["excerpt"].lower()
         ]
-        return related[:limit]
+        seen_urls = {n.get("url") for n in related}
+        macro = [
+            n for n in all_news
+            if n.get("category") == "economy" and n.get("url") not in seen_urls
+        ][:self._MACRO_CONTEXT_CAP]
+        return (related + macro)[:limit]

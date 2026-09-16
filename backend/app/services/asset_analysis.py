@@ -393,7 +393,10 @@ async def _llm_summary(name: str, ticker: str, metrics: dict, breakdown: dict | 
     if breakdown:
         for k, v in list(breakdown.items())[:5]:
             bd_lines.append(f"{k}: {v:+.2f}")
-    news_titles = "\n".join(f"- [{n.get('impact','neutral')}] {(n.get('title','') or '')[:140]}" for n in news[:8])
+    news_titles = "\n".join(
+        f"- [{n.get('impact', 'neutral')}{' · MACRO' if n.get('category') == 'economy' else ''}] {(n.get('title', '') or '')[:140]}"
+        for n in news[:8]
+    )
     system = (
         "Eres un analista cuantitativo senior escribiendo una nota de análisis para un broker. "
         "Tono profesional, conciso, honesto. REGLAS ESTRICTAS para evitar alucinaciones:\n"
@@ -403,7 +406,10 @@ async def _llm_summary(name: str, ticker: str, metrics: dict, breakdown: dict | 
         "3) No menciones precios objetivos, no recomiendas comprar/vender, no estimas direcciones futuras.\n"
         "4) Si una métrica es bench-relativa pero el benchmark no se puso (beta/alpha/IR/etc. = null), "
         "no presumas correlaciones con el mercado.\n"
-        "5) Distingue DATO (lo que el número dice) de LECTURA (tu interpretación)."
+        "5) Distingue DATO (lo que el número dice) de LECTURA (tu interpretación).\n"
+        "6) Los titulares marcados 'MACRO' son contexto de mercado general (tipos de interés, inflación, "
+        "geopolítica) — NO son noticias específicas de esta empresa. Puedes usarlos como telón de fondo "
+        "(p.ej. 'en un contexto de tipos al alza...'), pero nunca los presentes como si fueran sobre el activo."
     )
     user = (
         f"Activo: {name} ({ticker}).\n\n"
