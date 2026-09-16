@@ -193,18 +193,27 @@ class AlertsEngine:
                 # text (no <b>/<i> tags) and the title must not repeat the severity
                 # emoji (the delivery prepends ⚠️).
                 positions = portfolio.get("positions", [])
+                name_by_tk = {(p.get("ticker") or "").upper(): (p.get("name") or p.get("ticker") or "")
+                              for p in positions}
+
+                def _friendly(tk: str) -> str:
+                    nm = name_by_tk.get((tk or "").upper()) or tk or ""
+                    return (nm[:20] + "…") if len(nm) > 21 else nm
+
                 blocks = []
                 for s in shocks:
                     cp = s.get("chokepoint")
                     lines = [f"{s['emoji']} {s['name']}" + (f" — {cp}" if cp else "")]
                     for h in s["hits"][:2]:
                         lines.append(f"• {h.get('source','')}: {h.get('title','')}")
-                    lines.append(s["note"])
+                    # s['note'] is the general who-wins/loses; label it so it's not
+                    # confused with the reader's own holdings just below.
+                    lines.append(f"En general: {s['note']}")
                     exp = macro_shocks.exposure(positions, s["key"])
-                    tags = [f"👍{e['ticker']}" for e in exp["beneficiado"]] \
-                         + [f"👎{e['ticker']}" for e in exp["presionado"]]
-                    if tags:
-                        lines.append("En tu cartera: " + " · ".join(tags))
+                    ben = [f"👍 {_friendly(e['ticker'])}" for e in exp["beneficiado"]]
+                    pres = [f"👎 {_friendly(e['ticker'])}" for e in exp["presionado"]]
+                    if ben or pres:
+                        lines.append("Tu cartera: " + " · ".join(ben + pres))
                     blocks.append("\n".join(lines))
                 keys = "+".join(sorted(s["key"] for s in shocks))
                 short = ", ".join(s["name"].split(" (")[0] for s in shocks)
@@ -212,9 +221,11 @@ class AlertsEngine:
                     await self._maybe_create(
                         kind="macro_shock",
                         severity="warning",
-                        title=f"Radar macro: {short}",
+                        title=f"Contexto macro: {short}",
                         body="\n\n".join(blocks)
-                             + "\n\nHeurístico, no señal cuantitativa — no cambia el ranking.",
+                             + "\n\n➡ Qué hacer: nada. Es solo contexto para que sepas cómo "
+                               "te afecta el ruido de fondo — no es una recomendación ni cambia "
+                               "tus recomendaciones ni el ranking.",
                         payload={"themes": [s["key"] for s in shocks]},
                         dedupe_key=f"macro_shock:{keys}:{today_str}",
                     )
@@ -375,14 +386,21 @@ class AlertsEngine:
             cond = title = body = None
             if rsi is not None and rsi < 30:
                 cond = "oversold"
-                title = f"🟢 Setup: {tk} en sobreventa (RSI {rsi:.0f})"
-                body = (f"{name}: RSI {rsi:.0f} (<30) — posible rebote. Está en tu watchlist. "
-                        f"(Señal técnica, no recomendación.)")
+                title = f"🟢 {tk}: caída fuerte, posible rebote (técnico)"
+                body = (f"{name} ha caído mucho (RSI {rsi:.0f} de 100 = muy sobrevendido). "
+                        f"Cuando algo está así de castigado a veces rebota, pero también puede "
+                        f"seguir bajando — no es garantía.\n"
+                        f"➡ Qué hacer: nada obligatorio. Es solo un aviso de que, si pensabas "
+                        f"entrar o añadir {tk} (lo tienes en tu watchlist), ahora está "
+                        f"técnicamente barato.")
             elif above and rsi is not None and rsi < 42:
                 cond = "pullback"
-                title = f"🟢 Setup: {tk} pullback en tendencia alcista"
-                body = (f"{name}: sobre su media de 200 sesiones con RSI {rsi:.0f} — retroceso en "
-                        f"tendencia. En tu watchlist. (Señal técnica, no recomendación.)")
+                title = f"🟢 {tk}: retroceso dentro de tendencia alcista (técnico)"
+                body = (f"{name} sigue en tendencia alcista (por encima de su media de 200 días) "
+                        f"pero ha hecho una pausa/retroceso (RSI {rsi:.0f}). Ese tipo de recorte "
+                        f"a veces es un punto de entrada en tendencia, aunque no es garantía.\n"
+                        f"➡ Qué hacer: nada obligatorio. Míralo solo si pensabas añadir {tk} "
+                        f"(lo tienes en tu watchlist).")
             if cond:
                 res = await self._maybe_create(
                     kind="setup", severity="info", title=title, body=body,
