@@ -1,15 +1,17 @@
 """Catalyst / environment briefs — the 'what's the fundamental context' layer the
-momentum engine lacks. For a held or recommended asset we search the live web
-(Tavily) and have the LLM synthesize a short, SOURCED brief: recent catalysts,
-environment risks (competition, sector, regulation) and a one-line verdict.
+momentum engine lacks. For a held or recommended asset we pull real, recent news
+(Google News RSS — keyless) and have the LLM synthesize a short, SOURCED brief:
+recent catalysts, environment risks (competition, sector, regulation) and a
+one-line verdict.
 
-Grounded on REAL web results — if web search isn't configured or returns nothing,
-NO brief is produced (we never fabricate a brief from stale model memory). Cached
-per ticker for a few days to stay well within the free search quota.
+Grounded on REAL headlines — if the news search returns nothing, NO brief is
+produced (we never fabricate a brief from stale model memory). Cached per ticker
+for a few days so we don't hammer the feed.
 """
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 from loguru import logger
@@ -19,7 +21,23 @@ from app.services import websearch
 
 _KEY = "catalyst_briefs"
 _TTL_DAYS = 3
-_MAX_PER_RUN = 30   # cap per batch so we never blow the search quota
+_MAX_PER_RUN = 30   # cap per batch so we never hammer the news feed
+
+# Fund/ETF boilerplate that only narrows a news search (an ETF's news is about
+# its geography/theme, e.g. "Franklin FTSE Taiwan", not the "UCITS ETF" suffix).
+_FUND_STOP = {
+    "ucits", "etf", "etn", "etc", "fund", "index", "acc", "accumulating",
+    "dist", "distributing", "hedged", "eur", "usd", "gbp", "chf", "plc", "1c", "1d",
+}
+
+
+def _clean_name(name: str) -> str:
+    """Strip fund/share-class boilerplate so the geographic/thematic words drive
+    the news search. 'Franklin FTSE Taiwan UCITS ETF' -> 'Franklin FTSE Taiwan'."""
+    n = re.sub(r"\([^)]*\)", " ", name or "")
+    toks = [t for t in re.split(r"[\s\-–—]+", n) if t]
+    kept = [t for t in toks if t.lower().strip(".") not in _FUND_STOP]
+    return " ".join(kept).strip() or (name or "").strip()
 
 
 async def _load() -> dict:
@@ -64,22 +82,32 @@ async def generate_brief(ticker: str, name: str = "") -> dict | None:
     None if web search is unavailable or found nothing relevant."""
     if not websearch.enabled():
         return None
-    q = f"{name or ticker} {ticker} stock recent catalysts news outlook risks 2026"
-    results = await websearch.search(q, max_results=6, days=45)
+    # Query strategy: cleaned name + ticker sharpens well-known stocks (SNDK,
+    # IOVA), but an obscure ETF ticker (FLXT) poisons recall — so if that comes
+    # back thin, fall back to the cleaned name alone (its geography/theme).
+    base = _clean_name(name) if name else ticker
+    tk_up = (ticker or "").upper()
+    q = f"{base} {ticker}".strip() if base and base.upper() != tk_up else (base or ticker)
+    results = await websearch.search(q, max_results=10, days=45)
+    if len(results) < 3 and base and base.upper() != tk_up:
+        alt = await websearch.search(base, max_results=10, days=45)
+        if len(alt) > len(results):
+            results = alt
     if not results:
         return None
 
     src_lines = "\n".join(
-        f"[{i+1}] {r['title']} — {r['content']}" for i, r in enumerate(results)
+        f"[{i+1}] {r['title']}" + (f" ({r['content']})" if r.get("content") else "")
+        for i, r in enumerate(results)
     )
     system = (
-        "Eres un analista financiero. Con SOLO los resultados web recientes que se te dan, "
+        "Eres un analista financiero. Con SOLO los titulares de noticias recientes que se te dan, "
         "resume el ENTORNO de un activo para un inversor. Español, conciso, sin relleno. "
-        "Prohibido inventar: usa únicamente lo que aparezca en los resultados; si no hay nada "
-        "relevante, dilo claramente."
+        "Prohibido inventar: usa únicamente lo que aparezca en los titulares; si no hay nada "
+        "relevante o son escasos, dilo claramente (mejor 'poca información' que especular)."
     )
     user = (
-        f"Activo: {name or ticker} ({ticker})\n\nResultados web:\n{src_lines}\n\n"
+        f"Activo: {name or ticker} ({ticker})\n\nTitulares recientes:\n{src_lines}\n\n"
         "Devuelve EXACTAMENTE este formato:\n"
         "VEREDICTO: favorable | neutral | adverso (una palabra sobre el ENTORNO)\n"
         "CATALIZADORES: 1-3 bullets concretos (con fecha/dato si aparece)\n"
@@ -90,7 +118,10 @@ async def generate_brief(ticker: str, name: str = "") -> dict | None:
     try:
         resp = await get_llm_client().generate(
             [LLMMessage(role="system", content=system), LLMMessage(role="user", content=user)],
-            max_tokens=700, temperature=0.3,
+            # gemini-2.5-flash reasons before answering and reasoning tokens count
+            # against this budget — keep it high enough that the visible brief
+            # isn't truncated after the thinking phase.
+            max_tokens=2048, temperature=0.3,
         )
         md = (resp.text or "").strip()
         if not md:
@@ -119,7 +150,7 @@ async def refresh_briefs(assets: list[dict]) -> dict:
     """Generate/refresh briefs for a list of {ticker, name}. Skips ones still fresh.
     Caps at _MAX_PER_RUN to protect the search quota. Returns a small summary."""
     if not websearch.enabled():
-        return {"status": "web search no configurado (falta TAVILY_API_KEY)"}
+        return {"status": "búsqueda de noticias no disponible"}
     items = await _load()
     done = 0
     for a in assets:
