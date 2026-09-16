@@ -20,11 +20,16 @@ from loguru import logger
 
 from app.config import get_settings
 from app.services import report_prefs
+from app.services.notifications.telegram import html_escape as _esc
 from app.services.portfolio import PortfolioService
 
 # Only surface positions whose move today is at least this big (in %), to keep the
 # message signal-dense on calm days.
 MOVE_THRESHOLD = 1.0
+
+# Public app URL — the frontend hash router opens #asset/<ticker> (asset detail)
+# and #<page> (e.g. #dashboard) from these deep-links.
+APP_URL = "https://personalfintrack.duckdns.org"
 
 
 def _fmt_eur(v: float) -> str:
@@ -68,10 +73,17 @@ async def build_pulse_html(user_id: int) -> str | None:
                    key=lambda p: p.get("day_change_pct") or 0)[:6]
 
     def row(p: dict) -> str:
+        tk = str(p.get("ticker") or "")
+        # Show a name the user recognizes (not the raw ISIN/ticker), linked to the
+        # asset's detail page in the app.
+        name = (p.get("name") or tk).strip()
+        disp = tk if name.upper() == tk.upper() else name
+        disp = (disp[:26] + "…") if len(disp) > 27 else disp
+        label = f'<a href="{APP_URL}/#asset/{_esc(tk)}">{_esc(disp)}</a>' if tk else _esc(disp)
         cur = p.get("currency") or ""
         price = p.get("current_price")
         price_txt = f"{price:.2f} {cur}".strip() if price is not None else ""
-        return f"• {p.get('ticker')} <b>{(p.get('day_change_pct') or 0):+.2f}%</b>" + (f" · {price_txt}" if price_txt else "")
+        return f"• {label} <b>{(p.get('day_change_pct') or 0):+.2f}%</b>" + (f" · {_esc(price_txt)}" if price_txt else "")
 
     if ups:
         lines.append("\n<b>📈 Suben:</b>")
@@ -82,5 +94,6 @@ async def build_pulse_html(user_id: int) -> str | None:
     if not ups and not downs:
         lines.append(f"\nSesión tranquila: nada se mueve más de ±{MOVE_THRESHOLD:.0f}% hoy.")
 
-    lines.append("\n<i>Solo el movimiento del día — no es una recomendación. Decide con tu plan.</i>")
+    lines.append(f'\n🔎 <a href="{APP_URL}/#dashboard">Ver toda tu cartera →</a>')
+    lines.append("<i>Solo el movimiento del día — no es una recomendación. Decide con tu plan.</i>")
     return "\n".join(lines)
