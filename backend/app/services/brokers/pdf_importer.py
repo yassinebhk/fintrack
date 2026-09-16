@@ -12,7 +12,9 @@ single pipeline works for any broker statement.
 
 from __future__ import annotations
 
+import hashlib
 import io
+import re
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -22,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.llm import LLMMessage, get_llm_client
 from app.models.broker_sync import BrokerSync
-from app.repositories import PositionRepository
+from app.repositories import PositionRepository, TransactionRepository
 
 
 # Schema we expect the LLM to fill
@@ -181,6 +183,113 @@ def _normalize_type(asset_type: str | None, ticker: str | None) -> str:
     return "stock"
 
 
+# ── Deterministic parser for Revolut trading statements (no LLM → no quota) ──
+# A Revolut statement is a fixed, machine-readable table, so we parse the trades
+# ourselves instead of paying an LLM call (which was hitting Gemini's free-tier
+# 429 quota). Validated against a real 3-year statement: the reconstructed net
+# positions match the PDF's own "Portfolio breakdown" exactly.
+_MONTHS = {m: i for i, m in enumerate(
+    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
+_DATE = (r"(?P<day>\d{1,2}) (?P<mon>[A-Z][a-z]{2}) (?P<yr>\d{4}) "
+         r"(?P<h>\d{2}):(?P<mi>\d{2}):(?P<s>\d{2}) GMT")
+# Buy/Sell across Market/Limit/Stop order types.
+_TRADE_RE = re.compile(_DATE + r"\s+(?P<sym>[A-Z][A-Z0-9.]{0,9})\s+"
+                       r"Trade - (?:Market|Limit|Stop)\s+(?P<qty>[\d.]+)\s+"
+                       r"US\$(?P<price>[\d.,]+)\s+(?P<side>Buy|Sell)\b")
+# A stock split adds shares at no cost.
+_SPLIT_RE = re.compile(_DATE + r"\s+(?P<sym>[A-Z][A-Z0-9.]{0,9})\s+Stock split\s+(?P<qty>[\d.]+)")
+# Portfolio-breakdown rows give clean names + ISINs for the held symbols.
+_BREAKDOWN_RE = re.compile(
+    r"^(?P<sym>[A-Z][A-Z0-9.]{0,9})\s+(?P<name>.+?)\s+(?P<isin>[A-Z]{2}[A-Z0-9]{9}\d)\s+[\d.]+\s+US\$",
+    re.M)
+
+
+def _num_usd(s) -> float:
+    try:
+        return float(str(s).replace(",", "").replace("US$", "").replace("$", "").strip())
+    except ValueError:
+        return 0.0
+
+
+def _stmt_dt(m: re.Match) -> datetime:
+    return datetime(int(m["yr"]), _MONTHS[m["mon"]], int(m["day"]),
+                    int(m["h"]), int(m["mi"]), int(m["s"]), tzinfo=timezone.utc)
+
+
+def looks_like_revolut(text: str) -> bool:
+    return any(x in text for x in ("Trade - Market", "Trade - Limit", "Trade - Stop"))
+
+
+def parse_statement_transactions(text: str, broker: str) -> tuple[list[dict], dict]:
+    """Parse buy/sell/split rows deterministically. Returns (transactions, meta),
+    meta = {symbol: {name, isin}} from the portfolio breakdown."""
+    currency = "USD" if "US$" in text else "EUR"
+    meta = {m["sym"]: {"name": m["name"].strip(), "isin": m["isin"]}
+            for m in _BREAKDOWN_RE.finditer(text)}
+
+    def _mk(sym, kind, dt, qty, price, note=None):
+        raw = f"{broker}|{sym}|{kind}|{dt.isoformat()}|{qty}|{price}"
+        row = {"type": kind if kind in ("buy", "sell") else "buy", "ticker": sym,
+               "quantity": qty, "price": price, "currency": currency, "broker": broker,
+               "executed_at": dt, "external_id": f"{broker[:8]}:{hashlib.md5(raw.encode()).hexdigest()[:24]}"}
+        if note:
+            row["notes"] = note
+        return row
+
+    txs: list[dict] = []
+    for m in _TRADE_RE.finditer(text):
+        qty, price = float(m["qty"]), _num_usd(m["price"])
+        if qty <= 0 or price <= 0:
+            continue
+        txs.append(_mk(m["sym"], m["side"].lower(), _stmt_dt(m), qty, price))
+    for m in _SPLIT_RE.finditer(text):
+        qty = float(m["qty"])
+        if qty > 0:
+            txs.append(_mk(m["sym"], "split", _stmt_dt(m), qty, 0.0, note="Stock split"))
+    return txs, meta
+
+
+async def _import_transactions(txs: list[dict], meta: dict, broker: str,
+                               session: AsyncSession, user_id: int,
+                               replace_broker_positions: bool) -> tuple[int, list[dict]]:
+    tx_repo = TransactionRepository(session, user_id)
+    existing = {t.external_id for t in await tx_repo.list_all() if t.external_id}
+    added = 0
+    for t in txs:
+        if t["external_id"] in existing:
+            continue
+        await tx_repo.add(**t)
+        existing.add(t["external_id"])
+        added += 1
+    # Rebuild net positions: qty = Σbuys − Σsells, avg cost = Σ(buy_qty·price)/Σbuy_qty.
+    agg: dict[str, dict] = {}
+    for t in txs:
+        a = agg.setdefault(t["ticker"], {"qty": 0.0, "bq": 0.0, "bc": 0.0, "ccy": t["currency"]})
+        if t["type"] == "buy":
+            a["qty"] += t["quantity"]
+            a["bq"] += t["quantity"]
+            a["bc"] += t["quantity"] * t["price"]
+        elif t["type"] == "sell":
+            a["qty"] -= t["quantity"]
+    rows = []
+    for tk, a in agg.items():
+        if a["qty"] <= 1e-9:
+            continue
+        info = meta.get(tk, {})
+        rows.append({
+            "ticker": tk, "quantity": round(a["qty"], 8),
+            "avg_price": round(a["bc"] / a["bq"] if a["bq"] > 0 else 0.0, 6),
+            "type": "stock", "currency": a["ccy"], "broker": broker,
+            "isin": info.get("isin"), "asset_name": info.get("name"), "source": "pdf_ledger",
+        })
+    pos_repo = PositionRepository(session, user_id)
+    if replace_broker_positions:
+        await pos_repo.delete_by_broker(broker)
+    if rows:
+        await pos_repo.bulk_upsert(rows)
+    return added, rows
+
+
 async def import_pdf(
     pdf_bytes: bytes,
     broker: str,
@@ -189,7 +298,7 @@ async def import_pdf(
     *,
     replace_broker_positions: bool = True,
 ) -> dict[str, Any]:
-    """Full pipeline: PDF → text → LLM extraction → DB upsert."""
+    """Full pipeline: PDF → text → (deterministic Revolut parse | LLM) → DB."""
     sync_row = BrokerSync(
         broker=broker,
         status="running",
@@ -199,8 +308,28 @@ async def import_pdf(
     await session.flush()
 
     try:
-        text = extract_pdf_text(pdf_bytes)
+        text = extract_pdf_text(pdf_bytes, max_pages=60)
         logger.info("PDF text extracted: {} chars", len(text))
+
+        # Deterministic path: a Revolut trading statement is parsed without the
+        # LLM (no Gemini quota / 429), writing the full trade history AND the
+        # rebuilt positions so per-asset history + 'aportaciones' get populated.
+        if looks_like_revolut(text):
+            txs, meta = parse_statement_transactions(text, broker)
+            if txs:
+                added, rows = await _import_transactions(
+                    txs, meta, broker, session, user_id, replace_broker_positions)
+                sync_row.status = "success"
+                sync_row.positions_synced = len(rows)
+                sync_row.finished_at = datetime.now(timezone.utc)
+                logger.info("PDF (deterministic): {} txs, {} positions", added, len(rows))
+                return {
+                    "broker_detected": "Revolut",
+                    "method": "deterministic",
+                    "transactions_imported": added,
+                    "positions_imported": len(rows),
+                    "positions": rows,
+                }
 
         extraction = await extract_positions_from_text(text, broker_hint=broker)
         positions = extraction.get("positions", []) or []

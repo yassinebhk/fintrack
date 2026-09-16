@@ -80,7 +80,7 @@ async function handlePdfImport() {
     }
 
     btn.disabled = true;
-    resultEl.innerHTML = '<div class="alert alert-info">📄 Subiendo PDF y extrayendo posiciones con IA... (~10-30s)</div>';
+    resultEl.innerHTML = '<div class="alert alert-info">📄 Subiendo y leyendo el PDF… (~10-30s)</div>';
 
     const fd = new FormData();
     fd.append('file', file);
@@ -99,7 +99,8 @@ async function handlePdfImport() {
         resultEl.innerHTML = `
             <div class="alert alert-success">
                 ✅ ${data.positions_imported} posiciones importadas
-                ${data.broker_detected ? `<br><small>Broker detectado por IA: <b>${data.broker_detected}</b></small>` : ''}
+                ${data.transactions_imported ? `<br><small>📒 ${data.transactions_imported} transacciones importadas (histórico completo → aportaciones y gráfico por activo)</small>` : ''}
+                ${data.broker_detected ? `<br><small>Broker detectado: <b>${data.broker_detected}</b></small>` : ''}
                 ${data.statement_date ? `<br><small>Fecha del extracto: ${data.statement_date}</small>` : ''}
             </div>
             <details style="margin-top: 10px;">
