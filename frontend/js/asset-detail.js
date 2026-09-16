@@ -295,7 +295,10 @@ async function loadAssetDetailTransactions(ticker) {
             tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted" style="padding:20px;">Sin aportaciones registradas para este activo.</td></tr>`;
             return;
         }
-        const typeLabel = { buy: '🟢 Compra', sell: '🔴 Venta', dividend: '💰 Dividendo' };
+        const typeLabel = {
+            buy: '🟢 Compra', sell: '🔴 Venta', dividend: '💰 Dividendo',
+            deposit: '⬆️ Ingreso', withdrawal: '⬇️ Retirada', fee: '💸 Comisión',
+        };
         const fmt = (n, d = 2) => (n || 0).toLocaleString('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d });
         tbody.innerHTML = txs.map(t => `
             <tr>

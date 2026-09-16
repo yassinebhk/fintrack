@@ -192,23 +192,41 @@ _MONTHS = {m: i for i, m in enumerate(
     ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
 _DATE = (r"(?P<day>\d{1,2}) (?P<mon>[A-Z][a-z]{2}) (?P<yr>\d{4}) "
          r"(?P<h>\d{2}):(?P<mi>\d{2}):(?P<s>\d{2}) GMT")
+# Amounts can be in any currency the account holds (US$, €, £) — statements mix
+# them (e.g. an FX withdrawal in EUR on a USD account).
+_CCY = r"(?:US\$|€|£|\$)"
 # Buy/Sell across Market/Limit/Stop order types.
 _TRADE_RE = re.compile(_DATE + r"\s+(?P<sym>[A-Z][A-Z0-9.]{0,9})\s+"
                        r"Trade - (?:Market|Limit|Stop)\s+(?P<qty>[\d.]+)\s+"
-                       r"US\$(?P<price>[\d.,]+)\s+(?P<side>Buy|Sell)\b")
+                       r"(?P<ccy>" + _CCY + r")(?P<price>[\d.,]+)\s+(?P<side>Buy|Sell)\b")
 # A stock split adds shares at no cost.
 _SPLIT_RE = re.compile(_DATE + r"\s+(?P<sym>[A-Z][A-Z0-9.]{0,9})\s+Stock split\s+(?P<qty>[\d.]+)")
+# Dividends (per asset) and cash movements (no asset) — imported so the whole UI
+# is populated, not just trades. Amounts may be negative (fees, corrections).
+_DIV_RE = re.compile(_DATE + r"\s+(?P<sym>[A-Z][A-Z0-9.]{0,9})\s+Dividend(?P<corr> \(correction\))?\s+(?P<amt>-?" + _CCY + r"[\d.,]+)")
+_CASH_RE = re.compile(_DATE + r"\s+(?P<kind>Cash top-up|Cash withdrawal|Custody fee)\s+(?P<amt>-?" + _CCY + r"[\d.,]+)")
+_CASH_MAP = {"Cash top-up": ("deposit", "Ingreso de efectivo"),
+             "Cash withdrawal": ("withdrawal", "Retirada de efectivo"),
+             "Custody fee": ("fee", "Comisión de custodia")}
 # Portfolio-breakdown rows give clean names + ISINs for the held symbols.
 _BREAKDOWN_RE = re.compile(
-    r"^(?P<sym>[A-Z][A-Z0-9.]{0,9})\s+(?P<name>.+?)\s+(?P<isin>[A-Z]{2}[A-Z0-9]{9}\d)\s+[\d.]+\s+US\$",
+    r"^(?P<sym>[A-Z][A-Z0-9.]{0,9})\s+(?P<name>.+?)\s+(?P<isin>[A-Z]{2}[A-Z0-9]{9}\d)\s+[\d.]+\s+" + _CCY,
     re.M)
 
 
-def _num_usd(s) -> float:
+def _num_amt(s) -> float:
     try:
-        return float(str(s).replace(",", "").replace("US$", "").replace("$", "").strip())
+        return float(re.sub(r"(US\$|€|£|\$|,)", "", str(s)).strip())
     except ValueError:
         return 0.0
+
+
+def _ccy_of(s: str) -> str:
+    if "€" in s:
+        return "EUR"
+    if "£" in s:
+        return "GBP"
+    return "USD"
 
 
 def _stmt_dt(m: re.Match) -> datetime:
@@ -223,29 +241,48 @@ def looks_like_revolut(text: str) -> bool:
 def parse_statement_transactions(text: str, broker: str) -> tuple[list[dict], dict]:
     """Parse buy/sell/split rows deterministically. Returns (transactions, meta),
     meta = {symbol: {name, isin}} from the portfolio breakdown."""
-    currency = "USD" if "US$" in text else "EUR"
+    default_ccy = "USD" if "US$" in text else "EUR"
     meta = {m["sym"]: {"name": m["name"].strip(), "isin": m["isin"]}
             for m in _BREAKDOWN_RE.finditer(text)}
 
-    def _mk(sym, kind, dt, qty, price, note=None):
+    def _mk(sym, kind, dt, qty, price, ccy, note=None):
         raw = f"{broker}|{sym}|{kind}|{dt.isoformat()}|{qty}|{price}"
         row = {"type": kind if kind in ("buy", "sell") else "buy", "ticker": sym,
-               "quantity": qty, "price": price, "currency": currency, "broker": broker,
+               "quantity": qty, "price": price, "currency": ccy, "broker": broker,
                "executed_at": dt, "external_id": f"{broker[:8]}:{hashlib.md5(raw.encode()).hexdigest()[:24]}"}
         if note:
             row["notes"] = note
         return row
 
+    def _mk_cash(sym, kind, dt, amount, ccy, note):
+        # Non-share movements (dividend/deposit/withdrawal/fee): store the amount
+        # as price with quantity 1 so the UI's qty×price total shows the amount.
+        # Ignored by position reconstruction (only buy/sell count there).
+        raw = f"{broker}|{sym}|{kind}|{dt.isoformat()}|{amount}|{note}"
+        return {"type": kind, "ticker": sym, "quantity": 1.0, "price": round(abs(amount), 4),
+                "currency": ccy, "broker": broker, "executed_at": dt, "notes": note,
+                "external_id": f"{broker[:8]}:{hashlib.md5(raw.encode()).hexdigest()[:24]}"}
+
     txs: list[dict] = []
     for m in _TRADE_RE.finditer(text):
-        qty, price = float(m["qty"]), _num_usd(m["price"])
+        qty, price = float(m["qty"]), _num_amt(m["price"])
         if qty <= 0 or price <= 0:
             continue
-        txs.append(_mk(m["sym"], m["side"].lower(), _stmt_dt(m), qty, price))
+        txs.append(_mk(m["sym"], m["side"].lower(), _stmt_dt(m), qty, price, _ccy_of(m["ccy"])))
     for m in _SPLIT_RE.finditer(text):
         qty = float(m["qty"])
         if qty > 0:
-            txs.append(_mk(m["sym"], "split", _stmt_dt(m), qty, 0.0, note="Stock split"))
+            txs.append(_mk(m["sym"], "split", _stmt_dt(m), qty, 0.0, default_ccy, note="Stock split"))
+    for m in _DIV_RE.finditer(text):
+        amt = _num_amt(m["amt"])
+        if amt != 0:
+            note = "Dividendo (corrección)" if m.group("corr") else "Dividendo"
+            txs.append(_mk_cash(m["sym"], "dividend", _stmt_dt(m), amt, _ccy_of(m["amt"]), note))
+    for m in _CASH_RE.finditer(text):
+        amt = _num_amt(m["amt"])
+        if amt != 0:
+            kind, note = _CASH_MAP[m["kind"]]
+            txs.append(_mk_cash("CASH", kind, _stmt_dt(m), amt, _ccy_of(m["amt"]), note))
     return txs, meta
 
 

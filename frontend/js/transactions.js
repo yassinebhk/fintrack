@@ -41,7 +41,10 @@ function renderTransactions() {
         return;
     }
 
-    const typeLabel = { buy: '🟢 Compra', sell: '🔴 Venta', dividend: '💰 Dividendo' };
+    const typeLabel = {
+        buy: '🟢 Compra', sell: '🔴 Venta', dividend: '💰 Dividendo',
+        deposit: '⬆️ Ingreso', withdrawal: '⬇️ Retirada', fee: '💸 Comisión',
+    };
     const fmt = (n, d = 2) => (n || 0).toLocaleString('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d });
     tbody.innerHTML = list.map(t => {
         const date = (t.executed_at || '').slice(0, 10);
