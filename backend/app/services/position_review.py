@@ -334,6 +334,9 @@ async def _compute_review() -> dict:
                 "signal": "SIN_DATOS", "reasons": ["Sin histórico suficiente para evaluar objetivamente."],
                 "bias_flag": None, "horizon": horizon, "horizon_is_default": horizon_is_default,
                 "pnl_pct": pos.get("gain_loss_pct"), "weight_pct": round(pos.get("weight", 0) or 0, 1),
+                # Even without price history we can still show the web-grounded
+                # environment brief (this is the only signal for such holdings).
+                "catalyst_brief": briefs.get(tk_up),
             })
             continue
         ev = _evaluate(pos, m, horizon)

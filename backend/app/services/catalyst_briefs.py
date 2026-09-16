@@ -11,6 +11,7 @@ for a few days so we don't hammer the feed.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime, timezone
 
@@ -26,8 +27,9 @@ _MAX_PER_RUN = 30   # cap per batch so we never hammer the news feed
 # Fund/ETF boilerplate that only narrows a news search (an ETF's news is about
 # its geography/theme, e.g. "Franklin FTSE Taiwan", not the "UCITS ETF" suffix).
 _FUND_STOP = {
-    "ucits", "etf", "etn", "etc", "fund", "index", "acc", "accumulating",
-    "dist", "distributing", "hedged", "eur", "usd", "gbp", "chf", "plc", "1c", "1d",
+    "ucits", "uci", "etf", "etn", "etc", "fund", "index", "acc", "accumulating",
+    "dist", "distributing", "hedged", "swap", "core", "select", "sector",
+    "eur", "usd", "gbp", "chf", "plc", "1c", "1d",
 }
 
 
@@ -38,6 +40,55 @@ def _clean_name(name: str) -> str:
     toks = [t for t in re.split(r"[\s\-–—]+", n) if t]
     kept = [t for t in toks if t.lower().strip(".") not in _FUND_STOP]
     return " ".join(kept).strip() or (name or "").strip()
+
+
+_ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
+
+
+def _is_weak_name(name: str, ticker: str) -> bool:
+    """A name is 'weak' (useless for a news search) if it's empty, equals the
+    ticker, or is a bare symbol/ISIN/code (e.g. 'NUKL.DE', 'IE00BYX5NX33')."""
+    n = (name or "").strip()
+    if not n or n.upper() == (ticker or "").upper():
+        return True
+    if ".." in n:  # truncated/garbled exchange name, e.g. 'SSSPDR S+P US Ut..Sel.Se.U'
+        return True
+    toks = n.lower().split()
+    if "plc" in toks or "iii" in toks:  # umbrella-fund cruft, e.g. 'ISHARES III PLC ISH CORE E'
+        return True
+    if " " not in n:
+        u = n.upper()
+        if _ISIN_RE.match(u) or u.startswith("0P") or "." in u:
+            return True
+    return False
+
+
+def _yf_name_sync(ticker: str) -> str:
+    try:
+        import yfinance as yf
+        info = yf.Ticker(ticker).info or {}
+        return (info.get("longName") or info.get("shortName") or "").strip()
+    except Exception:
+        return ""
+
+
+async def _resolve_name(ticker: str, name: str) -> str:
+    """When the stored name is just the ticker/ISIN, look up a real human name so
+    the news search has something to match. Yahoo's longName is clean ('VanEck
+    Uranium and Nuclear Technologies UCITS ETF'); fall back to its quote name."""
+    if not _is_weak_name(name, ticker):
+        return name
+    better = await asyncio.to_thread(_yf_name_sync, ticker)
+    if not better:
+        try:
+            from app.services.market.yahoo_finance import YahooFinanceService
+            d = await YahooFinanceService().get_price(ticker)
+            better = ((d or {}).get("name") or "").strip()
+        except Exception:
+            better = ""
+    if better and " " in better and not _is_weak_name(better, ticker):
+        return better
+    return name
 
 
 async def _load() -> dict:
@@ -82,6 +133,9 @@ async def generate_brief(ticker: str, name: str = "") -> dict | None:
     None if web search is unavailable or found nothing relevant."""
     if not websearch.enabled():
         return None
+    # Resolve a real name when the stored one is just the ticker/ISIN, otherwise
+    # the search has nothing to match (e.g. 'NUKL.DE' -> 'VanEck Uranium ...').
+    name = await _resolve_name(ticker, name or "")
     # Query strategy: cleaned name + ticker sharpens well-known stocks (SNDK,
     # IOVA), but an obscure ETF ticker (FLXT) poisons recall — so if that comes
     # back thin, fall back to the cleaned name alone (its geography/theme).
