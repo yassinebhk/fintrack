@@ -9,6 +9,31 @@ let assetDetailTvChart = null;
 let assetDetailPositionChart = null;
 let currentAssetDetailTicker = null;
 
+// Retry transient failures (flaky mobile network, or the backend restarting
+// mid-deploy) before giving up. Retries on network error / 5xx; returns 4xx
+// (e.g. 401/404) as-is so the caller can handle it. This is what makes a deep
+// link opened during a brief blip load correctly instead of showing "sin
+// conexión" with empty data.
+async function assetDetailFetch(url, opts, tries = 3) {
+    let lastErr;
+    for (let i = 0; i < tries; i++) {
+        try {
+            const resp = await fetch(url, opts);
+            if (resp.status >= 500) throw new Error(`HTTP ${resp.status}`);
+            return resp;
+        } catch (e) {
+            lastErr = e;
+            if (i < tries - 1) await new Promise((r) => setTimeout(r, 600 * (i + 1)));
+        }
+    }
+    throw lastErr;
+}
+
+// Reload the current asset detail (used by the "Reintentar" buttons on error).
+window.retryAssetDetail = () => { if (currentAssetDetailTicker) showAssetDetail(currentAssetDetailTicker); };
+
+const _RETRY_BTN = '<button onclick="retryAssetDetail()" class="btn-secondary" style="margin-top:10px;">🔄 Reintentar</button>';
+
 function showAssetDetail(ticker) {
     if (!ticker) return;
     currentAssetDetailTicker = ticker.toUpperCase();
@@ -54,7 +79,13 @@ async function loadAssetDetailHeader(ticker) {
     }
 
     try {
-        const resp = await fetch(`${ASSET_DETAIL_API}/portfolio`);
+        const resp = await assetDetailFetch(`${ASSET_DETAIL_API}/portfolio`);
+        if (resp.status === 401) {
+            document.getElementById('assetDetailPrice').textContent = 'Sesión caducada';
+            document.getElementById('assetDetailGainLoss').innerHTML =
+                'Recarga la app para iniciar sesión. ' + _RETRY_BTN;
+            return;
+        }
         const portfolio = await resp.json();
         const position = portfolio.positions?.find(p => p.ticker === ticker);
 
@@ -82,6 +113,9 @@ async function loadAssetDetailHeader(ticker) {
         }
     } catch (err) {
         console.error('asset detail header failed:', err);
+        document.getElementById('assetDetailPrice').textContent = '—';
+        document.getElementById('assetDetailGainLoss').innerHTML =
+            'No se pudieron cargar los datos de tu posición. ' + _RETRY_BTN;
     }
 }
 
@@ -152,7 +186,11 @@ async function loadAssetDetailPositionChart(ticker) {
     if (!canvas || typeof Chart === 'undefined') return;
     const wrapper = canvas.parentElement;
     try {
-        const resp = await fetch(`${ASSET_DETAIL_API}/portfolio/position-history/${ticker}?days=1825`);
+        const resp = await assetDetailFetch(`${ASSET_DETAIL_API}/portfolio/position-history/${ticker}?days=1825`);
+        if (resp.status === 401) {
+            wrapper.innerHTML = `<p class="text-muted" style="padding:20px;">Sesión caducada — recarga la app para iniciar sesión.</p>`;
+            return;
+        }
         const data = await resp.json();
         const hist = data.history || [];
 
@@ -199,7 +237,7 @@ async function loadAssetDetailPositionChart(ticker) {
         });
     } catch (err) {
         console.error('asset detail position chart failed:', err);
-        wrapper.innerHTML = '<p class="text-muted" style="padding:20px; color:var(--negative);">No se pudo cargar el histórico de tu posición.</p>';
+        wrapper.innerHTML = '<p class="text-muted" style="padding:20px; color:var(--negative);">No se pudo cargar el histórico de tu posición.<br>' + _RETRY_BTN + '</p>';
     }
 }
 
@@ -208,13 +246,17 @@ async function loadAssetDetailTransactions(ticker) {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:20px;">Cargando…</td></tr>';
     try {
-        const resp = await fetch(`${ASSET_DETAIL_API}/transactions?ticker=${encodeURIComponent(ticker)}`, { cache: 'no-store' });
+        const resp = await assetDetailFetch(`${ASSET_DETAIL_API}/transactions?ticker=${encodeURIComponent(ticker)}`, { cache: 'no-store' });
+        if (resp.status === 401) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:20px;">Sesión caducada — recarga la app para iniciar sesión.</td></tr>';
+            return;
+        }
         const txs = await resp.json();
         if (!resp.ok) throw new Error(txs.detail || `HTTP ${resp.status}`);
         if (!Array.isArray(txs) || !txs.length) {
             let msg = 'Sin aportaciones registradas para este activo.';
             try {
-                const posResp = await fetch(`${ASSET_DETAIL_API}/portfolio`);
+                const posResp = await assetDetailFetch(`${ASSET_DETAIL_API}/portfolio`);
                 const portfolio = await posResp.json();
                 if (portfolio.positions?.some(p => p.ticker === ticker)) {
                     msg = 'Tienes esta posición, pero no hay compras individuales registradas — probablemente llegó por depósito/transferencia en vez de una compra ejecutada en el propio broker, que solo registra operaciones reales.';
@@ -236,7 +278,7 @@ async function loadAssetDetailTransactions(ticker) {
             </tr>
         `).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding:20px; color:var(--negative);">No se pudieron cargar: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding:20px; color:var(--negative);">No se pudieron cargar: ${err.message}<br>${_RETRY_BTN}</td></tr>`;
     }
 }
 

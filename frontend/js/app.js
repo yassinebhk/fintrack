@@ -212,17 +212,33 @@ function formatTime(dateStr) {
 }
 
 // API Functions
-async function fetchAPI(endpoint) {
-    try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}${endpoint}`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+async function fetchAPI(endpoint, tries = 3) {
+    // Retry transient failures (flaky mobile network, backend restarting
+    // mid-deploy) before flipping the app to "Sin conexión". Network errors and
+    // 5xx are retried; a real 4xx (401/404) fails immediately.
+    let lastErr;
+    for (let i = 0; i < tries; i++) {
+        let response;
+        try {
+            response = await fetch(`${CONFIG.API_BASE_URL}${endpoint}`);
+        } catch (netErr) {
+            lastErr = netErr;
+            if (i < tries - 1) { await new Promise((r) => setTimeout(r, 600 * (i + 1))); continue; }
+            console.error(`API Error (${endpoint}):`, netErr);
+            throw netErr;
         }
-        return await response.json();
-    } catch (error) {
-        console.error(`API Error (${endpoint}):`, error);
-        throw error;
+        if (response.ok) return await response.json();
+        if (response.status < 500) {
+            const err = new Error(`HTTP error! status: ${response.status}`);
+            err.status = response.status;
+            console.error(`API Error (${endpoint}):`, err);
+            throw err;
+        }
+        lastErr = new Error(`HTTP ${response.status}`);
+        if (i < tries - 1) await new Promise((r) => setTimeout(r, 600 * (i + 1)));
     }
+    console.error(`API Error (${endpoint}):`, lastErr);
+    throw lastErr;
 }
 
 async function fetchPortfolio() {
