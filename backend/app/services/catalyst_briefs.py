@@ -22,7 +22,8 @@ from app.services import websearch
 
 _KEY = "catalyst_briefs"
 _TTL_DAYS = 3
-_MAX_PER_RUN = 30   # cap per batch so we never hammer the news feed
+_MAX_PER_RUN = 30      # cap per batch so we never hammer the news feed
+_PACE_SECONDS = 3.0    # gap between assets in a batch (Google News throttles bursts)
 
 # Fund/ETF boilerplate that only narrows a news search (an ETF's news is about
 # its geography/theme, e.g. "Franklin FTSE Taiwan", not the "UCITS ETF" suffix).
@@ -135,18 +136,23 @@ async def generate_brief(ticker: str, name: str = "") -> dict | None:
         return None
     # Resolve a real name when the stored one is just the ticker/ISIN, otherwise
     # the search has nothing to match (e.g. 'NUKL.DE' -> 'VanEck Uranium ...').
-    name = await _resolve_name(ticker, name or "")
-    # Query strategy: cleaned name + ticker sharpens well-known stocks (SNDK,
-    # IOVA), but an obscure ETF ticker (FLXT) poisons recall — so if that comes
-    # back thin, fall back to the cleaned name alone (its geography/theme).
+    resolved = await _resolve_name(ticker, name or "")
+    was_resolved = resolved != (name or "")   # weak name => the ticker is obscure
+    name = resolved
     base = _clean_name(name) if name else ticker
     tk_up = (ticker or "").upper()
-    q = f"{base} {ticker}".strip() if base and base.upper() != tk_up else (base or ticker)
-    results = await websearch.search(q, max_results=10, days=45)
-    if len(results) < 3 and base and base.upper() != tk_up:
-        alt = await websearch.search(base, max_results=10, days=45)
-        if len(alt) > len(results):
-            results = alt
+    # Query strategy: for a well-known stock, name + ticker sharpens recall
+    # (SNDK, IOVA). For an obscure ETF the ticker only poisons the search, and
+    # we know it's obscure precisely when we had to resolve its name — so search
+    # by name/theme alone and skip the wasted second query.
+    if was_resolved or not base or base.upper() == tk_up:
+        results = await websearch.search(base or ticker, max_results=10, days=45)
+    else:
+        results = await websearch.search(f"{base} {ticker}".strip(), max_results=10, days=45)
+        if len(results) < 3:
+            alt = await websearch.search(base, max_results=10, days=45)
+            if len(alt) > len(results):
+                results = alt
     if not results:
         return None
 
@@ -207,6 +213,7 @@ async def refresh_briefs(assets: list[dict]) -> dict:
         return {"status": "búsqueda de noticias no disponible"}
     items = await _load()
     done = 0
+    attempted = 0
     for a in assets:
         if done >= _MAX_PER_RUN:
             break
@@ -216,10 +223,15 @@ async def refresh_briefs(assets: list[dict]) -> dict:
         existing = items.get(tk)
         if existing and _fresh(existing):
             continue
+        # Pace requests: Google News RSS throttles bursts, and a run of
+        # ETF assets that fail fast (no news) would otherwise hammer it.
+        if attempted:
+            await asyncio.sleep(_PACE_SECONDS)
+        attempted += 1
         brief = await generate_brief(tk, a.get("name") or tk)
         if brief:
             items[tk] = brief
             done += 1
     if done:
         await _save(items)
-    return {"generated": done, "total_cached": len(items)}
+    return {"generated": done, "attempted": attempted, "total_cached": len(items)}

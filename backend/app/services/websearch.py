@@ -11,6 +11,7 @@ date. Each result is {title, url, content}; the headline itself is the substance
 
 from __future__ import annotations
 
+import asyncio
 import re
 import urllib.parse
 from email.utils import parsedate_to_datetime
@@ -40,16 +41,22 @@ async def search(query: str, max_results: int = 8, days: int = 30) -> list[dict]
     q = f"{query} when:{max(int(days), 1)}d"
     params = {"q": q, "hl": "en-US", "gl": "US", "ceid": "US:en"}
     url = f"{_GNEWS_URL}?{urllib.parse.urlencode(params)}"
-    try:
-        async with httpx.AsyncClient(timeout=25.0, headers={"User-Agent": _UA},
-                                     follow_redirects=True) as client:
-            r = await client.get(url)
-            if r.status_code != 200:
-                logger.warning("gnews search {} -> HTTP {}", query[:50], r.status_code)
-                return []
-            root = ET.fromstring(r.content)
-    except Exception as exc:
-        logger.warning("gnews search error for {}: {}", query[:50], exc)
+    root = None
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=25.0, headers={"User-Agent": _UA},
+                                         follow_redirects=True) as client:
+                r = await client.get(url)
+            if r.status_code == 200:
+                root = ET.fromstring(r.content)
+                break
+            # 429/5xx = throttled/transient → back off and retry
+            logger.warning("gnews search {} -> HTTP {} (attempt {})", query[:50], r.status_code, attempt + 1)
+        except Exception as exc:
+            logger.warning("gnews search error for {} (attempt {}): {}", query[:50], attempt + 1, exc)
+        if attempt < 2:
+            await asyncio.sleep(2.0 * (attempt + 1))
+    if root is None:
         return []
 
     out: list[dict] = []
