@@ -29,6 +29,15 @@ _NEG_TTL = 900.0                     # 15 min
 _MAP_CACHE: dict[str, tuple[str, float]] = {}
 _MAP_TTL = 3600.0                    # 1 h
 
+# Shared across the (per-request) service instances so caches actually hit and we
+# don't leak a ThreadPoolExecutor per request. Previously each instance had its
+# own cache+executor, so on the small VM every request re-fetched Yahoo and
+# spawned threads that piled up (memory growth → swap). These make the 15min
+# price / 30min history caches real and keep exactly one thread pool.
+_EXECUTOR = ThreadPoolExecutor(max_workers=5)
+_PRICE_CACHE: dict[str, dict] = {}
+_PRICE_EXPIRY: dict[str, datetime] = {}
+
 
 HARDCODED_FALLBACK: dict[str, str] = {
     "LYX0F.DE": "UST.PA",
@@ -51,9 +60,10 @@ class YahooFinanceService:
     BASE_URL = "https://query1.finance.yahoo.com"
 
     def __init__(self, cache_ttl: timedelta = timedelta(minutes=15)) -> None:
-        self._executor = ThreadPoolExecutor(max_workers=5)
-        self._cache: dict[str, dict] = {}
-        self._expiry: dict[str, datetime] = {}
+        # Point at the shared, process-wide caches + executor (not per-instance).
+        self._executor = _EXECUTOR
+        self._cache = _PRICE_CACHE
+        self._expiry = _PRICE_EXPIRY
         self._ttl = cache_ttl
 
     def _fresh(self, key: str) -> bool:
