@@ -55,7 +55,9 @@ def setup_logging() -> None:
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
     for noisy in ("uvicorn", "uvicorn.access", "httpx", "httpcore"):
-        logging.getLogger(noisy).handlers = [InterceptHandler()]
+        lg = logging.getLogger(noisy)
+        lg.handlers = [InterceptHandler()]
+        lg.propagate = False  # else the record is also handled by root → logged twice
 
     logger.info(
         "logging configured (level={level}, dir={dir})",

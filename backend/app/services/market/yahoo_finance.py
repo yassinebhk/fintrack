@@ -7,6 +7,7 @@ Improvements over legacy:
 """
 
 import asyncio
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
@@ -16,6 +17,17 @@ from loguru import logger
 
 from app.db import session_scope
 from app.repositories import TickerMappingRepository
+
+# Process-wide caches shared across the (per-request) service instances.
+# - Negative cache: symbols Yahoo has no data for (e.g. PEPE-EUR) were retried on
+#   every cold portfolio load — a 404 + a slow yfinance fallback each time. Skip
+#   them for a while instead.
+# - Mapping cache: _resolve_ticker hit the DB (Neon) once per ticker per load;
+#   cache the resolution so a cold load isn't 22 round-trips.
+_NEG_CACHE: dict[str, float] = {}    # ticker -> expiry (monotonic)
+_NEG_TTL = 900.0                     # 15 min
+_MAP_CACHE: dict[str, tuple[str, float]] = {}
+_MAP_TTL = 3600.0                    # 1 h
 
 
 HARDCODED_FALLBACK: dict[str, str] = {
@@ -48,14 +60,19 @@ class YahooFinanceService:
         return key in self._expiry and datetime.now() < self._expiry[key]
 
     async def _resolve_ticker(self, ticker: str) -> str:
+        cached = _MAP_CACHE.get(ticker)
+        if cached and cached[1] > time.monotonic():
+            return cached[0]
+        resolved = HARDCODED_FALLBACK.get(ticker, ticker)
         try:
             async with session_scope() as s:
-                resolved = await TickerMappingRepository(s).resolve(ticker)
-                if resolved != ticker:
-                    return resolved
+                db_resolved = await TickerMappingRepository(s).resolve(ticker)
+                if db_resolved != ticker:
+                    resolved = db_resolved
         except Exception as exc:
             logger.debug("ticker mapping DB lookup failed for {}: {}", ticker, exc)
-        return HARDCODED_FALLBACK.get(ticker, ticker)
+        _MAP_CACHE[ticker] = (resolved, time.monotonic() + _MAP_TTL)
+        return resolved
 
     # Yahoo `quoteType` -> our internal asset_type vocabulary.
     _QUOTE_TYPE_MAP = {
@@ -348,6 +365,11 @@ class YahooFinanceService:
     async def get_price(self, ticker: str) -> dict | None:
         if self._fresh(ticker):
             return self._cache[ticker]
+        # Recently confirmed to have no data → fail fast (no chart call, no slow
+        # yfinance fallback) until the negative cache expires.
+        neg = _NEG_CACHE.get(ticker)
+        if neg and neg > time.monotonic():
+            return None
         result = await self._fetch_api(ticker)
         if not result:
             mapped = await self._resolve_ticker(ticker)
@@ -357,6 +379,9 @@ class YahooFinanceService:
         if result:
             self._cache[ticker] = result
             self._expiry[ticker] = datetime.now() + self._ttl
+            _NEG_CACHE.pop(ticker, None)
+        else:
+            _NEG_CACHE[ticker] = time.monotonic() + _NEG_TTL
         return result
 
     async def get_prices(self, tickers: list[str]) -> dict[str, dict]:
