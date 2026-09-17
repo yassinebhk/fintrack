@@ -7,6 +7,8 @@ Public API preserved for legacy callers:
 """
 
 import asyncio
+import copy
+import time
 from datetime import date, datetime, timedelta, timezone
 
 import numpy as np
@@ -18,6 +20,25 @@ from app.db import session_scope
 from app.repositories import PositionRepository, SnapshotRepository, TransactionRepository
 from app.services import allocation
 from app.services.market import CoinGeckoService, ExchangeRateService, YahooFinanceService
+
+# Process-wide short-TTL cache of the computed portfolio. MANY endpoints call
+# calculate_portfolio (dashboard + 60s auto-refresh, ticker, position review,
+# alerts, pulse, ai…), and each call was building a fresh PortfolioService and
+# re-fetching ~22 live prices from Yahoo. On the small VM that request storm
+# saturated CPU/RAM → swap thrashing → everything timed out ("Sin conexión").
+# Caching the result for a minute collapses that to one fetch per minute.
+_PORTFOLIO_CACHE: dict[tuple, dict] = {}
+_PORTFOLIO_TTL = 60.0  # seconds
+_PORTFOLIO_LOCK = asyncio.Lock()
+
+
+def invalidate_portfolio_cache(user_id: int | None = None) -> None:
+    """Drop cached portfolios (call after a trade/import so the next read is fresh)."""
+    if user_id is None:
+        _PORTFOLIO_CACHE.clear()
+    else:
+        for k in [k for k in _PORTFOLIO_CACHE if k[0] == user_id]:
+            _PORTFOLIO_CACHE.pop(k, None)
 
 
 class PortfolioService:
@@ -104,7 +125,27 @@ class PortfolioService:
 
     # ------------------------------------------------------------------ aggregation
 
-    async def calculate_portfolio(self) -> dict:
+    async def calculate_portfolio(self, use_cache: bool = True) -> dict:
+        """Compute the portfolio, served from a 60s process cache by default so a
+        burst of callers doesn't each hammer Yahoo. Pass use_cache=False right
+        after a change that must show immediately."""
+        key = (self.user_id, self.base_currency)
+        if use_cache:
+            hit = _PORTFOLIO_CACHE.get(key)
+            if hit and hit["expiry"] > time.monotonic():
+                return copy.deepcopy(hit["data"])
+        async with _PORTFOLIO_LOCK:
+            # Re-check inside the lock: a concurrent caller may have just filled it,
+            # so we compute once and everyone else reuses that result.
+            if use_cache:
+                hit = _PORTFOLIO_CACHE.get(key)
+                if hit and hit["expiry"] > time.monotonic():
+                    return copy.deepcopy(hit["data"])
+            data = await self._calculate_portfolio_impl()
+            _PORTFOLIO_CACHE[key] = {"data": data, "expiry": time.monotonic() + _PORTFOLIO_TTL}
+            return copy.deepcopy(data)
+
+    async def _calculate_portfolio_impl(self) -> dict:
         positions = await self.load_positions()
         if positions.empty:
             return self._empty_portfolio()

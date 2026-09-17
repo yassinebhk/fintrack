@@ -317,6 +317,8 @@ async def _import_ledger(txs: list[dict], skipped: int, broker: str,
         await pos_repo.delete_by_broker(broker)
     if pos_rows:
         await pos_repo.bulk_upsert(pos_rows)
+    from app.services.portfolio import invalidate_portfolio_cache
+    invalidate_portfolio_cache(user_id)
     return {
         "message": f"Importadas {added} transacciones nuevas y reconstruidas {len(pos_rows)} posiciones "
                    f"({skipped} filas omitidas: ingresos/comisiones/no-operaciones).",
@@ -357,6 +359,8 @@ async def _import_positions(df: pd.DataFrame, broker: str, merge_existing: bool,
         for _, r in processed.iterrows()
     ]
     affected = await repo.bulk_upsert(rows)
+    from app.services.portfolio import invalidate_portfolio_cache
+    invalidate_portfolio_cache(user_id)
     return {
         "message": f"Importadas {len(rows)} posiciones",
         "positions_imported": len(rows),

@@ -324,6 +324,8 @@ async def _import_transactions(txs: list[dict], meta: dict, broker: str,
         await pos_repo.delete_by_broker(broker)
     if rows:
         await pos_repo.bulk_upsert(rows)
+    from app.services.portfolio import invalidate_portfolio_cache
+    invalidate_portfolio_cache(user_id)
     return added, rows
 
 
