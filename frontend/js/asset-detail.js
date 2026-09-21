@@ -150,11 +150,6 @@ function renderAssetDetailMarketSeries(chart, history) {
 async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
     if (!series || !historyDates.length) return;
     try {
-        const resp = await assetDetailFetch(`${ASSET_DETAIL_API}/transactions?ticker=${encodeURIComponent(ticker)}`, { cache: 'no-store' });
-        if (resp.status === 401) return;
-        const txs = await resp.json();
-        if (!Array.isArray(txs) || !txs.length) return;
-
         // Chart bars only exist for trading days; a transaction on a weekend/holiday
         // (or before the fetched window) snaps to the nearest earlier bar so the
         // marker always renders instead of silently vanishing.
@@ -169,7 +164,11 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
         const fmtQty = (n) => (n || 0).toLocaleString('es-ES', { maximumFractionDigits: 6 });
         const fmtPrice = (n, cur) => `${(n || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cur ? ' ' + cur : ''}`;
 
-        const markers = txs
+        const resp = await assetDetailFetch(`${ASSET_DETAIL_API}/transactions?ticker=${encodeURIComponent(ticker)}`, { cache: 'no-store' });
+        if (resp.status === 401) return;
+        const txs = await resp.json();
+
+        let markers = (Array.isArray(txs) ? txs : [])
             .filter(t => t.type === 'buy' || t.type === 'sell')
             .map(t => {
                 const day = (t.executed_at || '').slice(0, 10);
@@ -183,8 +182,33 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
                     text: `${isBuy ? 'Compra' : 'Venta'} ${fmtQty(t.quantity)} @ ${fmtPrice(t.price, t.currency)}`,
                 };
             })
-            .filter(Boolean)
-            .sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+            .filter(Boolean);
+
+        // No individual trade recorded (true for most positions reconstructed in
+        // bulk after the Neon DB incident — see position_data_integrity memory) —
+        // fall back to ONE marker at the position's creation date, using a
+        // distinct shape/color and explicit "≈ aprox." wording so it's never
+        // mistaken for a real logged trade.
+        if (!markers.length) {
+            try {
+                const posResp = await assetDetailFetch(`${ASSET_DETAIL_API}/portfolio`);
+                if (posResp.status !== 401) {
+                    const portfolio = await posResp.json();
+                    const pos = portfolio.positions?.find(p => p.ticker === ticker);
+                    if (pos && pos.created_at && pos.quantity > 0) {
+                        markers = [{
+                            time: snapToChart(pos.created_at.slice(0, 10)),
+                            position: 'belowBar',
+                            color: '#9C9689',
+                            shape: 'circle',
+                            text: `≈ ${fmtQty(pos.quantity)} @ ${fmtPrice(pos.avg_price, pos.currency)} (posición reconstruida, no tu fecha real de compra)`,
+                        }];
+                    }
+                }
+            } catch (e) { /* keep no markers rather than fail the whole chart */ }
+        }
+
+        markers.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
         if (markers.length) series.setMarkers(markers);
     } catch (err) {
         console.error('asset detail trade markers failed:', err);

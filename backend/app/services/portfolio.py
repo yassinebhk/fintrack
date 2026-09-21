@@ -69,6 +69,7 @@ class PortfolioService:
                 "broker": r.broker,
                 "isin": r.isin,
                 "asset_name": r.asset_name,
+                "created_at": r.created_at,
             }
             for r in rows
         ])
@@ -203,6 +204,11 @@ class PortfolioService:
                 "broker": broker,
                 "block": allocation.BLOCK_LABEL[allocation.classify(ticker)],
                 "weight": 0.0,
+                # When the position row itself was created (e.g. reconstructed in bulk
+                # after the Neon DB incident) — NOT necessarily the real purchase date.
+                # Used only as a last-resort, clearly-labeled fallback marker on the
+                # price chart when no individual buy/sell transaction exists.
+                "created_at": pos["created_at"].isoformat() if pd.notna(pos["created_at"]) else None,
             })
             total_value += market_value_base
             total_cost += cost_basis_base
