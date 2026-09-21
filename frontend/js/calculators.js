@@ -151,12 +151,31 @@ function highlightResult(elementId) {
     }, 1500);
 }
 
+// Prefill "Tu patrimonio actual" with the REAL portfolio total (read from the
+// main dashboard's already-loaded value, same pattern already used by the
+// Objetivos wealth-projection chart) instead of a generic example number —
+// so the FIRE progress % means something the first time you look at it. Only
+// overwrites the field if it's still at the untouched default, so it never
+// clobbers a deliberate what-if number you've typed in.
+function prefillFireWithRealPortfolio() {
+    const el = document.getElementById('fire_current');
+    const hint = document.getElementById('fireRealHint');
+    if (!el) return;
+    const real = parseFloat((document.getElementById('totalValue') || {}).textContent?.replace(/[^0-9.-]+/g, ''));
+    if (!real || real <= 0) return;
+    if (el.value === '50000' || el.dataset.fromReal === '1') {
+        el.value = Math.round(real);
+        el.dataset.fromReal = '1';
+    }
+    if (hint) hint.textContent = `Tu cartera real ahora mismo: ${formatCalcCurrency(real)}${el.dataset.fromReal === '1' ? ' (ya puesto arriba)' : ' — edítalo arriba si quieres probar otro escenario'}`;
+}
+
 // Initialize calculators with default calculations on page load
 document.addEventListener('DOMContentLoaded', () => {
     // Run initial calculations
     setTimeout(() => {
         if (document.getElementById('ci_initial')) calculateCompound();
-        if (document.getElementById('fire_expenses')) calculateFIRE();
+        if (document.getElementById('fire_expenses')) { prefillFireWithRealPortfolio(); calculateFIRE(); }
         if (document.getElementById('dca_amount')) calculateDCA();
         if (document.getElementById('div_capital')) calculateDividends();
     }, 500);

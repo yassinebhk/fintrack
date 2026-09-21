@@ -57,6 +57,12 @@ async def lab_report(current_user: User = Depends(get_current_user)) -> dict:
     return await lab.report(current_user.id)
 
 
+@router.get("/lab/equity-curve")
+async def lab_equity_curve(current_user: User = Depends(get_current_user)) -> dict:
+    from app.services.polymarket import lab
+    return await lab.equity_curve(current_user.id)
+
+
 @router.get("/lab/ledger")
 async def lab_ledger(
     limit: int = Query(default=50, ge=1, le=500),

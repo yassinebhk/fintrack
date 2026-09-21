@@ -128,15 +128,50 @@ async function loadManagerPositions() {
         const response = await fetch(`${API_BASE}/positions`);
         const positions = await response.json();
         currentPositions = positions;
-        renderManagerPositions(positions);
+        renderManagerPositions();
     } catch (error) {
         console.error('Error loading positions:', error);
     }
 }
 
-function renderManagerPositions(positions) {
+let mgrSort = { key: null, dir: 'asc' };
+
+function mgrSetSort(key) {
+    if (mgrSort.key === key) {
+        mgrSort.dir = mgrSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        mgrSort = { key, dir: 'asc' };
+    }
+    ['ticker', 'type', 'broker', 'quantity', 'avg_price'].forEach(k => {
+        const el = document.getElementById(`mgrSortArrow-${k}`);
+        if (el) el.textContent = k === mgrSort.key ? (mgrSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+    });
+    renderManagerPositions();
+}
+
+function renderManagerPositions(positionsArg) {
     const tbody = document.getElementById('managerPositionsBody');
     if (!tbody) return;
+
+    let positions = positionsArg || currentPositions || [];
+    const q = ((document.getElementById('mgrPosSearch') || {}).value || '').trim().toLowerCase();
+    if (q) {
+        positions = positions.filter(p => {
+            const name = (p.asset_name || getAssetName(p.ticker) || '').toLowerCase();
+            return (p.ticker || '').toLowerCase().includes(q) || name.includes(q) || (p.broker || '').toLowerCase().includes(q);
+        });
+    }
+    if (mgrSort.key) {
+        const mul = mgrSort.dir === 'asc' ? 1 : -1;
+        positions = positions.slice().sort((a, b) => {
+            let av = a[mgrSort.key], bv = b[mgrSort.key];
+            if (typeof av === 'string' || typeof bv === 'string') {
+                av = (av || '').toString().toLowerCase(); bv = (bv || '').toString().toLowerCase();
+                return av < bv ? -mul : av > bv ? mul : 0;
+            }
+            return ((av || 0) - (bv || 0)) * mul;
+        });
+    }
 
     if (!positions || positions.length === 0) {
         tbody.innerHTML = `

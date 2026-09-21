@@ -108,6 +108,52 @@ function pmRenderReport(r) {
     `;
 }
 
+// Cumulative paper P&L over resolved bets — reuses the same ADV/_advCharts
+// Chart.js helpers already defined in asset-analysis.js (loaded on every
+// page). Gated by the lab's own pre-registered MIN_RESOLVED bar.
+async function pmLoadEquityCurve() {
+    const wrap = document.getElementById('pmEquityWrap');
+    if (!wrap) return;
+    let d;
+    try {
+        const r = await fetch(`${PM_API}/polymarket/lab/equity-curve`, { credentials: 'same-origin' });
+        if (!r.ok) { wrap.style.display = 'none'; return; }
+        d = await r.json();
+    } catch (e) { wrap.style.display = 'none'; return; }
+
+    wrap.style.display = 'block';
+    if (!d.gated) {
+        wrap.innerHTML = `<div class="card">
+            <h4 style="margin-top:0;">📈 Curva de resultado (papel)</h4>
+            <p class="text-muted" style="font-size:13px; margin:6px 0 0;">⏳ En validación: ${d.n}/${d.n_required} apuestas resueltas — el mismo umbral pre-registrado que el veredicto de arriba. Con menos, una "curva" sería ruido.</p>
+        </div>`;
+        return;
+    }
+    wrap.innerHTML = `<div class="card">
+        <h4 style="margin-top:0;">📈 Curva de resultado (papel)</h4>
+        <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">P&amp;L acumulado en unidades de papel, en orden de resolución. ${d.n} apuestas.</p>
+        <div class="chart-container-sm"><canvas id="pmEquityChart"></canvas></div>
+    </div>`;
+    if (typeof Chart === 'undefined' || typeof ADV === 'undefined') return;
+    const labels = d.points.map(p => p.date);
+    const cum = d.points.map(p => p.cum_pnl);
+    const up = cum.length && cum[cum.length - 1] >= 0;
+    if (typeof _destroyAdv === 'function') _destroyAdv('pmEquityChart');
+    const chart = new Chart(document.getElementById('pmEquityChart').getContext('2d'), {
+        type: 'line',
+        data: { labels, datasets: [{ data: cum, borderColor: up ? ADV.green : ADV.red, backgroundColor: up ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.12)', fill: true, pointRadius: 0, borderWidth: 1.5, tension: 0.15 }] },
+        options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `P&L acumulado: ${c.parsed.y >= 0 ? '+' : ''}${c.parsed.y.toFixed(2)}` } } },
+            scales: {
+                x: { title: { display: true, text: 'Fecha de resolución', color: ADV.muted, font: { size: 12, weight: '600' } }, ticks: { maxTicksLimit: 6, color: ADV.muted }, grid: { display: false } },
+                y: { title: { display: true, text: 'P&L acumulado (papel)', color: ADV.muted, font: { size: 12, weight: '600' } }, ticks: { color: ADV.muted }, grid: { color: ADV.grid } },
+            },
+        },
+    });
+    if (typeof _advCharts === 'object') _advCharts['pmEquityChart'] = chart;
+}
+
 function pmRenderLedger(bets) {
     const tbody = document.getElementById('pmLedgerBody');
     if (!tbody) return;
@@ -154,6 +200,7 @@ async function pmLoadLab() {
         const ledger = await ledgerResp.json();
         pmRenderReport(report);
         pmRenderLedger(ledger.bets || []);
+        pmLoadEquityCurve();
     } catch (err) {
         if (reportBox) reportBox.innerHTML = `<div class="alert alert-error">Error al cargar tu historial: ${err.message}</div>`;
     }

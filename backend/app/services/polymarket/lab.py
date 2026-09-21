@@ -220,6 +220,29 @@ async def evaluate(user_id: int) -> dict:
     return {"resolved_now": resolved_now}
 
 
+async def equity_curve(user_id: int) -> dict:
+    """Cumulative paper P&L over resolved bets, ordered by resolution time —
+    real sequential results, not a projection. Gated by the SAME pre-
+    registered MIN_RESOLVED bar as report()'s success criteria: under that,
+    a 'curve' would just be noise, exactly the false-positive risk this lab
+    exists to avoid."""
+    data = await _load(user_id)
+    resolved = sorted(
+        (b for b in data.get("bets", []) if b.get("status") == "resolved" and b.get("resolved_at")),
+        key=lambda b: b["resolved_at"],
+    )
+    n = len(resolved)
+    if n < MIN_RESOLVED:
+        return {"gated": False, "n": n, "n_required": MIN_RESOLVED, "points": []}
+
+    cum = 0.0
+    points = []
+    for b in resolved:
+        cum += b.get("pnl") or 0.0
+        points.append({"date": b["resolved_at"][:10], "cum_pnl": round(cum, 2), "market": _short_label(b)})
+    return {"gated": True, "n": n, "points": points}
+
+
 def _brier(probs_outcomes: list[tuple]) -> float | None:
     if not probs_outcomes:
         return None

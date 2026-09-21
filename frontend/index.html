@@ -1066,6 +1066,7 @@
                         <div class="card-header">
                             <h3>📊 Mis Posiciones Actuales</h3>
                             <div class="positions-actions">
+                                <input type="text" id="mgrPosSearch" placeholder="🔍 Ticker, nombre o broker…" class="input-date" style="min-width:200px;" oninput="renderManagerPositions()">
                                 <button class="btn-secondary" onclick="exportPositions()">📥 Exportar CSV</button>
                                 <button class="btn-secondary btn-danger" onclick="confirmClearAll()">🗑️ Limpiar Todo</button>
                             </div>
@@ -1074,11 +1075,11 @@
                             <table class="manager-table">
                                 <thead>
                                     <tr>
-                                        <th>Ticker</th>
-                                        <th>Tipo</th>
-                                        <th>Broker</th>
-                                        <th class="text-right">Cantidad<button type="button" class="info-icon" data-info-key="cantidad" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
-                                        <th class="text-right">Coste/Unidad<button type="button" class="info-icon" data-info-key="coste_unidad" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
+                                        <th onclick="mgrSetSort('ticker')" style="cursor:pointer;" title="Ordenar">Ticker<span id="mgrSortArrow-ticker"></span></th>
+                                        <th onclick="mgrSetSort('type')" style="cursor:pointer;" title="Ordenar">Tipo<span id="mgrSortArrow-type"></span></th>
+                                        <th onclick="mgrSetSort('broker')" style="cursor:pointer;" title="Ordenar">Broker<span id="mgrSortArrow-broker"></span></th>
+                                        <th class="text-right" onclick="mgrSetSort('quantity')" style="cursor:pointer;" title="Ordenar">Cantidad<span id="mgrSortArrow-quantity"></span><button type="button" class="info-icon" data-info-key="cantidad" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
+                                        <th class="text-right" onclick="mgrSetSort('avg_price')" style="cursor:pointer;" title="Ordenar">Coste/Unidad<span id="mgrSortArrow-avg_price"></span><button type="button" class="info-icon" data-info-key="coste_unidad" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></th>
                                         <th class="text-right">Divisa</th>
                                         <th>Acciones</th>
                                     </tr>
@@ -1415,6 +1416,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                                 <div class="form-group">
                                     <label>Tu patrimonio actual (€)</label>
                                     <input type="number" id="fire_current" value="50000" step="1000">
+                                    <span id="fireRealHint" class="text-muted" style="font-size:11px; display:block; margin-top:3px;"></span>
                                 </div>
                                 <div class="form-group">
                                     <label>Ahorro mensual (€)</label>
@@ -1809,6 +1811,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                         <div id="pmReportBody">
                             <p class="text-muted">Cargando tu historial…</p>
                         </div>
+                        <div id="pmEquityWrap" style="display:none; margin-top:16px;"></div>
                         <div class="table-container" style="margin-top:16px;">
                             <table class="manager-table">
                                 <thead>
@@ -2022,9 +2025,9 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/info-glossary.js?v=20260921dividendos"></script>
     <script src="js/app.js?v=20260921livesum"></script>
     <script src="js/ticker.js?v=20260912a"></script>
-    <script src="js/calculators.js?v=20260912blue"></script>
+    <script src="js/calculators.js?v=20260921fire"></script>
     <script src="js/news.js?v=20260921tally"></script>
-    <script src="js/portfolio-manager.js?v=20260916pdf"></script>
+    <script src="js/portfolio-manager.js?v=20260921sort"></script>
     <script src="js/ai-advisor.js?v=20260530a"></script>
     <script src="js/asset-analysis.js?v=20260921about"></script>
     <script src="js/backtest.js?v=20260921export"></script>
@@ -2032,7 +2035,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/asset-deep-analysis.js?v=20260921about"></script>
     <script src="js/asset-detail.js?v=20260921about"></script>
     <script src="js/transactions.js?v=20260921export"></script>
-    <script src="js/polymarket.js?v=20260912info"></script>
+    <script src="js/polymarket.js?v=20260921equity"></script>
     <script src="js/daytrading.js?v=20260921equity"></script>
     <script src="js/journal.js?v=20260921filter"></script>
     <script src="js/watchlist.js?v=20260921spark"></script>
