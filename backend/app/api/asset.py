@@ -12,6 +12,22 @@ _yahoo = YahooFinanceService()
 _coingecko = CoinGeckoService()
 
 
+async def _resolve_asset_type(ticker: str, current_user: User | None, asset_type: str) -> str:
+    if asset_type != "auto":
+        return asset_type
+    if current_user is not None:
+        positions = await PortfolioService(current_user.id).load_positions()
+        pos = positions[positions["ticker"].str.upper() == ticker.upper()]
+    else:
+        import pandas as pd
+        pos = pd.DataFrame()
+    if not pos.empty:
+        return pos.iloc[0]["type"]
+    if ticker.upper() in {"BTC", "ETH", "SOL", "DOGE", "PEPE", "XRP", "ADA"}:
+        return "crypto"
+    return "stock"
+
+
 @router.get("/price/{ticker}")
 async def get_price(ticker: str, asset_type: str = Query(default="stock")) -> dict:
     if asset_type == "crypto":
@@ -33,19 +49,7 @@ async def get_asset_history(
     asset_type: str = Query(default="auto"),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> dict:
-    if asset_type == "auto":
-        if current_user is not None:
-            positions = await PortfolioService(current_user.id).load_positions()
-            pos = positions[positions["ticker"].str.upper() == ticker.upper()]
-        else:
-            import pandas as pd
-            pos = pd.DataFrame()
-        if not pos.empty:
-            asset_type = pos.iloc[0]["type"]
-        elif ticker.upper() in {"BTC", "ETH", "SOL", "DOGE", "PEPE", "XRP", "ADA"}:
-            asset_type = "crypto"
-        else:
-            asset_type = "stock"
+    asset_type = await _resolve_asset_type(ticker, current_user, asset_type)
 
     if asset_type == "crypto":
         # Yahoo first: it has real OHLC (candles actually render) and no rate
@@ -79,3 +83,47 @@ async def get_asset_history(
         # requested period, since a crypto fallback to CoinGecko never has it.
         "intraday": bool(history) and "time" in history[0],
     }
+
+
+@router.get("/asset/{ticker}/stats")
+async def get_asset_stats(
+    ticker: str,
+    asset_type: str = Query(default="auto"),
+    current_user: User | None = Depends(get_current_user_optional),
+) -> dict:
+    """Quick-stats strip for the asset chart pages: day range, 52-week range,
+    average volume, market cap, PER, dividend yield, next earnings/ex-dividend,
+    insider sentiment. Every field is best-effort — missing ones are simply
+    omitted, never fabricated."""
+    asset_type = await _resolve_asset_type(ticker, current_user, asset_type)
+    lookup_ticker = f"{ticker.upper()}-EUR" if asset_type == "crypto" else ticker
+
+    out: dict = {}
+    fast = await _yahoo.get_fast_stats(lookup_ticker)
+    if fast:
+        out.update(fast)
+
+    if asset_type != "crypto":
+        fund = await _yahoo.get_fundamentals(ticker)
+        if fund:
+            if fund.get("trailingPE") is not None:
+                out["pe_ratio"] = fund["trailingPE"]
+            if fund.get("dividendYield") is not None:
+                out["dividend_yield"] = fund["dividendYield"]
+            if out.get("market_cap") is None and fund.get("marketCap") is not None:
+                out["market_cap"] = fund["marketCap"]
+
+        cats = await _yahoo.get_catalysts(ticker)
+        if cats:
+            if cats.get("earnings"):
+                out["next_earnings"] = cats["earnings"]
+            if cats.get("ex_dividend"):
+                out["next_ex_dividend"] = cats["ex_dividend"]
+
+        from app.services.market.finnhub import FinnhubClient
+        insider = await FinnhubClient().get_insider_sentiment(ticker)
+        if insider:
+            out["insider_mspr"] = insider.get("mspr")
+            out["insider_month"] = insider.get("month")
+
+    return out

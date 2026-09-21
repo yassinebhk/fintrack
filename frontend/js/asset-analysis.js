@@ -108,6 +108,9 @@ async function loadAssetChart() {
         // Update UI
         updateAssetInfo(ticker, data);
         renderAssetChart(data);
+        if (typeof renderAssetStatsStrip === 'function') {
+            renderAssetStatsStrip(ticker, document.getElementById('assetStatsStrip'));
+        }
         
         // Show action buttons
         document.getElementById('assetActions').style.display = 'flex';

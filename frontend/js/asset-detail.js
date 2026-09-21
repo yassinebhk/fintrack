@@ -53,6 +53,7 @@ function showAssetDetail(ticker) {
     loadAssetDetailMarketChart(currentAssetDetailTicker);
     loadAssetDetailPositionChart(currentAssetDetailTicker);
     loadAssetDetailTransactions(currentAssetDetailTicker);
+    renderAssetStatsStrip(currentAssetDetailTicker, document.getElementById('assetDetailStatsStrip'));
 
     if (window.innerWidth <= 900) {
         document.querySelector('.sidebar')?.classList.remove('open');
@@ -224,6 +225,79 @@ function attachCrosshairLegend(chart, container, history, timeKey = 'date') {
 // Mark each real buy/sell on the market-price chart, at its exact date — so
 // you see where on the real price curve you actually entered/exited, not just
 // your position value over time (that's the separate chart below).
+function _fmtMarketCap(n) {
+    if (n == null) return null;
+    const abs = Math.abs(n);
+    if (abs >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+    if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (abs >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    return n.toLocaleString('es-ES');
+}
+
+function _fmtVolume(n) {
+    if (n == null) return null;
+    const abs = Math.abs(n);
+    if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (abs >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (abs >= 1e3) return (n / 1e3).toFixed(0) + 'K';
+    return String(Math.round(n));
+}
+
+// Small stats strip (day/52-week range, avg volume, market cap, PER, dividend,
+// insider sentiment, next earnings/ex-dividend) shown below the interactive
+// price chart — one lightweight endpoint so the main history call stays fast.
+// Every field is optional; a missing one is simply left out, never guessed.
+// Shared by both the asset-detail and "Analiza cualquier activo" pages.
+async function renderAssetStatsStrip(ticker, containerEl) {
+    if (!containerEl) return;
+    containerEl.innerHTML = '';
+    try {
+        const base = window.API_BASE_URL || 'http://localhost:8000/api';
+        const resp = await fetch(`${base}/asset/${encodeURIComponent(ticker)}/stats?asset_type=auto`, { cache: 'no-store' });
+        if (!resp.ok) return;
+        const s = await resp.json();
+        if (!s || !Object.keys(s).length) return;
+
+        const fmtP = (n) => (n == null ? null : (+n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        const chips = [];
+        if (s.day_low != null && s.day_high != null) chips.push(['Rango del día', `${fmtP(s.day_low)} – ${fmtP(s.day_high)}`]);
+        if (s.year_low != null && s.year_high != null) chips.push(['Rango 52 semanas', `${fmtP(s.year_low)} – ${fmtP(s.year_high)}`]);
+        const vol = s.avg_volume_10d ?? s.avg_volume_3m;
+        if (vol != null) chips.push(['Volumen medio', _fmtVolume(vol)]);
+        if (s.market_cap != null) chips.push(['Market cap', _fmtMarketCap(s.market_cap)]);
+        if (s.pe_ratio != null) chips.push(['PER', (+s.pe_ratio).toFixed(1)]);
+        if (s.dividend_yield != null) chips.push(['Dividendo', (+s.dividend_yield).toFixed(2) + '%']);
+        if (s.insider_mspr != null) {
+            const mspr = +s.insider_mspr;
+            chips.push(['Insiders' + (s.insider_month ? ` (${s.insider_month})` : ''),
+                (mspr >= 0 ? '+' : '') + mspr.toFixed(0) + (mspr >= 20 ? ' 🟢' : mspr <= -20 ? ' 🔴' : '')]);
+        }
+
+        const daysTo = (iso) => Math.round((new Date(iso) - new Date()) / 86400000);
+        const catalystBits = [];
+        if (s.next_earnings) {
+            const dd = daysTo(s.next_earnings);
+            const soon = dd >= 0 && dd <= 14;
+            catalystBits.push(`<span${soon ? ' style="color:var(--negative); font-weight:600;"' : ''}>📊 Resultados ${s.next_earnings}${dd >= 0 ? ` (en ${dd}d)` : ''}${soon ? ' ⚠️' : ''}</span>`);
+        }
+        if (s.next_ex_dividend) {
+            const dd = daysTo(s.next_ex_dividend);
+            if (dd >= 0) catalystBits.push(`💰 Ex-dividendo ${s.next_ex_dividend} (en ${dd}d)`);
+        }
+
+        const chipsHtml = chips.map(([label, value]) =>
+            `<span style="background:rgba(43,40,34,0.05); border-radius:6px; padding:3px 9px; font-size:11.5px; white-space:nowrap;">${label}: <strong>${value}</strong></span>`
+        ).join('');
+
+        containerEl.innerHTML = `
+            ${chipsHtml ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${chipsHtml}</div>` : ''}
+            ${catalystBits.length ? `<div style="font-size:11.5px; margin-top:6px; color:var(--text-secondary);">📅 Próximos catalizadores: ${catalystBits.join(' · ')}</div>` : ''}
+        `;
+    } catch (err) {
+        console.error('asset stats strip failed:', err);
+    }
+}
+
 async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
     if (!series || !historyDates.length) return;
     try {

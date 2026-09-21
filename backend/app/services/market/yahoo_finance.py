@@ -173,6 +173,42 @@ class YahooFinanceService:
         "dividendYield": (0.0, 30.0), "marketCap": (0.0, float("inf")),
     }
 
+    # Confirmed live against the installed yfinance (1.4.0) fast_info keys —
+    # camelCase, matching Yahoo's own field naming (see get_info()/FUNDAMENTAL_FIELDS
+    # above, same convention).
+    _FAST_INFO_MAP = {
+        "dayHigh": "day_high", "dayLow": "day_low",
+        "yearHigh": "year_high", "yearLow": "year_low",
+        "tenDayAverageVolume": "avg_volume_10d",
+        "threeMonthAverageVolume": "avg_volume_3m",
+        "marketCap": "market_cap",
+        "fiftyDayAverage": "sma50", "twoHundredDayAverage": "sma200",
+    }
+
+    async def get_fast_stats(self, ticker: str) -> dict | None:
+        """Quick quote stats (day range, 52-week range, avg volume, market cap) via
+        yfinance's lightweight `fast_info` — works across stocks/ETFs/funds/crypto
+        pairs, unlike get_fundamentals() which is equity-only. Cached 12h; this
+        feeds a supporting stats strip, not the hot pricing path."""
+        key = f"fast:{ticker.upper()}"
+        if self._fresh(key):
+            return self._cache.get(key)
+
+        def _work() -> dict | None:
+            try:
+                fi = dict(yf.Ticker(ticker).fast_info)
+            except Exception as exc:
+                logger.debug("fast_info for {} failed: {}", ticker, exc)
+                return None
+            out = {dest: fi[src] for src, dest in self._FAST_INFO_MAP.items() if fi.get(src) is not None}
+            return out or None
+
+        loop = asyncio.get_event_loop()
+        res = await loop.run_in_executor(self._executor, _work)
+        self._cache[key] = res
+        self._expiry[key] = datetime.now() + timedelta(hours=12)
+        return res
+
     async def get_fundamentals(self, ticker: str) -> dict | None:
         """Fundamental ratios for a STOCK via yfinance `.get_info()`. Best-effort:
         returns the fields present AND plausible (partial for banks/REITs — they
