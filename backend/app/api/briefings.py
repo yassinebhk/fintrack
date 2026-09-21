@@ -5,7 +5,7 @@ from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
-from app.auth import get_current_user
+from app.auth import get_current_user, get_owner_user_id_cached
 from app.models.user import User
 from app.services.briefing import BriefingService
 
@@ -13,8 +13,17 @@ router = APIRouter(prefix="/api/briefings", tags=["briefings"])
 _service = BriefingService()
 
 
+# SECURITY (2026-09-21): the briefing is generated from the OWNER's portfolio
+# (BriefingService uses get_owner_user_id_cached internally), so serving it to any
+# logged-in user leaked the owner's portfolio. Owner-only until it's per-user.
+async def _is_owner(user: User) -> bool:
+    return user.id == (await get_owner_user_id_cached())
+
+
 @router.get("/today")
 async def get_today(current_user: User = Depends(get_current_user)) -> dict:
+    if not await _is_owner(current_user):
+        raise HTTPException(status_code=404, detail="No hay briefing para tu cuenta todavía.")
     today = date.today()
     existing = await _service.get_briefing(today)
     if existing:
@@ -24,6 +33,8 @@ async def get_today(current_user: User = Depends(get_current_user)) -> dict:
 
 @router.get("/{target_date}")
 async def get_by_date(target_date: str, current_user: User = Depends(get_current_user)) -> dict:
+    if not await _is_owner(current_user):
+        raise HTTPException(status_code=404, detail="No hay briefing para tu cuenta todavía.")
     try:
         target = datetime.strptime(target_date, "%Y-%m-%d").date()
     except ValueError as exc:
@@ -36,6 +47,8 @@ async def get_by_date(target_date: str, current_user: User = Depends(get_current
 
 @router.post("/generate")
 async def generate(force: bool = False, current_user: User = Depends(get_current_user)) -> dict:
+    if not await _is_owner(current_user):
+        raise HTTPException(status_code=403, detail="No autorizado.")
     try:
         return await _service.generate_today(force=force)
     except Exception as exc:

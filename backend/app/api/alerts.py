@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
+from app.auth import get_current_user, get_owner_user_id_cached
 from app.db import get_session
 from app.models.alert import Alert
 from app.models.user import User
@@ -15,6 +15,15 @@ from app.services.alerts import AlertsEngine
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 _engine = AlertsEngine()
+
+
+# SECURITY (2026-09-21): alerts and trailing stops are still single-owner data —
+# the Alert table has no user_id and trailing stops live under one global cache
+# key — so exposing them to any logged-in user leaked (and let them tamper with)
+# the owner's data. Until these are generalized per-user (Fase 2), scope them to
+# the owner: other users see nothing and cannot modify them.
+async def _is_owner(user: User) -> bool:
+    return user.id == (await get_owner_user_id_cached())
 
 
 class TrailingStopIn(BaseModel):
@@ -28,12 +37,16 @@ class TrailingStopIn(BaseModel):
 
 @router.get("/trailing-stops")
 async def list_trailing_stops(current_user: User = Depends(get_current_user)) -> dict:
+    if not await _is_owner(current_user):
+        return {"stops": []}
     from app.services import trailing_stops as ts
     return {"stops": await ts.get_all()}
 
 
 @router.post("/trailing-stop")
 async def set_trailing_stop(payload: TrailingStopIn, current_user: User = Depends(get_current_user)) -> dict:
+    if not await _is_owner(current_user):
+        raise HTTPException(status_code=403, detail="Los stops dinámicos aún no están disponibles para tu cuenta.")
     from app.services import trailing_stops as ts
     stop = await ts.set_stop(payload.ticker, payload.trailing_pct,
                              payload.label, payload.peak, payload.currency,
@@ -43,6 +56,8 @@ async def set_trailing_stop(payload: TrailingStopIn, current_user: User = Depend
 
 @router.delete("/trailing-stop/{ticker}")
 async def delete_trailing_stop(ticker: str, current_user: User = Depends(get_current_user)) -> dict:
+    if not await _is_owner(current_user):
+        raise HTTPException(status_code=403, detail="No autorizado.")
     from app.services import trailing_stops as ts
     ok = await ts.delete_stop(ticker)
     if not ok:
@@ -57,6 +72,9 @@ async def list_alerts(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> list[dict]:
+    # Owner-only until alerts are per-user (Alert has no user_id yet).
+    if not await _is_owner(current_user):
+        return []
     stmt = select(Alert).order_by(Alert.triggered_at.desc()).limit(limit)
     if status:
         stmt = stmt.where(Alert.status == status)
@@ -81,12 +99,16 @@ async def list_alerts(
 
 @router.post("/evaluate")
 async def evaluate(current_user: User = Depends(get_current_user)) -> dict:
+    if not await _is_owner(current_user):
+        raise HTTPException(status_code=403, detail="No autorizado.")
     created = await _engine.evaluate()
     return {"created": created, "count": len(created)}
 
 
 @router.post("/{alert_id}/ack")
 async def ack(alert_id: int, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)) -> dict:
+    if not await _is_owner(current_user):
+        raise HTTPException(status_code=403, detail="No autorizado.")
     row = await session.get(Alert, alert_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Alert not found")

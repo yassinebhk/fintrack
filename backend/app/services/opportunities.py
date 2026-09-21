@@ -235,16 +235,14 @@ class OpportunityService:
         return await self._finalize(themes, crypto)
 
     async def _finalize(self, themes: list[dict], crypto: list[dict]) -> dict:
-        portfolio = await (await self._get_portfolio_service()).calculate_portfolio()
-
-        # Exclude what the user already holds so discoveries are genuinely new.
-        held = set()
-        for p in (portfolio.get("positions") or []):
-            if p.get("ticker"):
-                held.add(str(p["ticker"]).upper())
-        # Filter held out of the scored themes (scan no longer excludes them itself,
-        # so the same scan result can be reused regardless of portfolio changes).
-        themes = [t for t in themes if (t.get("ticker") or "").upper() not in held]
+        # SECURITY (2026-09-21): the opportunities payload is a SHARED, cached market
+        # scan served to EVERY logged-in user. It must NOT be personalized with any
+        # single account's portfolio — doing so leaked the owner's holdings (via which
+        # tickers were excluded and via the analyst prompt) and their portfolio
+        # correlation (via position sizing). So we run it market-only. Per-user
+        # personalization ("exclude what I hold", correlation sizing) is Fase 2.
+        portfolio = {"positions": []}
+        themes = list(themes)
 
         themes_str = self.scanner.render_for_prompt(themes)
 
@@ -268,12 +266,9 @@ class OpportunityService:
         # 2Y, curve slope) — context for bond ideas, computed here on the VM (FRED).
         rates_context = await self._rates_context()
 
-        # Portfolio daily returns — for correlation-aware position sizing of ideas.
-        try:
-            port_returns = await (await self._get_portfolio_service()).get_nav_returns()
-        except Exception as exc:
-            logger.debug("nav returns for sizing failed: {}", exc)
-            port_returns = {}
+        # SECURITY (2026-09-21): shared payload — no per-user (owner) correlation
+        # sizing, which would leak the owner's portfolio composition. Fase 2.
+        port_returns = {}
 
         # Recent news (already sentiment-classified by LLM) to give the analyst current context.
         # Indexed so the analyst can reference the exact headlines that back each idea.
