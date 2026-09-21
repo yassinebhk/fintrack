@@ -900,6 +900,74 @@ function createBlockChart(data, targets) {
     }).join('');
 }
 
+// "¿Dónde lo meto?" — given a new contribution amount, suggests how to split it
+// across blocks so the portfolio moves toward its targets instead of the user
+// having to eyeball the drift chart. Pure client-side math over data already
+// loaded for the Reparto chart (by_block + block_targets), no extra request.
+//
+// Underweight blocks (real < target) get priority, proportional to how far
+// below target they are; if the contribution more than covers every gap, the
+// leftover is spread across ALL blocks by their target weight so nothing pools
+// idle in one place. Overweight blocks get nothing — new money rebalances,
+// it doesn't chase the winner further.
+function calculateRebalanceContribution() {
+    const resultEl = document.getElementById('rebalanceResult');
+    const input = document.getElementById('rebalanceAmount');
+    if (!resultEl || !input) return;
+
+    const contribution = parseFloat(input.value);
+    if (!contribution || contribution <= 0) {
+        resultEl.innerHTML = '<span class="text-muted">Escribe cuánto vas a aportar.</span>';
+        return;
+    }
+    if (!portfolioData || !portfolioData.by_block || !portfolioData.block_targets) {
+        resultEl.innerHTML = '<span class="text-muted">Sin datos de reparto todavía.</span>';
+        return;
+    }
+
+    const blocks = portfolioData.by_block;
+    const targets = portfolioData.block_targets;
+    const total = portfolioData.total_value || 0;
+    const newTotal = total + contribution;
+
+    const gaps = {};
+    let sumGaps = 0;
+    for (const label of Object.keys(targets)) {
+        const targetValue = (targets[label] / 100) * newTotal;
+        const currentValue = (blocks[label] && blocks[label].value) || 0;
+        const gap = Math.max(0, targetValue - currentValue);
+        gaps[label] = gap;
+        sumGaps += gap;
+    }
+
+    const alloc = {};
+    if (sumGaps <= 0) {
+        resultEl.innerHTML = '<span class="text-muted">Ningún bloque está por debajo de su objetivo ahora mismo — repártelo como prefieras.</span>';
+        return;
+    } else if (sumGaps <= contribution) {
+        const leftover = contribution - sumGaps;
+        for (const label of Object.keys(targets)) {
+            alloc[label] = gaps[label] + leftover * (targets[label] / 100);
+        }
+    } else {
+        for (const label of Object.keys(targets)) {
+            alloc[label] = (gaps[label] / sumGaps) * contribution;
+        }
+    }
+
+    const rows = Object.entries(alloc)
+        .filter(([, eur]) => eur >= 0.5)
+        .sort((a, b) => b[1] - a[1])
+        .map(([label, eur]) => {
+            const pct = (eur / contribution) * 100;
+            return `<div style="display:flex; justify-content:space-between; padding:2px 0;">
+                <span>${label}</span>
+                <span><strong>${formatNumber(eur)}€</strong> <span class="text-muted">(${formatNumber(pct)}%)</span></span>
+            </div>`;
+        }).join('');
+    resultEl.innerHTML = rows || '<span class="text-muted">Nada que repartir.</span>';
+}
+
 // Export to CSV
 function exportToCSV() {
     if (!portfolioData || !portfolioData.positions) return;

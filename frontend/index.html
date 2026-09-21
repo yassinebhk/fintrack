@@ -318,6 +318,14 @@
                                 <canvas id="blockChart"></canvas>
                             </div>
                             <div class="distribution-legend" id="blockLegend"></div>
+                            <div class="rebalance-calc" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color, #e5e0d5);">
+                                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                    <label for="rebalanceAmount" style="font-size:12px; color:var(--text-muted, #8a8375); white-space:nowrap;">Voy a aportar</label>
+                                    <input type="number" id="rebalanceAmount" placeholder="€" min="1" step="10" style="width:90px; padding:4px 8px; font-size:13px;">
+                                    <button type="button" class="btn-secondary" style="padding:4px 10px; font-size:12px;" onclick="calculateRebalanceContribution()">¿Dónde lo meto?</button>
+                                </div>
+                                <div id="rebalanceResult" style="margin-top:8px; font-size:12px;"></div>
+                            </div>
                         </div>
 
                         <div class="card card-distribution" id="sectorCard" hidden>
@@ -2028,7 +2036,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="js/info-glossary.js?v=20260921dividendos"></script>
-    <script src="js/app.js?v=20260921livesum"></script>
+    <script src="js/app.js?v=20260921rebalcalc"></script>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260921fire"></script>
     <script src="js/news.js?v=20260921tally"></script>
