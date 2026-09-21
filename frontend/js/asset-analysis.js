@@ -7,6 +7,8 @@ const ASSET_API = window.API_BASE_URL || CONFIG?.API_BASE_URL || 'http://localho
 let assetChart = null;
 let currentAssetPeriod = '3mo';
 let currentAssetData = null;
+let currentAssetStats = null;   // last /asset/{ticker}/stats result (day range, benchmark ticker, etc.)
+let assetVsIndexMode = false;   // "vs Índice" toggle — % comparison overlay instead of the normal price chart
 
 // ASSET_DISPLAY_NAMES lives in app.js (loaded before this file) — single
 // source of truth shared by every page. Do not redeclare it here.
@@ -18,6 +20,7 @@ function initAssetAnalysis() {
     loadAssetSelector();
     setupPeriodButtons();
     setupChartTypeToggle();
+    setupAssetVsIndexToggle();
     loadAssetQuickCards();
     loadBenchmarkChart();
     loadRiskAndCorrelation();
@@ -108,8 +111,15 @@ async function loadAssetChart() {
         // Update UI
         updateAssetInfo(ticker, data);
         renderAssetChart(data);
+        currentAssetStats = null;
         if (typeof renderAssetStatsStrip === 'function') {
-            renderAssetStatsStrip(ticker, document.getElementById('assetStatsStrip'));
+            renderAssetStatsStrip(ticker, document.getElementById('assetStatsStrip')).then(s => {
+                currentAssetStats = s;
+                // The stats fetch (which carries the benchmark ticker) can resolve
+                // AFTER the chart already rendered — if "vs Índice" was already on,
+                // redraw now that we actually have a benchmark to compare against.
+                if (assetVsIndexMode && currentAssetData) renderAssetChart(currentAssetData);
+            });
         }
         
         // Show action buttons
@@ -204,6 +214,16 @@ function setupChartTypeToggle() {
     });
 }
 
+function setupAssetVsIndexToggle() {
+    const btn = document.getElementById('assetBenchmarkToggle');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        assetVsIndexMode = !assetVsIndexMode;
+        btn.classList.toggle('active', assetVsIndexMode);
+        if (currentAssetData) renderAssetChart(currentAssetData);
+    });
+}
+
 function renderTradingViewChart(data) {
     const tvContainer = document.getElementById('tvChartContainer');
     const canvas = document.getElementById('assetHistoryChart');
@@ -261,6 +281,18 @@ function renderTradingViewChart(data) {
         if (typeof attachCrosshairLegend === 'function') attachCrosshairLegend(chart, tvContainer, history, 'time');
         return;
     }
+
+    const legendEl = document.getElementById('assetBenchmarkLegend');
+    if (assetVsIndexMode && currentAssetStats && currentAssetStats.benchmark_ticker) {
+        // % comparison vs the engine's own benchmark for this asset (same one
+        // used for beta/alpha) — a different axis (% return, not price), so it
+        // fully replaces the candle/area/SMA/markers view instead of layering
+        // on top of it.
+        renderAssetVsIndexOverlay(chart, history, currentAssetStats.benchmark_ticker, currentAssetStats.benchmark_name, legendEl);
+        chart.timeScale().fitContent();
+        return;
+    }
+    if (legendEl) { legendEl.style.display = 'none'; legendEl.textContent = ''; }
 
     const hasOHLC = history.length > 0 && history[0].open !== undefined && history[0].high !== undefined;
 
@@ -331,6 +363,49 @@ function renderIntradaySeries(chart, history) {
     });
     series.setData(history.map(h => ({ time: h.time, value: h.close })));
     return series;
+}
+
+// "vs Índice": both series rebased to % change from their first COMMON date,
+// so they're comparable regardless of price/currency — fetches the
+// benchmark's own history for the SAME period rather than reusing the
+// asset's (different instruments, different available dates).
+async function renderAssetVsIndexOverlay(chart, history, benchTicker, benchName, legendEl) {
+    try {
+        const resp = await fetch(`${ASSET_API}/asset/${encodeURIComponent(benchTicker)}/history?period=${currentAssetPeriod}&asset_type=auto`, { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const benchData = await resp.json();
+        const benchHistory = benchData.history || [];
+        const benchByDate = {};
+        benchHistory.forEach(h => { benchByDate[h.date] = h.close ?? h.price; });
+
+        const commonDates = history.map(h => h.date).filter(d => benchByDate[d] != null);
+        if (commonDates.length < 2) {
+            if (legendEl) { legendEl.style.display = 'block'; legendEl.textContent = `No hay suficientes fechas en común con ${benchName} para comparar en este rango.`; }
+            return;
+        }
+        const firstDate = commonDates[0];
+        const assetBase = (history.find(h => h.date === firstDate) || {}).close ?? (history.find(h => h.date === firstDate) || {}).price;
+        const benchBase = benchByDate[firstDate];
+        if (!assetBase || !benchBase) return;
+
+        const assetPct = history.filter(h => h.date >= firstDate).map(h => ({
+            time: h.date, value: ((h.close ?? h.price) / assetBase - 1) * 100,
+        }));
+        const benchPct = commonDates.map(d => ({ time: d, value: (benchByDate[d] / benchBase - 1) * 100 }));
+
+        const assetSeries = chart.addLineSeries({ color: '#2C4A6E', lineWidth: 2, priceFormat: { type: 'percent' } });
+        assetSeries.setData(assetPct);
+        const benchSeries = chart.addLineSeries({ color: '#C99A3E', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, priceFormat: { type: 'percent' } });
+        benchSeries.setData(benchPct);
+
+        if (legendEl) {
+            legendEl.style.display = 'block';
+            legendEl.innerHTML = `<span style="color:#2C4A6E;">■</span> este activo · <span style="color:#C99A3E;">■ (discontinua)</span> ${benchName} — % desde ${firstDate}`;
+        }
+    } catch (err) {
+        console.error('asset vs index overlay failed:', err);
+        if (legendEl) { legendEl.style.display = 'block'; legendEl.textContent = `No se pudo cargar la comparación con ${benchName}.`; }
+    }
 }
 
 function renderAssetChart(data) {

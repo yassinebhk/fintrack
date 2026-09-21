@@ -126,4 +126,15 @@ async def get_asset_stats(
             out["insider_mspr"] = insider.get("mspr")
             out["insider_month"] = insider.get("month")
 
+    # Same benchmark the engine itself uses for beta/alpha (asset_analysis.py),
+    # so "vs índice" on the chart matches what the deep-analysis modal compares
+    # against — not a second, inconsistent notion of "the market".
+    from app.services.asset_analysis import _benchmark_for
+    bfor_ticker = f"{ticker.upper()}-USD" if asset_type == "crypto" else ticker
+    bench_category = "cripto" if asset_type == "crypto" else ""
+    bench_ticker, bench_name = _benchmark_for(bfor_ticker, category=bench_category)
+    if bench_ticker.upper() != ticker.upper():
+        out["benchmark_ticker"] = bench_ticker
+        out["benchmark_name"] = bench_name
+
     return out

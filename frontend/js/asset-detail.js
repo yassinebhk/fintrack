@@ -293,8 +293,10 @@ async function renderAssetStatsStrip(ticker, containerEl) {
             ${chipsHtml ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${chipsHtml}</div>` : ''}
             ${catalystBits.length ? `<div style="font-size:11.5px; margin-top:6px; color:var(--text-secondary);">📅 Próximos catalizadores: ${catalystBits.join(' · ')}</div>` : ''}
         `;
+        return s;
     } catch (err) {
         console.error('asset stats strip failed:', err);
+        return null;
     }
 }
 
