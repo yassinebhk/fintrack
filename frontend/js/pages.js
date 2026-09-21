@@ -8,12 +8,13 @@
  */
 async function loadLearnPage(targetPage) {
     if (targetPage.dataset.loaded === 'true') return;
-    
+
     try {
-        const response = await fetch('pages/learn.html?v=20260921graficos', { cache: 'no-store' });
+        const response = await fetch('pages/learn.html?v=20260921graficos2', { cache: 'no-store' });
         if (response.ok) {
             targetPage.innerHTML = await response.text();
             targetPage.dataset.loaded = 'true';
+            if (window.lzSim) { try { window.lzSim(); } catch (e) { /* noop */ } }  // init interactive compound-interest simulator
         } else {
             targetPage.innerHTML = pageContent.learn;
         }
@@ -22,6 +23,29 @@ async function loadLearnPage(targetPage) {
         targetPage.innerHTML = pageContent.learn;
     }
 }
+
+// Interactive compound-interest simulator on the Learn page. Defined globally so
+// the sliders' inline oninput can call it (scripts inside the fetched learn.html
+// don't execute; inline handlers on innerHTML-injected elements do).
+window.lzSim = function () {
+    const el = (id) => document.getElementById(id);
+    const amount = el('lzSimAmount'), years = el('lzSimYears'), rate = el('lzSimRate');
+    if (!amount || !years || !rate) return;
+    const A = +amount.value, Y = +years.value, R = +rate.value;
+    if (el('lzSimA')) el('lzSimA').textContent = A;
+    if (el('lzSimY')) el('lzSimY').textContent = Y;
+    if (el('lzSimR')) el('lzSimR').textContent = R.toString().replace('.', ',');
+    const n = Y * 12, r = R / 100 / 12;
+    const fv = r > 0 ? A * ((Math.pow(1 + r, n) - 1) / r) : A * n;
+    const paid = A * n, interest = Math.max(fv - paid, 0);
+    const eur = (x) => Math.round(x).toLocaleString('es-ES') + '€';
+    if (el('lzSimTotal')) el('lzSimTotal').textContent = eur(fv);
+    if (el('lzSimPaid')) el('lzSimPaid').textContent = eur(paid);
+    if (el('lzSimInt')) el('lzSimInt').textContent = eur(interest);
+    const pPaid = fv > 0 ? (paid / fv * 100) : 50;
+    if (el('lzSimBarPaid')) el('lzSimBarPaid').style.width = pPaid + '%';
+    if (el('lzSimBarInt')) el('lzSimBarInt').style.width = (100 - pPaid) + '%';
+};
 
 /**
  * Fetch the real, current scorecard + systematic-engine status and fill in

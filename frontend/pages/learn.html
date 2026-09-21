@@ -7,6 +7,14 @@
     .lz-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin-top:8px;color:var(--text-secondary,#6b6456);}
     .lz-legend span{display:inline-flex;align-items:center;gap:6px;}
     .lz-dot{width:11px;height:11px;border-radius:3px;display:inline-block;flex:0 0 auto;}
+    .lz-meter{display:inline-block;width:66px;height:9px;border-radius:5px;background:rgba(43,40,34,.10);vertical-align:middle;position:relative;overflow:hidden;}
+    .lz-meter::before{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--v,50%);background:var(--c,#2C4A6E);}
+    .lz-sim-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px;margin:8px 0;}
+    .lz-sim-row input[type=range]{flex:1;min-width:150px;accent-color:#2C4A6E;}
+    .lz-sim-out{background:rgba(43,40,34,.04);border-radius:10px;padding:12px 14px;margin-top:10px;}
+    .lz-sim-out .lz-total{font-size:24px;font-weight:800;color:#2C4A6E;}
+    .lz-simbar{display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;background:rgba(43,40,34,.06);}
+    .lz-simbar-paid{background:#2C4A6E;} .lz-simbar-int{background:#16a34a;}
     </style>
     <h1>📚 Guía Completa de Inversión</h1>
     <p class="intro-text">Esta guía está diseñada para que <strong>cualquier persona</strong>, sin importar su nivel de conocimiento, pueda entender cómo funcionan las inversiones. Desde lo más básico hasta estrategias avanzadas.</p>
@@ -449,6 +457,60 @@
             <figcaption class="lz-cap">No existe “mucha rentabilidad con poco riesgo” (si alguien te lo ofrece, huye 🚩). Cada activo vive en algún punto de esta línea: cuanto más arriba-derecha, más puede crecer… y más puede caer por el camino. <strong>Tu trabajo no es evitar el riesgo, sino elegir cuánto puedes soportar</strong> según tu horizonte y tus nervios.</figcaption>
         </figure>
 
+        <figure class="lz-fig">
+            <h4>🔎 Comparativa rápida (de un vistazo)</h4>
+            <table class="data-table" style="margin:0;">
+                <thead>
+                    <tr>
+                        <th>Activo</th>
+                        <th>Riesgo</th>
+                        <th>Rentab. potencial</th>
+                        <th>Liquidez</th>
+                        <th>¿Para empezar?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Acción individual</strong></td>
+                        <td><span class="lz-meter" style="--v:82%;--c:#dc2626"></span></td>
+                        <td><span class="lz-meter" style="--v:80%;--c:#16a34a"></span></td>
+                        <td><span class="lz-meter" style="--v:95%;--c:#2C4A6E"></span></td>
+                        <td>⚠️ Con cuidado</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ETF</strong> (fondo cotizado)</td>
+                        <td><span class="lz-meter" style="--v:55%;--c:#dc2626"></span></td>
+                        <td><span class="lz-meter" style="--v:72%;--c:#16a34a"></span></td>
+                        <td><span class="lz-meter" style="--v:92%;--c:#2C4A6E"></span></td>
+                        <td>✅ Ideal</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Fondo indexado</strong></td>
+                        <td><span class="lz-meter" style="--v:50%;--c:#dc2626"></span></td>
+                        <td><span class="lz-meter" style="--v:72%;--c:#16a34a"></span></td>
+                        <td><span class="lz-meter" style="--v:60%;--c:#2C4A6E"></span></td>
+                        <td>✅ Ideal</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Bono</strong></td>
+                        <td><span class="lz-meter" style="--v:25%;--c:#dc2626"></span></td>
+                        <td><span class="lz-meter" style="--v:32%;--c:#16a34a"></span></td>
+                        <td><span class="lz-meter" style="--v:55%;--c:#2C4A6E"></span></td>
+                        <td>👍 Sí (estabilidad)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cripto</strong></td>
+                        <td><span class="lz-meter" style="--v:100%;--c:#dc2626"></span></td>
+                        <td><span class="lz-meter" style="--v:88%;--c:#16a34a"></span></td>
+                        <td><span class="lz-meter" style="--v:88%;--c:#2C4A6E"></span></td>
+                        <td>⚠️ Solo una pizca</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="lz-legend"><span><i class="lz-dot" style="background:#dc2626"></i> Riesgo</span><span><i class="lz-dot" style="background:#16a34a"></i> Rentabilidad potencial</span><span><i class="lz-dot" style="background:#2C4A6E"></i> Liquidez (facilidad de vender)</span></div>
+            <figcaption class="lz-cap">Cuanto más llena la barra, más alto ese rasgo. Para empezar de cero, un <strong>ETF o fondo indexado global</strong> es lo más sensato: diversificas en cientos de empresas de golpe, con poco riesgo específico y sin tener que elegir acciones una a una.</figcaption>
+        </figure>
+
         <h3>📈 Acciones (Stocks)</h3>
         <p>Cuando compras una acción, compras un <strong>trozo de una empresa</strong>. Si Apple vale 3 billones y tiene 16.000 millones de acciones, cada acción vale 187€.</p>
         
@@ -561,6 +623,36 @@
     <!-- SECCIÓN 4 -->
     <section id="mercados">
         <h2>4. Mercados y Horarios</h2>
+
+        <figure class="lz-fig">
+            <h4>🕐 ¿Cuándo está abierto cada mercado? (hora española, CET)</h4>
+            <svg class="lz-svg" viewBox="0 0 480 215" role="img" aria-label="Horario de apertura de las bolsas de Asia, Europa y EEUU y la cripto en hora española">
+                <!-- rejilla horas -->
+                <g font-size="9.5" fill="#8a8275" text-anchor="middle">
+                    <line x1="55" y1="30" x2="55" y2="180" stroke="#eae6dd"/><text x="55" y="196">0h</text>
+                    <line x1="155" y1="30" x2="155" y2="180" stroke="#eae6dd"/><text x="155" y="196">6h</text>
+                    <line x1="255" y1="30" x2="255" y2="180" stroke="#eae6dd"/><text x="255" y="196">12h</text>
+                    <line x1="355" y1="30" x2="355" y2="180" stroke="#eae6dd"/><text x="355" y="196">18h</text>
+                    <line x1="455" y1="30" x2="455" y2="180" stroke="#eae6dd"/><text x="455" y="196">24h</text>
+                </g>
+                <!-- filas: x = 55 + hora*16.667 -->
+                <g font-size="11" fill="#2b2822">
+                    <text x="50" y="52" text-anchor="end">🌏 Asia</text>
+                    <rect x="71.7" y="42" width="100" height="16" rx="4" fill="#d97706"/>
+                    <text x="50" y="87" text-anchor="end">🇪🇺 Europa</text>
+                    <rect x="205" y="77" width="141.7" height="16" rx="4" fill="#2C4A6E"/>
+                    <text x="50" y="122" text-anchor="end">🇺🇸 EEUU</text>
+                    <rect x="313.3" y="112" width="108.3" height="16" rx="4" fill="#6d28d9"/>
+                    <text x="50" y="157" text-anchor="end">🪙 Cripto</text>
+                    <rect x="55" y="147" width="400" height="16" rx="4" fill="#16a34a"/>
+                </g>
+                <text x="121" y="54" font-size="9" fill="#fff" text-anchor="middle">1–7h</text>
+                <text x="275" y="89" font-size="9" fill="#fff" text-anchor="middle">9:00–17:30</text>
+                <text x="367" y="124" font-size="9" fill="#fff" text-anchor="middle">15:30–22:00</text>
+                <text x="255" y="159" font-size="9" fill="#fff" text-anchor="middle">24 horas, todos los días</text>
+            </svg>
+            <figcaption class="lz-cap">Las <strong>bolsas</strong> solo operan en su horario (y de lunes a viernes): una acción europea se mueve por la mañana-tarde, una de EEUU por la tarde-noche española. La <strong>cripto</strong> no cierra nunca. Para invertir a largo plazo da igual la hora exacta; esto importa sobre todo si haces operativa de corto plazo.</figcaption>
+        </figure>
 
         <h3>Principales bolsas del mundo</h3>
         <table class="data-table">
@@ -678,6 +770,35 @@
     <section id="dividendos">
         <h2>6. Dividendos: Cómo Funcionan y Cómo se Cobran</h2>
         <p>Un <strong>dividendo</strong> es la parte del beneficio que una empresa reparte a sus accionistas, en vez de reinvertirlo todo en el negocio. No todas las empresas lo hacen — muchas de crecimiento (Amazon durante años, por ejemplo) reinvierten el 100% del beneficio y no reparten nada.</p>
+
+        <figure class="lz-fig">
+            <h4>💶 El viaje de un dividendo hasta tu bolsillo</h4>
+            <svg class="lz-svg" viewBox="0 0 400 300" role="img" aria-label="Flujo de un dividendo desde el beneficio de la empresa hasta tu cuenta" style="max-width:340px;margin:0 auto;">
+                <g font-size="12.5" fill="#2b2822" text-anchor="middle">
+                    <rect x="40" y="8"  width="320" height="46" rx="9" fill="#2C4A6E22" stroke="#2C4A6E"/>
+                    <text x="200" y="30" font-weight="700">🏭 La empresa gana beneficios</text>
+                    <text x="200" y="46" font-size="10.5" fill="#8a8275">(vende sus productos/servicios)</text>
+
+                    <rect x="40" y="86" width="320" height="46" rx="9" fill="#2C4A6E22" stroke="#2C4A6E"/>
+                    <text x="200" y="108" font-weight="700">✂️ Reparte una parte a los dueños</text>
+                    <text x="200" y="124" font-size="10.5" fill="#8a8275">(los accionistas — tú, si tienes la acción)</text>
+
+                    <rect x="40" y="164" width="320" height="46" rx="9" fill="#16a34a22" stroke="#16a34a"/>
+                    <text x="200" y="186" font-weight="700">💶 Llega a tu cuenta en efectivo</text>
+                    <text x="200" y="202" font-size="10.5" fill="#8a8275">(normalmente cada 3 meses)</text>
+
+                    <rect x="40" y="242" width="320" height="50" rx="9" fill="#d9770622" stroke="#d97706"/>
+                    <text x="200" y="264" font-weight="700">🔁 Tú decides qué hacer con él</text>
+                    <text x="200" y="281" font-size="10.5" fill="#8a8275">gastarlo · o reinvertirlo (DRIP) = bola de nieve</text>
+                </g>
+                <g stroke="#b9b2a3" stroke-width="2" fill="#b9b2a3">
+                    <line x1="200" y1="54" x2="200" y2="84"/><polygon points="195,80 205,80 200,88"/>
+                    <line x1="200" y1="132" x2="200" y2="162"/><polygon points="195,158 205,158 200,166"/>
+                    <line x1="200" y1="210" x2="200" y2="240"/><polygon points="195,236 205,236 200,244"/>
+                </g>
+            </svg>
+            <figcaption class="lz-cap">No tienes que hacer nada para cobrarlo: si tienes la acción antes de la <strong>fecha ex-dividendo</strong>, el dinero aparece en tu cuenta del bróker automáticamente. Reinvertirlo (DRIP) es lo que dispara el interés compuesto que viste en la sección 2.</figcaption>
+        </figure>
 
         <h3>Dividend Yield (rentabilidad por dividendo)</h3>
         <p>Es el dato que más se cita, y mide cuánto cobras en dividendos al año en relación con el precio de la acción.</p>
@@ -924,6 +1045,23 @@
         <h3>🔄 DCA (Dollar Cost Averaging)</h3>
         <p><strong>La estrategia más recomendada para principiantes.</strong> Consiste en invertir la misma cantidad cada mes, sin importar el precio.</p>
 
+        <figure class="lz-fig">
+            <h4>🟢 Con 100€/mes, compras MÁS cuando está barato (sin pensarlo)</h4>
+            <svg class="lz-svg" viewBox="0 0 470 245" role="img" aria-label="Precio de un ETF cayendo y recuperándose, con compras mensuales mayores cuando el precio es bajo">
+                <line x1="50" y1="205" x2="455" y2="205" stroke="#c9c2b4" stroke-width="1"/>
+                <polyline points="70,83 138,132 206,181 274,144 342,96 410,59" fill="none" stroke="#2C4A6E" stroke-width="2"/>
+                <!-- círculos verdes: tamaño = nº de acciones que compras ese mes con 100€ -->
+                <circle cx="70"  cy="83"  r="5"   fill="#16a34a"/><text x="70"  y="72"  text-anchor="middle" font-size="9.5" fill="#8a8275">1,0</text>
+                <circle cx="138" cy="132" r="6.3" fill="#16a34a"/><text x="138" y="119" text-anchor="middle" font-size="9.5" fill="#8a8275">1,25</text>
+                <circle cx="206" cy="181" r="8.3" fill="#16a34a"/><text x="206" y="199" text-anchor="middle" font-size="10" font-weight="700" fill="#16a34a">1,67 ⬅ más</text>
+                <circle cx="274" cy="144" r="6.7" fill="#16a34a"/><text x="274" y="131" text-anchor="middle" font-size="9.5" fill="#8a8275">1,33</text>
+                <circle cx="342" cy="96"  r="5.3" fill="#16a34a"/><text x="342" y="85"  text-anchor="middle" font-size="9.5" fill="#8a8275">1,05</text>
+                <circle cx="410" cy="59"  r="4.6" fill="#16a34a"/><text x="410" y="48"  text-anchor="middle" font-size="9.5" fill="#8a8275">0,91</text>
+                <text x="252" y="228" text-anchor="middle" font-size="10.5" fill="#8a8275">Mes 1 → Mes 6  (la línea azul es el precio; los círculos, acciones compradas con tus 100€)</text>
+            </svg>
+            <figcaption class="lz-cap">Aportas <strong>lo mismo cada mes</strong> pase lo que pase. Cuando el precio cae, esos 100€ compran <strong>más</strong> acciones (círculo grande); cuando sube, compran menos. Sin adivinar nada, acabas comprando barato de forma automática y tu <strong>precio medio baja</strong>. Además te quita la ansiedad de “¿es buen momento?”.</figcaption>
+        </figure>
+
         <div class="example-box">
             <h4>Ejemplo: DCA vs Todo de golpe</h4>
             <p>Tienes 6.000€ para invertir. Precio del ETF varía mes a mes:</p>
@@ -1028,6 +1166,23 @@
     <section id="ejemplos">
         <h2>9. Ejemplos Reales con Números</h2>
 
+        <figure class="lz-fig" id="lzSimBox">
+            <h4>🧮 Pruébalo tú: ¿cuánto tendrías?</h4>
+            <div class="lz-sim-row">Aporto <b id="lzSimA">200</b> €/mes
+                <input type="range" id="lzSimAmount" min="10" max="1000" step="10" value="200" oninput="lzSim()" aria-label="Aportación mensual"></div>
+            <div class="lz-sim-row">durante <b id="lzSimY">30</b> años
+                <input type="range" id="lzSimYears" min="1" max="45" step="1" value="30" oninput="lzSim()" aria-label="Años invirtiendo"></div>
+            <div class="lz-sim-row">a un <b id="lzSimR">7</b> % anual de media
+                <input type="range" id="lzSimRate" min="1" max="12" step="0.5" value="7" oninput="lzSim()" aria-label="Rentabilidad anual"></div>
+            <div class="lz-sim-out">
+                <div>Tendrías: <span class="lz-total" id="lzSimTotal">—</span></div>
+                <div class="lz-cap" style="margin-top:6px;">De eso, aportado por ti: <strong id="lzSimPaid">—</strong> · generado por los intereses: <strong id="lzSimInt" style="color:#16a34a;">—</strong></div>
+                <div class="lz-simbar"><div class="lz-simbar-paid" id="lzSimBarPaid" style="width:50%"></div><div class="lz-simbar-int" id="lzSimBarInt" style="width:50%"></div></div>
+                <div class="lz-legend"><span><i class="lz-dot" style="background:#2C4A6E"></i> Lo que pones tú</span><span><i class="lz-dot" style="background:#16a34a"></i> Lo que generan los intereses</span></div>
+            </div>
+            <figcaption class="lz-cap">Mueve los deslizadores. Verás que, cuantos más <strong>años</strong>, más gorda se pone la parte verde (los intereses) frente a lo que tú aportas — el interés compuesto en acción. Es una estimación; la rentabilidad real varía cada año.</figcaption>
+        </figure>
+
         <h3>Ejemplo 1: El universitario precavido</h3>
         <div class="case-study">
             <p><strong>Perfil:</strong> Sara, 22 años, acaba de empezar a trabajar. Sueldo 1.500€/mes.</p>
@@ -1078,6 +1233,30 @@
     <!-- SECCIÓN 10 -->
     <section id="errores">
         <h2>10. Errores Comunes a Evitar</h2>
+
+        <figure class="lz-fig">
+            <h4>😱 El error más caro: vender en el fondo (crisis 2008)</h4>
+            <svg class="lz-svg" viewBox="0 0 470 250" role="img" aria-label="Dos inversores en 2008: quien aguantó recuperó y multiplicó; quien vendió en el fondo se quedó con la pérdida">
+                <line x1="50" y1="210" x2="455" y2="210" stroke="#c9c2b4" stroke-width="1"/>
+                <text x="47" y="214" text-anchor="end" font-size="9.5" fill="#8a8275">0€</text>
+                <text x="47" y="175" text-anchor="end" font-size="9.5" fill="#8a8275">10k</text>
+                <text x="47" y="40"  text-anchor="end" font-size="9.5" fill="#8a8275">45k</text>
+                <!-- ambos: 2007 10k -> 2009 4.7k -->
+                <polyline points="55,172 130,192" fill="none" stroke="#8a8275" stroke-width="2.5"/>
+                <!-- aguantó (verde): recupera y sube a 45k -->
+                <polyline points="130,192 230,150 440,37" fill="none" stroke="#16a34a" stroke-width="3"/>
+                <!-- vendió (rojo): se queda plano en 4.7k -->
+                <polyline points="130,192 440,196" fill="none" stroke="#dc2626" stroke-width="3" stroke-dasharray="6 4"/>
+                <circle cx="130" cy="192" r="4.5" fill="#2b2822"/>
+                <text x="130" y="207" text-anchor="middle" font-size="9.5" fill="#dc2626" font-weight="700">2009: −53% 😱</text>
+                <circle cx="440" cy="37" r="4.5" fill="#16a34a"/>
+                <text x="435" y="30" text-anchor="end" font-size="11" font-weight="700" fill="#16a34a">Aguantó: ~45.000€</text>
+                <circle cx="440" cy="196" r="4.5" fill="#dc2626"/>
+                <text x="435" y="211" text-anchor="end" font-size="11" font-weight="700" fill="#dc2626">Vendió: se quedó en ~4.700€</text>
+                <text x="250" y="234" text-anchor="middle" font-size="10" fill="#8a8275">2007 ————————————————→ 2024</text>
+            </svg>
+            <figcaption class="lz-cap">Los dos invirtieron 10.000€ justo antes del crash y los dos vieron −53%. La diferencia: uno <strong>vendió presa del pánico</strong> en 2009 y convirtió la caída (que era solo “sobre el papel”) en una <strong>pérdida real</strong>; el otro <strong>no tocó nada</strong>, se recuperó en unos años y multiplicó ×4,5. Una caída no es una pérdida hasta que vendes. <strong>El mayor enemigo del inversor no es el mercado: son sus propios nervios.</strong></figcaption>
+        </figure>
 
         <div class="error-list">
             <div class="error-item">
