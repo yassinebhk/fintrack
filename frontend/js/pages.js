@@ -10,7 +10,7 @@ async function loadLearnPage(targetPage) {
     if (targetPage.dataset.loaded === 'true') return;
 
     try {
-        const response = await fetch('pages/learn.html?v=20260921graficos2', { cache: 'no-store' });
+        const response = await fetch('pages/learn.html?v=20260921graficos3', { cache: 'no-store' });
         if (response.ok) {
             targetPage.innerHTML = await response.text();
             targetPage.dataset.loaded = 'true';
@@ -45,6 +45,36 @@ window.lzSim = function () {
     const pPaid = fv > 0 ? (paid / fv * 100) : 50;
     if (el('lzSimBarPaid')) el('lzSimBarPaid').style.width = pPaid + '%';
     if (el('lzSimBarInt')) el('lzSimBarInt').style.width = (100 - pPaid) + '%';
+};
+
+// Self-assessment quiz on the Learn page. Global so the options' inline onclick
+// can call it (same reason as lzSim). Marks the choice, reveals the explanation,
+// and shows a score once every question is answered.
+window.lzQuizAnswer = function (btn, correct) {
+    const q = btn.closest('[data-lz-q]');
+    if (!q || q.dataset.answered) return;
+    q.dataset.answered = correct ? 'ok' : 'bad';
+    q.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    btn.classList.add(correct ? 'lz-q-ok' : 'lz-q-bad');
+    if (!correct) {
+        const ok = q.querySelector('button[data-correct="1"]');
+        if (ok) ok.classList.add('lz-q-ok');
+    }
+    const exp = q.querySelector('.lz-q-exp');
+    if (exp) exp.style.display = 'block';
+    const all = document.querySelectorAll('.lz-q');
+    const answered = document.querySelectorAll('.lz-q[data-answered]');
+    if (all.length && answered.length === all.length) {
+        const hits = document.querySelectorAll('.lz-q[data-answered="ok"]').length;
+        const box = document.getElementById('lzQuizScore');
+        if (box) {
+            const tail = hits === all.length ? '¡Perfecto! Tienes las bases claras. 🎉'
+                : hits >= all.length - 2 ? 'Muy bien — repasa las que fallaste y lo tienes. 👏'
+                : 'Buen intento — vuelve a leer las secciones de arriba y repite; se aprende rápido. 💪';
+            box.innerHTML = `Has acertado <strong>${hits} de ${all.length}</strong>. ${tail}`;
+            box.style.display = '';
+        }
+    }
 };
 
 /**

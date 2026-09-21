@@ -15,6 +15,20 @@
     .lz-sim-out .lz-total{font-size:24px;font-weight:800;color:#2C4A6E;}
     .lz-simbar{display:flex;height:16px;border-radius:6px;overflow:hidden;margin-top:8px;background:rgba(43,40,34,.06);}
     .lz-simbar-paid{background:#2C4A6E;} .lz-simbar-int{background:#16a34a;}
+    .lz-gloss{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px;margin:14px 0;}
+    .lz-term{background:rgba(43,40,34,.03);border:1px solid rgba(43,40,34,.08);border-radius:9px;padding:10px 12px;}
+    .lz-term b{display:block;color:#2C4A6E;font-size:13.5px;margin-bottom:3px;}
+    .lz-term span{font-size:12.5px;color:var(--text-secondary,#6b6456);line-height:1.45;}
+    .lz-quiz{display:flex;flex-direction:column;gap:14px;}
+    .lz-q{background:rgba(43,40,34,.03);border:1px solid rgba(43,40,34,.10);border-radius:10px;padding:14px 16px;}
+    .lz-q-ask{font-weight:700;margin-bottom:10px;}
+    .lz-q-opts{display:flex;flex-direction:column;gap:8px;}
+    .lz-q button{text-align:left;padding:9px 12px;border-radius:8px;border:1px solid rgba(43,40,34,.15);background:#fff;cursor:pointer;font-size:14px;color:#2b2822;}
+    .lz-q button:hover:not(:disabled){background:rgba(44,74,110,.06);}
+    .lz-q button:disabled{cursor:default;}
+    .lz-q button.lz-q-ok{background:#16a34a22;border-color:#16a34a;color:#166534;font-weight:600;}
+    .lz-q button.lz-q-bad{background:#dc262622;border-color:#dc2626;color:#991b1b;}
+    .lz-q-exp{display:none;margin-top:10px;font-size:13px;color:var(--text-secondary,#6b6456);background:rgba(44,74,110,.06);border-left:3px solid #2C4A6E;padding:8px 12px;border-radius:0 8px 8px 0;}
     </style>
     <h1>📚 Guía Completa de Inversión</h1>
     <p class="intro-text">Esta guía está diseñada para que <strong>cualquier persona</strong>, sin importar su nivel de conocimiento, pueda entender cómo funcionan las inversiones. Desde lo más básico hasta estrategias avanzadas.</p>
@@ -118,6 +132,18 @@
                 <span class="toc-title">Macroeconomía y Noticias</span>
                 <span class="toc-desc">Índices bursátiles, tipos de interés, inflación, PIB, VIX y rating crediticio.</span>
                 <span class="toc-badge nivel-intermedio">Intermedio</span>
+            </a>
+            <a href="#glosario" class="toc-card">
+                <span class="toc-icon">📖</span>
+                <span class="toc-title">Glosario Rápido</span>
+                <span class="toc-desc">Todos los términos que oirás, explicados en una frase.</span>
+                <span class="toc-badge nivel-basico">Básico</span>
+            </a>
+            <a href="#quiz" class="toc-card">
+                <span class="toc-icon">✅</span>
+                <span class="toc-title">Pon a Prueba lo Aprendido</span>
+                <span class="toc-desc">6 preguntas rápidas con respuesta explicada al instante.</span>
+                <span class="toc-badge nivel-basico">Básico</span>
             </a>
             <a href="#recursos" class="toc-card">
                 <span class="toc-icon">📚</span>
@@ -1614,6 +1640,102 @@
     </section>
 
     <!-- SECCIÓN RECURSOS -->
+    <section id="glosario">
+        <h2>📖 Glosario Rápido</h2>
+        <p>Todos los palabros que oirás por ahí, cada uno explicado en una sola frase. Vuelve aquí siempre que te encuentres un término que no reconozcas.</p>
+        <div class="lz-gloss">
+            <div class="lz-term"><b>Acción</b><span>Un trozo de la propiedad de una empresa.</span></div>
+            <div class="lz-term"><b>ETF</b><span>Una cesta de muchas acciones que cotiza como si fuera una sola: diversificas de golpe.</span></div>
+            <div class="lz-term"><b>Fondo indexado</b><span>Fondo que copia un índice (p. ej. el S&amp;P 500). Barato y “automático”.</span></div>
+            <div class="lz-term"><b>Índice</b><span>El “termómetro” de un grupo de empresas: S&amp;P 500, IBEX 35, Nasdaq…</span></div>
+            <div class="lz-term"><b>Bono</b><span>Un préstamo que le haces a un Estado o empresa a cambio de intereses.</span></div>
+            <div class="lz-term"><b>Cupón</b><span>El interés que te paga un bono.</span></div>
+            <div class="lz-term"><b>Dividendo</b><span>La parte del beneficio que una empresa reparte a sus accionistas.</span></div>
+            <div class="lz-term"><b>Yield</b><span>Rentabilidad por dividendo: dividendo anual ÷ precio, en %.</span></div>
+            <div class="lz-term"><b>Cartera (portfolio)</b><span>El conjunto de todo lo que tienes invertido.</span></div>
+            <div class="lz-term"><b>Diversificar</b><span>Repartir el dinero para que un solo activo no te hunda.</span></div>
+            <div class="lz-term"><b>Volatilidad</b><span>Cómo de bruscos son los sube-y-baja del precio.</span></div>
+            <div class="lz-term"><b>Drawdown</b><span>La caída desde un máximo hasta el siguiente mínimo.</span></div>
+            <div class="lz-term"><b>Interés compuesto</b><span>Cuando los intereses generan, a su vez, más intereses.</span></div>
+            <div class="lz-term"><b>Inflación</b><span>La subida general de precios; hace que tu dinero valga menos cada año.</span></div>
+            <div class="lz-term"><b>Liquidez</b><span>Lo fácil y rápido que es convertir algo en dinero.</span></div>
+            <div class="lz-term"><b>Bróker</b><span>La app/empresa por la que compras y vendes (Trade Republic, Kraken…).</span></div>
+            <div class="lz-term"><b>ISIN</b><span>El “DNI” internacional de un activo (12 caracteres).</span></div>
+            <div class="lz-term"><b>DCA</b><span>Invertir la misma cantidad cada mes, pase lo que pase con el precio.</span></div>
+            <div class="lz-term"><b>Largo plazo</b><span>Invertir pensando en años o décadas (lo sensato para empezar).</span></div>
+            <div class="lz-term"><b>Corto plazo (trading)</b><span>Comprar y vender en días/semanas. Mucho más arriesgado.</span></div>
+            <div class="lz-term"><b>Stop-loss</b><span>Orden que vende sola si algo cae hasta X, para limitar la pérdida.</span></div>
+            <div class="lz-term"><b>PER</b><span>Precio ÷ beneficio por acción: cuánto pagas por cada € que gana la empresa.</span></div>
+            <div class="lz-term"><b>Capitalización</b><span>Valor total de una empresa en bolsa (precio × nº de acciones).</span></div>
+            <div class="lz-term"><b>Comisión</b><span>Lo que te cobra el bróker o el fondo; erosiona tu rentabilidad.</span></div>
+            <div class="lz-term"><b>CAGR</b><span>La rentabilidad media anual “suavizada”.</span></div>
+            <div class="lz-term"><b>Apalancamiento</b><span>Invertir con dinero prestado: multiplica ganancias Y pérdidas.</span></div>
+            <div class="lz-term"><b>Sharpe</b><span>Rentabilidad ajustada por riesgo: cuanto más alto, mejor.</span></div>
+        </div>
+    </section>
+
+    <section id="quiz">
+        <h2>✅ Pon a Prueba lo Aprendido</h2>
+        <p>6 preguntas rápidas. Pulsa una respuesta y te digo al instante si es correcta y por qué. No se guarda nada — es solo para ti.</p>
+        <div class="lz-quiz">
+            <div class="lz-q" data-lz-q>
+                <div class="lz-q-ask">1. La bolsa cae un 30% y tú no vendes. ¿Has perdido dinero?</div>
+                <div class="lz-q-opts">
+                    <button onclick="lzQuizAnswer(this,true)" data-correct="1">No: es una pérdida “sobre el papel” hasta que vendes.</button>
+                    <button onclick="lzQuizAnswer(this,false)">Sí, has perdido ese 30% para siempre.</button>
+                    <button onclick="lzQuizAnswer(this,false)">Depende del bróker que uses.</button>
+                </div>
+                <div class="lz-q-exp">💡 Una caída no se convierte en pérdida real hasta que vendes. Históricamente el mercado se recupera si le das tiempo — el error caro es vender en pánico en el fondo.</div>
+            </div>
+            <div class="lz-q" data-lz-q>
+                <div class="lz-q-ask">2. Empiezas de cero. ¿Qué es lo más sensato?</div>
+                <div class="lz-q-opts">
+                    <button onclick="lzQuizAnswer(this,true)" data-correct="1">Un ETF o fondo indexado global, bien diversificado.</button>
+                    <button onclick="lzQuizAnswer(this,false)">Meter todo en una sola acción que está de moda.</button>
+                    <button onclick="lzQuizAnswer(this,false)">Cripto con apalancamiento para ganar rápido.</button>
+                </div>
+                <div class="lz-q-exp">💡 Con un índice global diversificas en cientos de empresas de golpe, con poco riesgo específico y sin tener que acertar una acción concreta.</div>
+            </div>
+            <div class="lz-q" data-lz-q>
+                <div class="lz-q-ask">3. El interés compuesto funciona mejor cuando…</div>
+                <div class="lz-q-opts">
+                    <button onclick="lzQuizAnswer(this,true)" data-correct="1">Le das mucho TIEMPO.</button>
+                    <button onclick="lzQuizAnswer(this,false)">Inviertes de golpe y lo sacas al año.</button>
+                    <button onclick="lzQuizAnswer(this,false)">El mercado no baja nunca.</button>
+                </div>
+                <div class="lz-q-exp">💡 Los intereses generan intereses; cuantos más años, más se acelera la bola de nieve. Empezar pronto pesa más que empezar con mucho.</div>
+            </div>
+            <div class="lz-q" data-lz-q>
+                <div class="lz-q-ask">4. Con DCA (aportar lo mismo cada mes), cuando el precio baja…</div>
+                <div class="lz-q-opts">
+                    <button onclick="lzQuizAnswer(this,true)" data-correct="1">Compras MÁS participaciones con el mismo dinero.</button>
+                    <button onclick="lzQuizAnswer(this,false)">Compras menos y pierdes seguro.</button>
+                    <button onclick="lzQuizAnswer(this,false)">Dejas de comprar hasta que suba.</button>
+                </div>
+                <div class="lz-q-exp">💡 A menor precio, tus 100€ compran más participaciones. Así tu precio medio baja sin tener que adivinar el mejor momento.</div>
+            </div>
+            <div class="lz-q" data-lz-q>
+                <div class="lz-q-ask">5. ¿Qué significa “diversificar”?</div>
+                <div class="lz-q-opts">
+                    <button onclick="lzQuizAnswer(this,true)" data-correct="1">Repartir entre activos que no suben y bajan a la vez.</button>
+                    <button onclick="lzQuizAnswer(this,false)">Comprar la misma acción muchas veces.</button>
+                    <button onclick="lzQuizAnswer(this,false)">Invertir solo cuando todo sube.</button>
+                </div>
+                <div class="lz-q-exp">💡 Si uno cae, otro puede aguantar (o subir). Así ninguna mala racha de un solo activo hunde toda tu cartera.</div>
+            </div>
+            <div class="lz-q" data-lz-q>
+                <div class="lz-q-ask">6. Dejar el dinero parado en el banco, con la inflación…</div>
+                <div class="lz-q-opts">
+                    <button onclick="lzQuizAnswer(this,true)" data-correct="1">Pierde poder de compra con el tiempo.</button>
+                    <button onclick="lzQuizAnswer(this,false)">Gana valor automáticamente.</button>
+                    <button onclick="lzQuizAnswer(this,false)">Se mantiene igual para siempre.</button>
+                </div>
+                <div class="lz-q-exp">💡 Con ~3% de inflación, lo que hoy cuesta 100€ costará más el año que viene. El dinero sin invertir compra cada vez menos: “no hacer nada” también cuesta.</div>
+            </div>
+        </div>
+        <div id="lzQuizScore" class="info-box success" style="display:none; margin-top:16px;"></div>
+    </section>
+
     <section id="recursos">
         <h2>📚 Libros y Recursos Adicionales</h2>
 
