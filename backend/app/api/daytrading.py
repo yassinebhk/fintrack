@@ -84,3 +84,9 @@ async def list_trades(
 async def report(current_user: User = Depends(get_current_user)) -> dict:
     from app.services.daytrading import journal
     return await journal.report(current_user.id)
+
+
+@router.get("/equity-curve")
+async def equity_curve(current_user: User = Depends(get_current_user)) -> dict:
+    from app.services.daytrading import journal
+    return await journal.equity_curve(current_user.id)

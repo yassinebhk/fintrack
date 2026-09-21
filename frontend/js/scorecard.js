@@ -20,6 +20,52 @@ async function loadScorecard() {
     el.innerHTML = scorecardHtml(data);
     const ex = document.getElementById('scorecardExport');
     if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('scorecardContent', 'eficacia-recomendaciones');
+    loadScorecardEquityCurve();
+}
+
+// Cumulative average alpha over time — the trend line every competitor's
+// scorecard leads with. Gated the same way as the rest of this page: under
+// the anti-noise floor it explains why, instead of drawing a fake trend.
+async function loadScorecardEquityCurve() {
+    const wrap = document.getElementById('scorecardEquityWrap');
+    if (!wrap) return;
+    let d;
+    try {
+        const r = await fetch(`${SCORECARD_API}/scorecard/equity-curve`);
+        if (!r.ok) { wrap.style.display = 'none'; return; }
+        d = await r.json();
+    } catch (e) { wrap.style.display = 'none'; return; }
+
+    wrap.style.display = 'block';
+    if (!d.gated) {
+        wrap.innerHTML = `<div class="card" style="margin-bottom:16px;">
+            <h4>📈 Alpha acumulada (tendencia)</h4>
+            <p class="text-muted" style="font-size:13px; margin:6px 0 0;">⏳ En validación: ${d.n}/${d.n_required} recomendaciones evaluadas a 3 meses, ${d.span_days}/${d.span_required} días de histórico. Con una muestra tan pequeña, una "tendencia" sería puro ruido — por eso no se dibuja todavía.</p>
+        </div>`;
+        return;
+    }
+    wrap.innerHTML = `<div class="card" style="margin-bottom:16px;">
+        <h4>📈 Alpha acumulada (tendencia)</h4>
+        <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">Media acumulada del exceso de retorno a 3 meses (frente al índice) de cada recomendación evaluada, en el orden en que se hicieron. Sube = el motor va ganando al mercado de media; baja = va perdiendo. ${d.n} recomendaciones evaluadas.</p>
+        <div class="chart-container-sm"><canvas id="scorecardEquityChart"></canvas></div>
+    </div>`;
+    if (typeof Chart === 'undefined' || typeof ADV === 'undefined') return;
+    const labels = d.points.map(p => p.date);
+    const alpha = d.points.map(p => p.cum_avg_alpha_pct);
+    if (typeof _destroyAdv === 'function') _destroyAdv('scorecardEquityChart');
+    const chart = new Chart(document.getElementById('scorecardEquityChart').getContext('2d'), {
+        type: 'line',
+        data: { labels, datasets: [{ data: alpha, borderColor: ADV.blue, backgroundColor: 'rgba(44,74,110,0.12)', fill: true, pointRadius: 0, borderWidth: 1.5, tension: 0.15 }] },
+        options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `Alpha acumulada: ${c.parsed.y >= 0 ? '+' : ''}${c.parsed.y.toFixed(2)}%` } } },
+            scales: {
+                x: { title: { display: true, text: 'Fecha de la recomendación', color: ADV.muted, font: { size: 12, weight: '600' } }, ticks: { maxTicksLimit: 6, color: ADV.muted }, grid: { display: false } },
+                y: { title: { display: true, text: 'Alpha media acumulada (%)', color: ADV.muted, font: { size: 12, weight: '600' } }, ticks: { color: ADV.muted, callback: v => v + '%' }, grid: { color: ADV.grid } },
+            },
+        },
+    });
+    if (typeof _advCharts === 'object') _advCharts['scorecardEquityChart'] = chart;
 }
 
 function scorecardHtml(d) {

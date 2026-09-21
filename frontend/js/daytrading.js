@@ -191,9 +191,56 @@ async function dtRefresh() {
         dtRenderReport(reportData);
         const ex = document.getElementById('dtHistorialExport');
         if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('dtHistorialCard', 'trading-diario-historial');
+        dtLoadEquityCurve();
     } catch (err) {
         console.error('Error loading day trading data:', err);
     }
+}
+
+// Cumulative € P&L over closed paper trades, ordered by close date — real
+// sequential results. Gated (same floor as the Veredicto card) so a handful
+// of trades never gets drawn as if it were a meaningful trend.
+async function dtLoadEquityCurve() {
+    const wrap = document.getElementById('dtEquityWrap');
+    if (!wrap) return;
+    let d;
+    try {
+        const r = await fetch(`${DT_API}/daytrading/equity-curve`);
+        if (!r.ok) { wrap.style.display = 'none'; return; }
+        d = await r.json();
+    } catch (e) { wrap.style.display = 'none'; return; }
+
+    wrap.style.display = 'block';
+    if (!d.gated) {
+        wrap.innerHTML = `<div class="card" style="margin-top:16px;">
+            <h3>📈 Curva de resultado (papel)</h3>
+            <p class="text-muted" style="font-size:13px; margin:6px 0 0;">⏳ En validación: ${d.n}/${d.n_required} operaciones cerradas, ${d.span_days}/${d.span_required} días de histórico. Con tan pocas operaciones, una "curva" sería ruido — por eso no se dibuja todavía.</p>
+        </div>`;
+        return;
+    }
+    wrap.innerHTML = `<div class="card" style="margin-top:16px;">
+        <h3>📈 Curva de resultado (papel)</h3>
+        <p class="text-muted" style="font-size:12px; margin:-4px 0 8px;">P&amp;L acumulado en € de cada operación cerrada, en orden de cierre. ${d.n} operaciones.</p>
+        <div class="chart-container-sm"><canvas id="dtEquityChart"></canvas></div>
+    </div>`;
+    if (typeof Chart === 'undefined' || typeof ADV === 'undefined') return;
+    const labels = d.points.map(p => p.date);
+    const cum = d.points.map(p => p.cum_pnl_eur);
+    const up = cum.length && cum[cum.length - 1] >= 0;
+    if (typeof _destroyAdv === 'function') _destroyAdv('dtEquityChart');
+    const chart = new Chart(document.getElementById('dtEquityChart').getContext('2d'), {
+        type: 'line',
+        data: { labels, datasets: [{ data: cum, borderColor: up ? ADV.green : ADV.red, backgroundColor: up ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.12)', fill: true, pointRadius: 0, borderWidth: 1.5, tension: 0.15 }] },
+        options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `P&L acumulado: ${c.parsed.y >= 0 ? '+' : ''}${c.parsed.y.toFixed(2)} €` } } },
+            scales: {
+                x: { title: { display: true, text: 'Fecha de cierre', color: ADV.muted, font: { size: 12, weight: '600' } }, ticks: { maxTicksLimit: 6, color: ADV.muted }, grid: { display: false } },
+                y: { title: { display: true, text: 'P&L acumulado (€)', color: ADV.muted, font: { size: 12, weight: '600' } }, ticks: { color: ADV.muted, callback: v => v + ' €' }, grid: { color: ADV.grid } },
+            },
+        },
+    });
+    if (typeof _advCharts === 'object') _advCharts['dtEquityChart'] = chart;
 }
 
 window.renderDayTrading = dtRefresh;

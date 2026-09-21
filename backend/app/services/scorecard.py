@@ -190,6 +190,44 @@ async def summary() -> dict:
     }
 
 
+async def equity_curve() -> dict:
+    """Cumulative average alpha (excess_3m) over time, ordered by recommendation
+    date, for every recommendation that's already reached its 3-month
+    evaluation — the trend of the engine's real out-of-sample edge, not a
+    fabricated backtest. Same anti-noise gate as feedback_context()/
+    _bucket_stats(): under n>=30 evaluated recs spanning >=90 days, a
+    'trend' would just be noise."""
+    async with session_scope() as s:
+        rows = (await s.execute(select(RecommendationTrack))).scalars().all()
+
+    evaluated = sorted(
+        [r for r in rows if r.ret_3m is not None],
+        key=lambda r: r.rec_date,
+    )
+    n = len(evaluated)
+    dates = [r.rec_date for r in evaluated]
+    span_days = (max(dates) - min(dates)).days if len(dates) > 1 else 0
+    gated = n >= MIN_N_FEEDBACK and span_days >= MIN_SPAN_DAYS_FEEDBACK
+
+    if not gated:
+        return {"gated": False, "n": n, "n_required": MIN_N_FEEDBACK,
+                "span_days": span_days, "span_required": MIN_SPAN_DAYS_FEEDBACK, "points": []}
+
+    cum_ret, cum_exc, n_exc = 0.0, 0.0, 0
+    points = []
+    for i, r in enumerate(evaluated, start=1):
+        cum_ret += r.ret_3m
+        if r.excess_3m is not None:
+            cum_exc += r.excess_3m
+            n_exc += 1
+        points.append({
+            "date": r.rec_date.isoformat(), "ticker": r.ticker,
+            "cum_avg_return_pct": round(cum_ret / i, 2),
+            "cum_avg_alpha_pct": round(cum_exc / n_exc, 2) if n_exc else None,
+        })
+    return {"gated": True, "n": n, "points": points}
+
+
 def _bucket_stats(rows: list[RecommendationTrack], attr: str, ret_field: str = "ret_3m") -> dict:
     """Group by `attr` (approach/conviction) at the given return horizon and gate
     each group on (n >= MIN_N_FEEDBACK and date span >= MIN_SPAN_DAYS_FEEDBACK) —

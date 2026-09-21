@@ -18,6 +18,16 @@ async def get_scorecard() -> dict:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/equity-curve")
+async def get_equity_curve() -> dict:
+    """Cumulative average alpha over time from evaluated recommendations."""
+    try:
+        return await sc.equity_curve()
+    except Exception as exc:
+        logger.exception("scorecard equity curve failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.post("/evaluate")
 async def evaluate() -> dict:
     """Manually evaluate matured recommendations (also runs daily on a cron)."""

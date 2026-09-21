@@ -281,6 +281,33 @@ async def report(user_id: int) -> dict:
     return out
 
 
+async def equity_curve(user_id: int) -> dict:
+    """Cumulative € P&L over closed trades, ordered by close date — real
+    sequential paper results, not a projection. Gated by the same
+    MIN_N_TRADES/MIN_SPAN_DAYS floor as report(): under that, a 'curve' of a
+    handful of trades would just be noise dressed up as a trend."""
+    async with session_scope() as session:
+        repo = DayTradeRepository(session, user_id)
+        closed = await repo.list_closed()
+
+    closed = sorted([t for t in closed if t.closed_at is not None], key=lambda t: t.closed_at)
+    n = len(closed)
+    dates = [t.closed_at for t in closed]
+    span_days = (max(dates) - min(dates)).days if len(dates) > 1 else 0
+    gated = n >= MIN_N_TRADES and span_days >= MIN_SPAN_DAYS
+
+    if not gated:
+        return {"gated": False, "n": n, "n_required": MIN_N_TRADES,
+                "span_days": span_days, "span_required": MIN_SPAN_DAYS, "points": []}
+
+    cum = 0.0
+    points = []
+    for t in closed:
+        cum += t.pnl_eur or 0.0
+        points.append({"date": t.closed_at.date().isoformat(), "cum_pnl_eur": round(cum, 2), "ticker": t.ticker})
+    return {"gated": True, "n": n, "points": points}
+
+
 def _readiness(r: dict) -> dict:
     n = r["n_closed"]
     span = r["span_days"]
