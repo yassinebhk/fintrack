@@ -128,6 +128,7 @@ function renderAssetDetailMarketSeries(chart, history) {
             wickUpColor: '#2C4A6E', wickDownColor: '#C6473C',
         });
         series.setData(history.map(h => ({ time: h.date, open: h.open, high: h.high, low: h.low, close: h.close })));
+        return series;
     } else {
         const firstPrice = history[0]?.close ?? history[0]?.price ?? 0;
         const lastPrice = history[history.length - 1]?.close ?? history[history.length - 1]?.price ?? 0;
@@ -139,6 +140,54 @@ function renderAssetDetailMarketSeries(chart, history) {
             lineWidth: 2,
         });
         series.setData(history.map(h => ({ time: h.date, value: h.close ?? h.price })));
+        return series;
+    }
+}
+
+// Mark each real buy/sell on the market-price chart, at its exact date — so
+// you see where on the real price curve you actually entered/exited, not just
+// your position value over time (that's the separate chart below).
+async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
+    if (!series || !historyDates.length) return;
+    try {
+        const resp = await assetDetailFetch(`${ASSET_DETAIL_API}/transactions?ticker=${encodeURIComponent(ticker)}`, { cache: 'no-store' });
+        if (resp.status === 401) return;
+        const txs = await resp.json();
+        if (!Array.isArray(txs) || !txs.length) return;
+
+        // Chart bars only exist for trading days; a transaction on a weekend/holiday
+        // (or before the fetched window) snaps to the nearest earlier bar so the
+        // marker always renders instead of silently vanishing.
+        const dates = historyDates.slice().sort();
+        const snapToChart = (isoDate) => {
+            let best = null;
+            for (const d of dates) {
+                if (d <= isoDate) best = d; else break;
+            }
+            return best || dates[0];
+        };
+        const fmtQty = (n) => (n || 0).toLocaleString('es-ES', { maximumFractionDigits: 6 });
+        const fmtPrice = (n, cur) => `${(n || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cur ? ' ' + cur : ''}`;
+
+        const markers = txs
+            .filter(t => t.type === 'buy' || t.type === 'sell')
+            .map(t => {
+                const day = (t.executed_at || '').slice(0, 10);
+                if (!day) return null;
+                const isBuy = t.type === 'buy';
+                return {
+                    time: snapToChart(day),
+                    position: isBuy ? 'belowBar' : 'aboveBar',
+                    color: isBuy ? '#4A9B8E' : '#C6473C',
+                    shape: isBuy ? 'arrowUp' : 'arrowDown',
+                    text: `${isBuy ? 'Compra' : 'Venta'} ${fmtQty(t.quantity)} @ ${fmtPrice(t.price, t.currency)}`,
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+        if (markers.length) series.setMarkers(markers);
+    } catch (err) {
+        console.error('asset detail trade markers failed:', err);
     }
 }
 
@@ -167,8 +216,9 @@ async function loadAssetDetailMarketChart(ticker) {
             crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
         });
         assetDetailTvChart = chart;
-        renderAssetDetailMarketSeries(chart, history);
+        const series = renderAssetDetailMarketSeries(chart, history);
         chart.timeScale().fitContent();
+        loadAssetDetailTradeMarkers(ticker, series, history.map(h => h.date));
 
         if (!container._resizeHandler) {
             container._resizeHandler = () => {
