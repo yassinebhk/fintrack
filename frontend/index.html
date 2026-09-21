@@ -1295,65 +1295,46 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                 <!-- Alerts Page -->
                 <div class="page page-alerts" id="page-alerts">
                     <section class="alerts-header">
-                        <h2>Alertas de Precio</h2>
-                        <button class="btn-primary" id="btnAddAlert">+ Nueva Alerta</button>
+                        <h2>🔔 Alertas</h2>
+                        <button class="btn-primary" id="btnAddAlert">+ Nuevo trailing stop</button>
                     </section>
+                    <p class="text-muted" style="font-size:12px; margin:-4px 0 14px;">Dos cosas reales aquí: las <strong>alertas del sistema</strong> (movimientos fuertes, drawdown, noticias bajistas, setups de entrada — el motor las revisa cada ~5 minutos y las manda también por Telegram) y tus <strong>trailing stops</strong> (aviso de venta si un activo cae X% desde su máximo, más un objetivo de precio opcional).</p>
 
-                    <div class="alerts-list" id="alertsList">
-                        <div class="alert-item">
-                            <div class="alert-info">
-                                <span class="alert-ticker">AAPL</span>
-                                <span class="alert-condition">Precio &gt; $200</span>
-                            </div>
-                            <div class="alert-status active">Activa</div>
-                            <button class="btn-icon btn-delete">🗑️</button>
-                        </div>
-                        <div class="alert-item">
-                            <div class="alert-info">
-                                <span class="alert-ticker">BTC</span>
-                                <span class="alert-condition">Precio &lt; $40,000</span>
-                            </div>
-                            <div class="alert-status active">Activa</div>
-                            <button class="btn-icon btn-delete">🗑️</button>
-                        </div>
-                        <div class="alert-item triggered">
-                            <div class="alert-info">
-                                <span class="alert-ticker">NVDA</span>
-                                <span class="alert-condition">Cambio diario &gt; 5%</span>
-                            </div>
-                            <div class="alert-status triggered">¡Disparada!</div>
-                            <button class="btn-icon btn-delete">🗑️</button>
-                        </div>
+                    <div class="card" style="margin-bottom:16px;">
+                        <h3 style="margin-top:0;">📉 Trailing stops</h3>
+                        <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">Sigue el máximo de un activo y avisa (por Telegram y aquí) si cae un % desde ese máximo — la señal de "el movimiento se ha girado". El objetivo de precio, si lo pones, avisa una vez al alcanzarlo (informativo, el stop sigue siendo la salida real).</p>
+                        <div id="trailingStopsList"><p class="text-muted">Cargando…</p></div>
                     </div>
 
-                    <!-- Alert Modal -->
+                    <div class="card">
+                        <h3 style="margin-top:0;">🔔 Alertas recientes del sistema</h3>
+                        <div id="alertsList"><p class="text-muted">Cargando…</p></div>
+                    </div>
+
+                    <!-- Trailing Stop Modal -->
                     <div class="modal" id="alertModal">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h3>Nueva Alerta</h3>
+                                <h3>Nuevo trailing stop</h3>
                                 <button class="modal-close" id="closeAlertModal">×</button>
                             </div>
                             <form id="alertForm">
                                 <div class="form-group">
-                                    <label>Activo</label>
-                                    <input type="text" name="ticker" placeholder="AAPL, BTC, etc." required>
+                                    <label>Activo (ticker)</label>
+                                    <input type="text" id="tsTicker" placeholder="AAPL, BTC, etc." style="text-transform:uppercase;" required>
                                 </div>
                                 <div class="form-group">
-                                    <label>Condición</label>
-                                    <select name="condition">
-                                        <option value="price_above">Precio mayor que</option>
-                                        <option value="price_below">Precio menor que</option>
-                                        <option value="change_above">Cambio diario mayor que %</option>
-                                        <option value="change_below">Cambio diario menor que %</option>
-                                    </select>
+                                    <label>Caída desde máximo que dispara el aviso (%)</label>
+                                    <input type="number" id="tsPct" value="12" step="0.5" min="0.5" max="90" required>
                                 </div>
                                 <div class="form-group">
-                                    <label>Valor</label>
-                                    <input type="number" name="value" step="any" required>
+                                    <label>Objetivo de precio (opcional)</label>
+                                    <input type="number" id="tsTarget" step="any" min="0" placeholder="Ej. 250">
                                 </div>
+                                <span id="tsMsg" style="font-size:13px;"></span>
                                 <div class="form-actions">
                                     <button type="button" class="btn-secondary" id="cancelAlert">Cancelar</button>
-                                    <button type="submit" class="btn-primary">Crear Alerta</button>
+                                    <button type="submit" class="btn-primary" id="tsSubmitBtn">Armar trailing stop</button>
                                 </div>
                             </form>
                         </div>
@@ -2038,6 +2019,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/journal.js?v=20260915repartos"></script>
     <script src="js/watchlist.js?v=20260921spark"></script>
     <script src="js/goals.js?v=20260921real"></script>
+    <script src="js/alerts.js?v=20260921real"></script>
     <script src="js/export-utils.js?v=20260913export"></script>
     <script src="js/scorecard.js?v=20260921equity"></script>
     <script src="js/daily-summary.js?v=20260913export"></script>

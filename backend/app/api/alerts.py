@@ -23,6 +23,7 @@ class TrailingStopIn(BaseModel):
     label: str = ""
     peak: float | None = None
     currency: str = ""
+    target_price: float | None = None
 
 
 @router.get("/trailing-stops")
@@ -35,8 +36,18 @@ async def list_trailing_stops(current_user: User = Depends(get_current_user)) ->
 async def set_trailing_stop(payload: TrailingStopIn, current_user: User = Depends(get_current_user)) -> dict:
     from app.services import trailing_stops as ts
     stop = await ts.set_stop(payload.ticker, payload.trailing_pct,
-                             payload.label, payload.peak, payload.currency)
+                             payload.label, payload.peak, payload.currency,
+                             payload.target_price)
     return {"message": "trailing stop armado", "stop": stop}
+
+
+@router.delete("/trailing-stop/{ticker}")
+async def delete_trailing_stop(ticker: str, current_user: User = Depends(get_current_user)) -> dict:
+    from app.services import trailing_stops as ts
+    ok = await ts.delete_stop(ticker)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Trailing stop no encontrado")
+    return {"status": "deleted"}
 
 
 @router.get("")

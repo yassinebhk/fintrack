@@ -67,3 +67,16 @@ async def set_stop(ticker: str, trailing_pct: float, label: str = "",
 async def update_peaks_and_save(stops: list[dict]) -> None:
     """Persist the (possibly updated) stops list back to the cache."""
     await _save({"stops": stops})
+
+
+async def delete_stop(ticker: str) -> bool:
+    """Remove a trailing stop entirely (not just disarm it)."""
+    ticker = (ticker or "").upper().strip()
+    data = await _load()
+    stops = data.get("stops", [])
+    remaining = [s for s in stops if (s.get("ticker") or "").upper() != ticker]
+    if len(remaining) == len(stops):
+        return False
+    data["stops"] = remaining
+    await _save(data)
+    return True
