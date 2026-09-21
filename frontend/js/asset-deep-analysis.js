@@ -200,6 +200,22 @@ function _newsBlock(news, sentiment, sources) {
     return sentBar + `<ul style="margin:0; padding-left:20px; font-size:13px;">${items}</ul>`;
 }
 
+// Which of the engine's two theses this asset's CURRENT profile fits better
+// (momentum ~1-3 meses vs valor/reversión ~6-18 meses) — not a prediction, and
+// flags when it's extended enough above its 200d average that a pullback is
+// statistically more likely, regardless of which thesis fits.
+function _horizonBlock(h) {
+    if (!h) return '';
+    const color = h.thesis === 'momentum' ? 'var(--info)' : h.thesis === 'valor' ? 'var(--positive)' : 'var(--text-secondary)';
+    const warn = h.extended
+        ? `<div style="margin-top:6px; background:rgba(201,154,62,0.12); border:1px solid rgba(201,154,62,0.4); border-radius:6px; padding:6px 10px; font-size:12px;">⚠️ Está un ${h.dist_sma200_pct}% por encima de su media de 200 sesiones — cuanto más lejos, estadísticamente más probable una pausa/consolidación (no es una predicción para este caso concreto).</div>`
+        : '';
+    return `<div style="margin:10px 0; padding:10px 14px; background:rgba(43,40,34,0.03); border-radius:8px; border-left:3px solid ${color};">
+        <strong>⏱️ Horizonte que mejor encaja:</strong> ${h.label}
+        ${warn}
+    </div>`;
+}
+
 function renderDeepAnalysis(d) {
     const m = d.metrics || {};
     const charts = d.charts || {};
@@ -221,6 +237,8 @@ function renderDeepAnalysis(d) {
         · <a href="${yh}" target="_blank" rel="noopener" style="color:var(--info);">Ficha en Yahoo</a>
         ${isFund ? ` · <a href="${je}" target="_blank" rel="noopener" style="color:var(--info);">justETF (ISIN / dónde comprar)</a>` : ''}
     </p>
+
+    ${_horizonBlock(d.horizon)}
 
     <h3 style="margin-top:18px;">📊 Métricas extendidas</h3>
     ${_metricsBlock(m)}
@@ -244,6 +262,7 @@ function renderDeepAnalysis(d) {
 
     <h3 style="margin-top:18px;">📰 Noticias del activo (varias fuentes)</h3>
     ${_newsBlock(d.news, d.news_sentiment || {}, d.news_sources || [])}
+    ${_catalystBriefHtml(d.catalyst_brief)}
 
     ${d.narrative ? `
     <h3 style="margin-top:18px;">🖋️ Nota del analista</h3>

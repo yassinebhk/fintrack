@@ -29,6 +29,7 @@ from app.services.market.fred import FREDClient
 from app.services.discovery.market_scanner import MarketScanner
 from app.services.discovery.quant_score import compute_factors
 from app.services.discovery.technical import compute_signals
+from app.services import catalyst_briefs
 from app.services.news import NewsService
 from app.services.opportunities import get_opportunity_service
 
@@ -45,6 +46,37 @@ def _benchmark_for(ticker: str, category: str = "", region: str = "") -> tuple[s
     if region in ("Europa", "España") or t.endswith(".L") or t.endswith(".DE") or t.endswith(".PA"):
         return ("SWDA.L", "MSCI World UCITS")
     return ("SPY", "S&P 500")
+
+
+def _horizon_fit(factors: dict) -> dict:
+    """Which of the engine's two theses this asset's CURRENT profile fits better,
+    using the same framing already documented for the ranking engine (momentum
+    ~1-3 meses, valor/reversión ~6-18 meses) — not a prediction, just which
+    lens the numbers support right now. Also flags when it's stretched enough
+    above its 200d average that a pullback/consolidation is statistically more
+    likely (same >=30%/40% thresholds already used elsewhere as "extendido"),
+    since that risk applies regardless of which thesis fits."""
+    momentum = factors.get("momentum") or 0
+    above200 = bool(factors.get("above_sma200"))
+    dist200 = factors.get("dist_sma200") or 0
+    mean_rev_z = factors.get("mean_rev_z") or 0
+
+    momentum_fit = above200 and momentum > 0
+    value_fit = mean_rev_z <= -1.0  # meaningfully below its own 50d mean
+
+    if momentum_fit and not value_fit:
+        thesis, label = "momentum", "Corto-medio plazo (~1-3 meses) — encaja con tesis MOMENTUM"
+    elif value_fit and not momentum_fit:
+        thesis, label = "valor", "Medio-largo plazo (~6-18 meses) — encaja con tesis VALOR/reversión"
+    else:
+        thesis, label = "mixto", "Sin encaje claro con ninguna tesis ahora mismo"
+
+    return {
+        "thesis": thesis,
+        "label": label,
+        "dist_sma200_pct": round(dist200 * 100, 1),
+        "extended": dist200 >= 0.30,
+    }
 
 
 def _series_from_history(hist: list[dict]) -> pd.Series | None:
@@ -507,6 +539,21 @@ async def analyze_asset(ticker: str, name_override: str | None = None) -> dict:
     breakdown = dict(sorted(breakdown.items(), key=lambda kv: abs(kv[1]), reverse=True))
 
     narrative = await _llm_summary(name, ticker, metrics, breakdown, news, factors, signals)
+    horizon = _horizon_fit(factors)
+
+    # Web-grounded environment/catalyst brief (real, dated, sourced headlines +
+    # LLM verdict) — the same layer already used for portfolio holdings in
+    # "¿Vender o mantener?", now also for any asset searched here, so a user
+    # doesn't have to ask for it by hand every time (feedback 2026-09-21).
+    try:
+        # refresh_briefs() itself skips regenerating when the cached one is
+        # still fresh (TTL 3 days) and saves the result — so a re-opened modal
+        # for the same ticker doesn't re-run the search + LLM call every time.
+        await catalyst_briefs.refresh_briefs([{"ticker": ticker, "name": name}])
+        brief = await catalyst_briefs.get_brief(ticker)
+    except Exception as exc:
+        logger.warning("asset_analysis catalyst brief failed for {}: {}", ticker, exc)
+        brief = None
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -525,9 +572,11 @@ async def analyze_asset(ticker: str, name_override: str | None = None) -> dict:
         },
         "score_breakdown": breakdown,
         "ensemble_thesis": which,
+        "horizon": horizon,
         "charts": charts,
         "news": news,
         "news_sources": sources,
         "news_sentiment": sentiment,
         "narrative": narrative,
+        "catalyst_brief": brief,
     }
