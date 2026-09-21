@@ -380,6 +380,12 @@ function renderOpportunities(data) {
         return '📊 ETFs';
     };
     const GROUP_ORDER = ['📈 Acciones', '📊 ETFs', '📁 Fondos', '🏦 Renta fija (bonos)', '🪙 Materias primas'];
+    const themeHorizonBadge = (t) => {
+        const h = t.horizon_fit;
+        if (!h || h.thesis === 'ninguna') return '<span class="text-muted" style="font-size:11px;">—</span>';
+        if (h.thesis === 'momentum') return `<span title="Score momentum ≥ score valor: encaja mejor con la tesis de tendencia (corto-medio plazo)" style="background:rgba(198, 71, 60, 0.13); color:var(--negative); padding:2px 8px; border-radius:10px; font-size:11px; white-space:nowrap;">🔥 ${h.label}</span>`;
+        return `<span title="Score valor > score momentum: encaja mejor con la tesis de reversión (medio-largo plazo)" style="background:rgba(59, 130, 246, 0.13); color:#3b82f6; padding:2px 8px; border-radius:10px; font-size:11px; white-space:nowrap;">🧊 ${h.label}</span>`;
+    };
     const themeRow = (t) => {
         const r3 = t.ret_3m, cls = (r3 || 0) >= 0 ? 'value-positive' : 'value-negative';
         const safeTicker = (t.ticker + '').replace(/'/g, "&#39;");
@@ -390,6 +396,7 @@ function renderOpportunities(data) {
             <td class="text-right">${fmtScore(t.value_score)}</td>
             <td class="text-right mono ${cls}">${r3 != null ? (r3>=0?'+':'')+r3+'%' : '—'}</td>
             <td class="text-right mono">${t.range_pos_52w != null ? t.range_pos_52w.toFixed(0)+'%' : '—'}</td>
+            <td class="text-right">${themeHorizonBadge(t)}</td>
         </tr>`;
     };
     const themesByGroup = {};
@@ -414,7 +421,7 @@ function renderOpportunities(data) {
             <strong style="font-size:13px;">${g} <span class="text-muted" style="font-weight:400;">(${themesByGroup[g].length})</span></strong>
             <div class="table-container" style="margin-top:6px;">
                 <table class="manager-table">
-                    <thead><tr><th>Tema</th>${sortableTh('momentum_score', 'Score Mom.')}${sortableTh('value_score', 'Score Valor')}${sortableTh('ret_3m', '3 meses')}${sortableTh('range_pos_52w', 'Rango 52s')}</tr></thead>
+                    <thead><tr><th>Tema</th>${sortableTh('momentum_score', 'Score Mom.')}${sortableTh('value_score', 'Score Valor')}${sortableTh('ret_3m', '3 meses')}${sortableTh('range_pos_52w', 'Rango 52s')}<th class="text-right">Horizonte</th></tr></thead>
                     <tbody>${rows}</tbody>
                 </table>
             </div>
@@ -475,7 +482,7 @@ function renderOpportunities(data) {
         ${opps}
         <div class="card" style="margin-top:16px;">
             <h3>📊 Ranking cuantitativo (motor empyrical + ta, datos reales)</h3>
-            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">${data.universe_size ? `Escaneados <strong>${data.universe_size}</strong> instrumentos (acciones, ETFs, fondos, bonos + screeners de Yahoo), excluyendo lo que ya tienes. ` : ''}Puntuación objetiva por estadística sobre precios, no opinión de la IA. Score Mom. = tendencia + retorno ajustado a riesgo · Score Valor = castigado pero de calidad. <strong>Pincha cualquier fila</strong> para el análisis completo (estadísticas, noticias y narrativa).</p>
+            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">${data.universe_size ? `Escaneados <strong>${data.universe_size}</strong> instrumentos (acciones, ETFs, fondos, bonos + screeners de Yahoo), excluyendo lo que ya tienes. ` : ''}Puntuación objetiva por estadística sobre precios, no opinión de la IA. Score Mom. = tendencia + retorno ajustado a riesgo · Score Valor = castigado pero de calidad. <strong>Horizonte</strong> = qué tesis encaja mejor ahora mismo con cada fila (🔥 momentum → corto-medio plazo, 🧊 valor → medio-largo plazo), calculado con los mismos dos scores de la tabla. <strong>Pincha cualquier fila</strong> para el análisis completo: estadísticas, horizonte detallado y noticias reales/catalizadores con veredicto (favorable/neutral/adverso).</p>
             ${themeGroups}
         </div>
         ${data.disclaimer ? `<p class="text-muted" style="font-size:11px; margin-top:12px;">${data.disclaimer}</p>` : ''}

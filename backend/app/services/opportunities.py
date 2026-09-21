@@ -392,6 +392,8 @@ class OpportunityService:
             if t["ticker"] not in seen:
                 seen.add(t["ticker"])
                 top_themes.append(t)
+        for t in top_themes:
+            t["horizon_fit"] = self._theme_horizon_fit(t)
 
         payload = {
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -487,6 +489,21 @@ class OpportunityService:
         except Exception as exc:
             logger.warning("rates context fetch failed: {}", exc)
             return {}
+
+    @staticmethod
+    def _theme_horizon_fit(t: dict) -> dict:
+        """Which horizon a raw ranking row currently fits — derived from the SAME
+        two ensemble scores the table already shows (momentum_score vs value_score),
+        never a third signal, so the badge can't contradict what the user sees in
+        those two columns. Same 1-3m / 6-18m framing as _HORIZON_BY_APPROACH above,
+        applied here to every scanned instrument, not just the LLM's curated picks."""
+        mom = t.get("momentum_score") or 0
+        val = t.get("value_score") or 0
+        if mom > 0 and mom >= val:
+            return {"thesis": "momentum", "label": "Corto (1-3m)"}
+        if val > 0 and val > mom:
+            return {"thesis": "valor", "label": "Medio-largo (6-18m)"}
+        return {"thesis": "ninguna", "label": "Sin encaje claro"}
 
     @staticmethod
     def _risk_climate(breadth: float | None, rates: dict | None, shocks: list[dict] | None = None) -> dict:
