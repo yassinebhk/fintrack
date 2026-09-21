@@ -257,6 +257,13 @@ function renderTradingViewChart(data) {
 
     chart.timeScale().fitContent();
 
+    // Real buy/sell markers — same helper as the asset-detail page's price chart
+    // (defined in asset-detail.js, loaded on every page) so both charts show them
+    // consistently instead of duplicating the fetch+snap-to-bar logic twice.
+    if (typeof loadAssetDetailTradeMarkers === 'function' && data.ticker) {
+        loadAssetDetailTradeMarkers(data.ticker, tvSeries, history.map(h => h.date));
+    }
+
     // Responsive resize
     if (!tvContainer._resizeHandler) {
         tvContainer._resizeHandler = () => {
