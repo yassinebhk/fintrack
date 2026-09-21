@@ -473,6 +473,11 @@ function renderOpportunities(data) {
         </div>` : '';
 
     content.innerHTML = `
+        <div class="card" style="margin-bottom:16px;">
+            <h3>📊 Ranking cuantitativo (motor empyrical + ta, datos reales)</h3>
+            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">${data.universe_size ? `Escaneados <strong>${data.universe_size}</strong> instrumentos (acciones, ETFs, fondos, bonos + screeners de Yahoo), excluyendo lo que ya tienes. ` : ''}Puntuación objetiva por estadística sobre precios, no opinión de la IA. Score Mom. = tendencia + retorno ajustado a riesgo · Score Valor = castigado pero de calidad. <strong>Horizonte</strong> = qué tesis encaja mejor ahora mismo con cada fila (🔥 momentum → corto-medio plazo, 🧊 valor → medio-largo plazo), calculado con los mismos dos scores de la tabla. <strong>Pincha cualquier fila</strong> para el análisis completo: estadísticas, horizonte detallado y noticias reales/catalizadores con veredicto (favorable/neutral/adverso).</p>
+            ${themeGroups}
+        </div>
         ${frothBanner}
         ${regimeBanner}
         ${climateBanner}
@@ -480,11 +485,6 @@ function renderOpportunities(data) {
         ${data.market_summary ? `<div class="integrations-banner-inner" style="margin-bottom:16px;"><div class="integrations-banner-icon">🧠</div><div class="integrations-banner-body"><strong>Resumen de mercado</strong><p style="margin:6px 0 0;">${data.market_summary}</p></div></div>` : ''}
         ${trendsCard}
         ${opps}
-        <div class="card" style="margin-top:16px;">
-            <h3>📊 Ranking cuantitativo (motor empyrical + ta, datos reales)</h3>
-            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">${data.universe_size ? `Escaneados <strong>${data.universe_size}</strong> instrumentos (acciones, ETFs, fondos, bonos + screeners de Yahoo), excluyendo lo que ya tienes. ` : ''}Puntuación objetiva por estadística sobre precios, no opinión de la IA. Score Mom. = tendencia + retorno ajustado a riesgo · Score Valor = castigado pero de calidad. <strong>Horizonte</strong> = qué tesis encaja mejor ahora mismo con cada fila (🔥 momentum → corto-medio plazo, 🧊 valor → medio-largo plazo), calculado con los mismos dos scores de la tabla. <strong>Pincha cualquier fila</strong> para el análisis completo: estadísticas, horizonte detallado y noticias reales/catalizadores con veredicto (favorable/neutral/adverso).</p>
-            ${themeGroups}
-        </div>
         ${data.disclaimer ? `<p class="text-muted" style="font-size:11px; margin-top:12px;">${data.disclaimer}</p>` : ''}
         <p class="text-muted" style="font-size:11px;">Generado ${data.generated_at ? new Date(data.generated_at).toLocaleString('es-ES') : ''} · modelo ${data.model || ''}</p>
     `;
