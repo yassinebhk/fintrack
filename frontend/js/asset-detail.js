@@ -188,7 +188,7 @@ function addSMAOverlays(chart, history) {
 // style. Reuses one overlay div per container — safe to call again after a
 // chart is torn down and recreated (container.innerHTML='' wipes it along
 // with the old chart, so no stale subscriptions pile up).
-function attachCrosshairLegend(chart, container, history) {
+function attachCrosshairLegend(chart, container, history, timeKey = 'date') {
     if (!container || !history.length) return;
     let legend = container.querySelector('.tv-crosshair-legend');
     if (!legend) {
@@ -198,23 +198,26 @@ function attachCrosshairLegend(chart, container, history) {
         container.style.position = container.style.position || 'relative';
         container.appendChild(legend);
     }
-    const byDate = {};
-    history.forEach(h => { byDate[h.date] = h; });
+    const byTime = {};
+    history.forEach(h => { byTime[h[timeKey]] = h; });
     const fmt = (n) => (n == null ? '—' : (+n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    const label = (h) => timeKey === 'time'
+        ? new Date(h.time * 1000).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        : h.date;
     const render = (h) => {
         if (!h) { legend.style.display = 'none'; return; }
         legend.style.display = 'block';
         if (h.open !== undefined && h.high !== undefined) {
             legend.style.color = h.close >= h.open ? '#2C4A6E' : '#C6473C';
-            legend.textContent = `${h.date}  O ${fmt(h.open)}  H ${fmt(h.high)}  L ${fmt(h.low)}  C ${fmt(h.close)}`;
+            legend.textContent = `${label(h)}  O ${fmt(h.open)}  H ${fmt(h.high)}  L ${fmt(h.low)}  C ${fmt(h.close)}`;
         } else {
             legend.style.color = '#2B2822';
-            legend.textContent = `${h.date}  ${fmt(h.close ?? h.price)}`;
+            legend.textContent = `${label(h)}  ${fmt(h.close ?? h.price)}`;
         }
     };
     render(history[history.length - 1]);
     chart.subscribeCrosshairMove((param) => {
-        render(param && param.time ? byDate[param.time] : history[history.length - 1]);
+        render(param && param.time != null ? byTime[param.time] : history[history.length - 1]);
     });
 }
 

@@ -74,4 +74,8 @@ async def get_asset_history(
         "history": history,
         "current": current,
         "data_points": len(history),
+        # True only when the rows actually carry a unix-timestamp "time" field
+        # (real intraday candles) — checked on the data itself, not just the
+        # requested period, since a crypto fallback to CoinGecko never has it.
+        "intraday": bool(history) and "time" in history[0],
     }

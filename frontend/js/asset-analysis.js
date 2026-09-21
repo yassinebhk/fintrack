@@ -234,7 +234,31 @@ function renderTradingViewChart(data) {
     });
     tvChart = chart;
 
+    // Responsive resize — registered once per container, before any branch below,
+    // so it applies to both the intraday and the regular daily-bar chart.
+    if (!tvContainer._resizeHandler) {
+        tvContainer._resizeHandler = () => {
+            if (tvChart) tvChart.applyOptions({ width: tvContainer.clientWidth });
+        };
+        window.addEventListener('resize', tvContainer._resizeHandler);
+    }
+
     const history = data.history || [];
+
+    if (data.intraday) {
+        // Real intraday candles (unix-timestamp bars) — a genuinely different time
+        // axis from every other range, so it gets its own render path instead of
+        // reusing the daily-bar one. No SMA/buy-sell markers here: both are
+        // multi-day concepts (50/200 daily closes; snapping a trade to a trading
+        // day) that don't apply to a single session.
+        const series = renderIntradaySeries(chart, history);
+        tvSeries = series;
+        chart.applyOptions({ timeScale: { timeVisible: true, secondsVisible: false } });
+        chart.timeScale().fitContent();
+        if (typeof attachCrosshairLegend === 'function') attachCrosshairLegend(chart, tvContainer, history, 'time');
+        return;
+    }
+
     const hasOHLC = history.length > 0 && history[0].open !== undefined && history[0].high !== undefined;
 
     if (currentChartType === 'candles' && hasOHLC) {
@@ -278,14 +302,32 @@ function renderTradingViewChart(data) {
     if (typeof loadAssetDetailTradeMarkers === 'function' && data.ticker) {
         loadAssetDetailTradeMarkers(data.ticker, tvSeries, history.map(h => h.date));
     }
+}
 
-    // Responsive resize
-    if (!tvContainer._resizeHandler) {
-        tvContainer._resizeHandler = () => {
-            if (tvChart) tvChart.applyOptions({ width: tvContainer.clientWidth });
-        };
-        window.addEventListener('resize', tvContainer._resizeHandler);
+// Real intraday candles/area for the "1D" range — separate from the daily-bar
+// renderer above because the time axis is unix-timestamp bars, not date strings.
+function renderIntradaySeries(chart, history) {
+    const hasOHLC = history.length > 0 && history[0].open !== undefined && history[0].high !== undefined;
+    if (hasOHLC) {
+        const series = chart.addCandlestickSeries({
+            upColor: '#2C4A6E', downColor: '#C6473C',
+            borderUpColor: '#2C4A6E', borderDownColor: '#C6473C',
+            wickUpColor: '#2C4A6E', wickDownColor: '#C6473C',
+        });
+        series.setData(history.map(h => ({ time: h.time, open: h.open, high: h.high, low: h.low, close: h.close })));
+        return series;
     }
+    const firstPrice = history[0]?.close ?? 0;
+    const lastPrice = history[history.length - 1]?.close ?? 0;
+    const up = lastPrice >= firstPrice;
+    const series = chart.addAreaSeries({
+        lineColor: up ? '#2C4A6E' : '#C6473C',
+        topColor: up ? 'rgba(44, 74, 110,0.4)' : 'rgba(198, 71, 60,0.4)',
+        bottomColor: 'rgba(0,0,0,0)',
+        lineWidth: 2,
+    });
+    series.setData(history.map(h => ({ time: h.time, value: h.close })));
+    return series;
 }
 
 function renderAssetChart(data) {

@@ -401,7 +401,11 @@ class YahooFinanceService:
     async def _fetch_history_api(self, ticker: str, period: str = "1y") -> list[dict] | None:
         mapped = await self._resolve_ticker(ticker)
         url = f"{self.BASE_URL}/v8/finance/chart/{mapped}"
-        params = {"interval": "1d", "range": period}
+        # "1d" with a daily interval returns a single bar (today's OHLC) — useless
+        # for a chart. Ask Yahoo for real intraday candles instead; every other
+        # period keeps the exact daily-interval behavior it already had.
+        intraday = period == "1d"
+        params = {"interval": "5m" if intraday else "1d", "range": period}
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.get(url, headers=YAHOO_HEADERS, params=params)
@@ -418,14 +422,21 @@ class YahooFinanceService:
                     close = (quotes.get("close") or [])[i] if i < len(quotes.get("close", [])) else None
                     if close is None:
                         continue
-                    history.append({
+                    row = {
                         "date": datetime.fromtimestamp(t).strftime("%Y-%m-%d"),
                         "open": (quotes.get("open") or [close])[i] or close,
                         "high": (quotes.get("high") or [close])[i] or close,
                         "low": (quotes.get("low") or [close])[i] or close,
                         "close": close,
                         "volume": (quotes.get("volume") or [0])[i] or 0,
-                    })
+                    }
+                    if intraday:
+                        # Unix seconds — multiple bars share the same "date" on a
+                        # 1D view, so callers that need real chart granularity use
+                        # this instead (the "intraday" flag on the endpoint tells
+                        # them to).
+                        row["time"] = t
+                    history.append(row)
                 return history or None
         except Exception as exc:
             logger.error("yahoo history error for {}: {}", ticker, exc)
