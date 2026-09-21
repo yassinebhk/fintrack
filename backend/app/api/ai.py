@@ -21,7 +21,8 @@ Reglas:
 - Hablas SIEMPRE en español.
 - Eres amable, cercano y didáctico.
 - Explicas conceptos complejos de forma simple.
-- Nunca recomiendas comprar/vender tickers concretos (regulación).
+- Nunca recomiendas comprar/vender tickers concretos, ni opinas sobre si el precio de algo va a subir o bajar (regulación + principio de esta app).
+- Sí puedes y debes hablar de diversificación, concentración y desviación del reparto objetivo cuando los datos de la cartera te lo permitan — eso es tamaño/riesgo, no predicción de precio.
 - Recomiendas diversificación y horizonte a largo plazo.
 - Si te preguntan sobre la cartera del usuario, la analizas de forma educativa.
 - Si la pregunta toca inversión, añades un disclaimer breve al final.
@@ -50,7 +51,8 @@ def _build_portfolio_context(portfolio: dict) -> str:
         "",
         "POSICIONES:",
     ]
-    for pos in (portfolio.get("positions") or [])[:15]:
+    positions = portfolio.get("positions") or []
+    for pos in positions[:15]:
         lines.append(
             f"- {pos['ticker']} ({pos.get('type', '?')}): {pos.get('quantity'):.6g} unidades, "
             f"P/L: {pos.get('gain_loss_pct', 0):+.1f}%, Peso: {pos.get('weight', 0):.1f}%"
@@ -61,6 +63,31 @@ def _build_portfolio_context(portfolio: dict) -> str:
         lines.append("DISTRIBUCIÓN POR TIPO:")
         for t, info in by_type.items():
             lines.append(f"- {t}: {info.get('weight', 0):.1f}%")
+
+    # Allocation drift (target vs actual per block) — already computed for the
+    # daily-summary REPARTO block; giving the LLM this means it can actually
+    # answer "should I add to X" in terms of diversification/concentration
+    # instead of guessing without that context.
+    by_block = portfolio.get("by_block") or {}
+    block_targets = portfolio.get("block_targets") or {}
+    if by_block:
+        lines.append("")
+        lines.append("REPARTO POR BLOQUE (objetivo vs real — para hablar de diversificación, NUNCA de si el precio subirá):")
+        for block, info in by_block.items():
+            target = block_targets.get(block)
+            actual = info.get("weight", 0)
+            drift = f", desviación {actual - target:+.1f}pp vs objetivo {target}%" if target is not None else ""
+            lines.append(f"- {block}: {actual:.1f}%{drift}")
+
+    # Concentration flags — objective fact (weight above a threshold), not a
+    # judgment on the asset itself.
+    concentrated = [p for p in positions if (p.get("weight") or 0) >= 8]
+    if concentrated:
+        lines.append("")
+        lines.append("POSICIONES CONCENTRADAS (≥8% de la cartera en un solo activo):")
+        for p in concentrated:
+            lines.append(f"- {p['ticker']}: {p.get('weight', 0):.1f}%")
+
     return "\n".join(lines)
 
 
