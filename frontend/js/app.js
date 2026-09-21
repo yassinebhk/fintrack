@@ -643,6 +643,30 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); });
 });
 
+// "Ver resumen en tiempo real": the EXACT same table sent to Telegram
+// (HOY/ACUMULADO/TENDENCIA/REPARTO), computed fresh right now (bypasses the
+// 60s portfolio cache) — never sent anywhere, purely an on-demand preview.
+// Reuses the day-detail modal since it already renders this same format.
+async function showLiveSummary() {
+    const modal = document.getElementById('dayDetailModal');
+    const body = document.getElementById('dayDetailBody');
+    const title = document.getElementById('dayDetailTitle');
+    if (!modal || !body || !title) return;
+    title.textContent = '🔴 Resumen en tiempo real';
+    body.innerHTML = '<p class="text-muted">Calculando con datos en vivo…</p>';
+    modal.classList.add('active');
+    try {
+        const r = await fetch(`${CONFIG.API_BASE_URL}/portfolio/summary-preview`, { cache: 'no-store' });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        const when = new Date(data.generated_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        body.innerHTML = `<p class="text-muted" style="font-size:11px; margin:0 0 8px;">Calculado ahora mismo (${when}) — mismo formato que se envía a Telegram, sin enviarlo a ningún sitio.</p>
+            <div style="white-space:pre-wrap; font-family:var(--font-mono); font-size:12px; line-height:1.5; background:rgba(43,40,34,0.04); border-radius:8px; padding:12px; overflow-x:auto;">${data.html}</div>`;
+    } catch (err) {
+        body.innerHTML = `<p class="text-muted" style="color:var(--negative);">No se pudo calcular: ${err.message}</p>`;
+    }
+}
+
 function createPortfolioChart(history) {
     const ctx = document.getElementById('portfolioChart');
     if (!ctx) return;

@@ -112,14 +112,36 @@ async def _save_pin(message_id: int, date: str) -> None:
         await s.execute(stmt)
 
 
+async def build_live_summary(use_cache: bool = True) -> tuple[str, dict]:
+    """Assembles the exact same summary table used everywhere this report
+    appears (Telegram sends, the in-app 'ver en tiempo real' preview) — one
+    shared source of truth. use_cache=False forces a fresh computation instead
+    of the portfolio's normal 60s cache, for an on-demand real-time preview."""
+    from app.auth import get_owner_user_id_cached
+    from app.services import allocation
+    from app.services.portfolio import PortfolioService
+    from app.services.report_prefs import get_excluded
+
+    owner_id = await get_owner_user_id_cached()
+    svc = PortfolioService(owner_id or 0)
+    p = await svc.calculate_portfolio(use_cache=use_cache)
+    excluded = await get_excluded()
+    targets = await allocation.get_targets()
+    shown = sorted(
+        (x for x in p.get("positions", []) if (x.get("ticker") or "").upper() not in excluded),
+        key=lambda x: x.get("market_value_base") or 0, reverse=True,
+    )[:14]
+    trends = await _asset_trends(svc, shown)
+    html = build_summary_html(p, excluded, targets, trends)
+    return html, p
+
+
 async def send_daily_summary_pinned(force: bool = False) -> dict:
     """Build the portfolio table, send it, unpin yesterday's, pin today's.
     Idempotent per day: if already sent today it skips (unless force=True), so several
     morning cron times can fire as redundancy without spamming the user."""
     from datetime import datetime, timezone
     from app.services.notifications.telegram import TelegramNotifier
-    from app.services.portfolio import PortfolioService
-    from app.services.report_prefs import get_excluded
 
     now = datetime.now(timezone.utc)
     today = now.date().isoformat()
@@ -133,20 +155,8 @@ async def send_daily_summary_pinned(force: bool = False) -> dict:
     if not force and prev.get("date") == today:
         return {"skipped": "ya enviado hoy", "date": today}
 
-    from app.auth import get_owner_user_id_cached
-    from app.services import allocation
-
-    owner_id = await get_owner_user_id_cached()
-    svc = PortfolioService(owner_id or 0)
-    p = await svc.calculate_portfolio()
-    excluded = await get_excluded()
-    targets = await allocation.get_targets()
-    shown = sorted(
-        (x for x in p.get("positions", []) if (x.get("ticker") or "").upper() not in excluded),
-        key=lambda x: x.get("market_value_base") or 0, reverse=True,
-    )[:14]
-    trends = await _asset_trends(svc, shown)
-    html = build_summary_html(p, excluded, targets, trends) + "\n📌 <i>Resumen diario</i>"
+    base_html, p = await build_live_summary(use_cache=False)
+    html = base_html + "\n📌 <i>Resumen diario</i>"
     await _save_daily_summary(today, html, p)  # archive for the in-app history
     n = TelegramNotifier()
     mid = await n.send_html_return_id(html)
