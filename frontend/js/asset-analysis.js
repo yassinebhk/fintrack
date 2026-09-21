@@ -137,13 +137,25 @@ async function updateAssetInfo(ticker, data) {
     // Update price info
     if (data.current) {
         const price = data.current.price || data.current.price_eur || 0;
-        const change = data.current.change_percent || data.current.change_24h || 0;
-        
         document.getElementById('assetCurrentPrice').textContent = formatCurrencyLocal(price);
-        
+
         const changeEl = document.getElementById('assetPriceChange');
-        changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-        changeEl.className = `price-change ${change >= 0 ? 'positive' : 'negative'}`;
+        const history = data.history || [];
+        // Range-relative: the % shown matches the SELECTED chart period (like
+        // Yahoo/Robinhood), not always "hoy" regardless of which range button is
+        // active. Computed straight from the same history array the chart draws.
+        const PERIOD_LABEL = { '1d': 'hoy', '5d': '1 semana', '1mo': '1 mes', '3mo': '3 meses', '1y': '1 año', 'max': 'histórico' };
+        if (currentAssetPeriod !== '1d' && history.length >= 2) {
+            const first = history[0].close ?? history[0].price;
+            const last = history[history.length - 1].close ?? history[history.length - 1].price;
+            const pct = first ? (last / first - 1) * 100 : (data.current.change_percent || data.current.change_24h || 0);
+            changeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}% (${PERIOD_LABEL[currentAssetPeriod] || currentAssetPeriod})`;
+            changeEl.className = `price-change ${pct >= 0 ? 'positive' : 'negative'}`;
+        } else {
+            const change = data.current.change_percent || data.current.change_24h || 0;
+            changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}% hoy`;
+            changeEl.className = `price-change ${change >= 0 ? 'positive' : 'negative'}`;
+        }
     }
     
     // Get position data
@@ -254,6 +266,9 @@ function renderTradingViewChart(data) {
         })));
         tvSeries = series;
     }
+
+    if (typeof addSMAOverlays === 'function') addSMAOverlays(chart, history);
+    if (typeof attachCrosshairLegend === 'function') attachCrosshairLegend(chart, tvContainer, history);
 
     chart.timeScale().fitContent();
 

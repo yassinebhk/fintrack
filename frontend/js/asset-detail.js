@@ -144,6 +144,80 @@ function renderAssetDetailMarketSeries(chart, history) {
     }
 }
 
+// Rolling-mean SMA over the CLOSE prices already loaded for the chart — same
+// 50/200-session windows the quant engine itself uses (asset_analysis.py's
+// _build_charts), computed client-side so no extra backend round-trip is
+// needed. Returns [] when there aren't enough bars yet (e.g. a 1M range).
+function computeSMASeries(history, period) {
+    const closes = history.map(h => h.close ?? h.price);
+    const out = [];
+    for (let i = period - 1; i < closes.length; i++) {
+        let sum = 0, ok = true;
+        for (let j = i - period + 1; j <= i; j++) {
+            if (closes[j] == null) { ok = false; break; }
+            sum += closes[j];
+        }
+        if (ok) out.push({ time: history[i].date, value: sum / period });
+    }
+    return out;
+}
+
+// Draw SMA50 (gold, dashed) and SMA200 (terracotta, dashed) on top of the price
+// series — same colors as the static chart in the deep-analysis modal, just
+// interactive here. Shared by both the asset-detail and asset-analysis pages.
+function addSMAOverlays(chart, history) {
+    const sma50 = computeSMASeries(history, 50);
+    const sma200 = computeSMASeries(history, 200);
+    if (sma50.length) {
+        const s = chart.addLineSeries({
+            color: '#C99A3E', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+            priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        });
+        s.setData(sma50);
+    }
+    if (sma200.length) {
+        const s = chart.addLineSeries({
+            color: '#C6473C', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+            priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        });
+        s.setData(sma200);
+    }
+}
+
+// Floating O/H/L/C (or price) readout that follows the crosshair, TradingView-
+// style. Reuses one overlay div per container — safe to call again after a
+// chart is torn down and recreated (container.innerHTML='' wipes it along
+// with the old chart, so no stale subscriptions pile up).
+function attachCrosshairLegend(chart, container, history) {
+    if (!container || !history.length) return;
+    let legend = container.querySelector('.tv-crosshair-legend');
+    if (!legend) {
+        legend = document.createElement('div');
+        legend.className = 'tv-crosshair-legend';
+        legend.style.cssText = 'position:absolute; top:6px; left:6px; z-index:2; font-size:11px; font-family:monospace; background:rgba(245,241,233,0.9); border:1px solid rgba(43,40,34,0.12); border-radius:6px; padding:3px 8px; pointer-events:none; white-space:nowrap;';
+        container.style.position = container.style.position || 'relative';
+        container.appendChild(legend);
+    }
+    const byDate = {};
+    history.forEach(h => { byDate[h.date] = h; });
+    const fmt = (n) => (n == null ? '—' : (+n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    const render = (h) => {
+        if (!h) { legend.style.display = 'none'; return; }
+        legend.style.display = 'block';
+        if (h.open !== undefined && h.high !== undefined) {
+            legend.style.color = h.close >= h.open ? '#2C4A6E' : '#C6473C';
+            legend.textContent = `${h.date}  O ${fmt(h.open)}  H ${fmt(h.high)}  L ${fmt(h.low)}  C ${fmt(h.close)}`;
+        } else {
+            legend.style.color = '#2B2822';
+            legend.textContent = `${h.date}  ${fmt(h.close ?? h.price)}`;
+        }
+    };
+    render(history[history.length - 1]);
+    chart.subscribeCrosshairMove((param) => {
+        render(param && param.time ? byDate[param.time] : history[history.length - 1]);
+    });
+}
+
 // Mark each real buy/sell on the market-price chart, at its exact date — so
 // you see where on the real price curve you actually entered/exited, not just
 // your position value over time (that's the separate chart below).
@@ -241,6 +315,8 @@ async function loadAssetDetailMarketChart(ticker) {
         });
         assetDetailTvChart = chart;
         const series = renderAssetDetailMarketSeries(chart, history);
+        addSMAOverlays(chart, history);
+        attachCrosshairLegend(chart, container, history);
         chart.timeScale().fitContent();
         loadAssetDetailTradeMarkers(ticker, series, history.map(h => h.date));
 
