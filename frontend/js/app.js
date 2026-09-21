@@ -811,6 +811,26 @@ function exportToCSV() {
 }
 
 // Check which backend integrations are configured and surface a banner if any are missing.
+// Realized gains and dividends YTD (real FIFO reconstruction from the
+// transaction ledger — already computed for Análisis → Fiscalidad, just
+// wasn't surfaced on the main dashboard). "Dividendos YTD" was a dead HTML
+// element that never got wired up before this.
+async function loadTaxSummaryTiles() {
+    try {
+        const r = await fetch(`${CONFIG.API_BASE_URL}/portfolio/tax`);
+        if (!r.ok) return;
+        const d = await r.json();
+        const divEl = document.getElementById('dividendsYTD');
+        if (divEl) divEl.textContent = formatCurrency(d.dividends_ytd_eur || 0);
+        const realEl = document.getElementById('realizedYTD');
+        if (realEl) {
+            const v = d.realized_ytd_eur || 0;
+            realEl.textContent = formatCurrency(v);
+            realEl.className = v >= 0 ? 'stat-value value-positive' : 'stat-value value-negative';
+        }
+    } catch (err) { /* best-effort — leave the placeholders */ }
+}
+
 async function loadIntegrationsStatus() {
     const banner = document.getElementById('integrationsBanner');
     if (!banner) return;
@@ -899,7 +919,8 @@ async function loadDashboard() {
         }
         
         updateStatus(true);
-        
+        loadTaxSummaryTiles(); // fire-and-forget: FIFO reconstruction, don't block the rest of the dashboard
+
     } catch (error) {
         console.error('Error loading dashboard:', error);
         updateStatus(false);

@@ -436,6 +436,11 @@ const INFO_GLOSSARY = {
         what: 'El total de dividendos/cupones cobrados en efectivo desde el 1 de enero de este año.',
         read: 'Solo cuenta el dinero efectivamente recibido — si acabas de comprar una posición, tardará hasta el próximo pago en aparecer aquí.',
     },
+    realized_ytd: {
+        title: 'Realizado este año',
+        what: 'Ganancia o pérdida ya materializada este año al vender, calculada por FIFO (primero en entrar, primero en salir) sobre tus transacciones reales.',
+        read: 'Distinto de la ganancia/pérdida "no realizada" de la cabecera: esta es dinero que ya has cobrado o perdido de verdad, no una valoración a precio de mercado que aún puede cambiar. Detalle completo en Análisis → Fiscalidad.',
+    },
     positions_count: {
         title: 'Posiciones',
         what: 'El número de activos distintos que tienes actualmente en cartera.',

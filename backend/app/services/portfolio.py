@@ -777,6 +777,63 @@ class PortfolioService:
                      "(2 meses). No es asesoramiento fiscal."),
         }
 
+    async def dividend_report(self) -> dict:
+        """Real dividend history straight from the transaction ledger — total
+        received, broken down by year and by position (with yield-on-cost =
+        dividends received ÷ that position's current cost basis), and the most
+        recent payments. No live market calls, no forward projection (would
+        need per-ticker Yahoo fundamentals, too slow for a request hot path) —
+        every number here is something that already actually happened."""
+        from collections import defaultdict
+
+        async with session_scope() as session:
+            txs = await TransactionRepository(session, self.user_id).list_all()
+
+        by_year: dict[int, float] = defaultdict(float)
+        by_ticker: dict[str, float] = defaultdict(float)
+        events: list[dict] = []
+        for t in txs:
+            if (t.type or "").lower() != "dividend":
+                continue
+            tk = (t.ticker or "").upper()
+            qty = float(t.quantity or 0.0)
+            price = float(t.price or 0.0)
+            amount = qty * price if price else qty
+            yr = t.executed_at.year
+            by_year[yr] += amount
+            by_ticker[tk] += amount
+            events.append({
+                "date": t.executed_at.date().isoformat(), "ticker": tk,
+                "amount_eur": round(amount, 2), "broker": t.broker,
+            })
+
+        portfolio = await self.calculate_portfolio()
+        positions = {p["ticker"]: p for p in portfolio.get("positions", [])}
+
+        by_position = []
+        for tk, total in sorted(by_ticker.items(), key=lambda kv: -kv[1]):
+            pos = positions.get(tk)
+            cost_basis = pos.get("cost_basis") if pos else None
+            yoc = round(total / cost_basis * 100, 2) if cost_basis else None
+            by_position.append({
+                "ticker": tk, "name": (pos or {}).get("name") or tk,
+                "total_received_eur": round(total, 2),
+                "yield_on_cost_pct": yoc,
+                "still_held": pos is not None,
+            })
+
+        this_year = date.today().year
+        return {
+            "total_received_eur": round(sum(by_year.values()), 2),
+            "this_year_eur": round(by_year.get(this_year, 0.0), 2),
+            "by_year": [{"year": y, "amount_eur": round(v, 2)} for y, v in sorted(by_year.items())],
+            "by_position": by_position,
+            "recent_events": sorted(events, key=lambda e: e["date"], reverse=True)[:20],
+            "note": ("Basado en las transacciones tipo 'dividendo' que tienes registradas. "
+                     "Yield-on-coste = dividendos recibidos ÷ coste de la posición actual "
+                     "(solo para lo que sigues manteniendo)."),
+        }
+
     async def get_portfolio_history(self, days: int = 365) -> list[dict]:
         async with session_scope() as session:
             rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)

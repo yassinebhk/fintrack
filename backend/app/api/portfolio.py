@@ -102,6 +102,16 @@ async def get_portfolio_tax(svc: PortfolioService = Depends(_get_service)) -> di
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/portfolio/dividends")
+async def get_portfolio_dividends(svc: PortfolioService = Depends(_get_service)) -> dict:
+    """Real dividend history from the transaction ledger: total received, by
+    year, by position (with yield-on-cost), and the most recent payments."""
+    try:
+        return await svc.dividend_report()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.get("/portfolio/history")
 async def get_portfolio_history(
     days: int = Query(default=365, ge=1, le=3650), svc: PortfolioService = Depends(_get_service)

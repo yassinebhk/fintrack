@@ -237,6 +237,13 @@
                             </div>
                         </div>
                         <div class="stat-card">
+                            <span class="stat-icon">✅</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="realizedYTD">0 €</span>
+                                <span class="stat-label">Realizado este año<button type="button" class="info-icon" data-info-key="realized_ytd" aria-label="Qué es esto" onclick="event.stopPropagation(); openInfoIcon(this)">i</button></span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
                             <span class="stat-icon">📊</span>
                             <div class="stat-info">
                                 <span class="stat-value" id="positionsCount">0</span>
@@ -535,6 +542,11 @@
                             <h4>🧾 Fiscalidad (estimada)</h4>
                             <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">Plusvalías realizadas (FIFO), IRPF estimado (base del ahorro, España) y posiciones para compensar pérdidas.</p>
                             <div id="taxContent"><p class="text-muted">Cargando…</p></div>
+                        </div>
+                        <div class="card" id="dividendCard" style="margin-bottom: var(--spacing-md);">
+                            <h4>💰 Dividendos recibidos</h4>
+                            <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">Historial real de dividendos por tus transacciones registradas — total, por año y por posición (yield-on-coste).</p>
+                            <div id="dividendContent"><p class="text-muted">Cargando…</p></div>
                         </div>
                         <div class="advanced-grid">
                             <div class="card">
@@ -2003,14 +2015,14 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="js/info-glossary.js?v=20260915repartos"></script>
-    <script src="js/app.js?v=20260916retry"></script>
+    <script src="js/info-glossary.js?v=20260921dividendos"></script>
+    <script src="js/app.js?v=20260921realized"></script>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260912blue"></script>
     <script src="js/news.js?v=20260530a"></script>
     <script src="js/portfolio-manager.js?v=20260916pdf"></script>
     <script src="js/ai-advisor.js?v=20260530a"></script>
-    <script src="js/asset-analysis.js?v=20260921vsindex"></script>
+    <script src="js/asset-analysis.js?v=20260921dividendos"></script>
     <script src="js/backtest.js?v=20260912info"></script>
     <script src="js/opportunities.js?v=20260921reorder"></script>
     <script src="js/asset-deep-analysis.js?v=20260921catalyst"></script>

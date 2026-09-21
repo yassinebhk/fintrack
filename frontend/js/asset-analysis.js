@@ -30,6 +30,7 @@ function initAssetAnalysis() {
     loadAttribution();
     loadStressTest();
     loadTaxReport();
+    loadDividendReport();
 }
 
 /**
@@ -931,6 +932,47 @@ async function loadTaxReport() {
         ? `<div style="margin-top:10px;"><strong style="font-size:13px;">🍂 Para compensar (posiciones en pérdida):</strong><ul style="margin:6px 0 0; padding-left:18px; font-size:12.5px;">${d.harvest_candidates.map(h => `<li>${h.name} <span class="text-muted mono" style="font-size:11px;">${h.ticker}</span>: <span class="value-negative mono">${eur(h.unrealized_loss_eur)}</span></li>`).join('')}</ul></div>`
         : '';
     el.innerHTML = tiles + sales + harvest + `<p class="text-muted" style="font-size:10.5px; margin:8px 0 0;">${d.note}</p>`;
+}
+
+async function loadDividendReport() {
+    const el = document.getElementById('dividendContent');
+    if (!el) return;
+    let d;
+    try {
+        const r = await fetch(`${ASSET_API}/portfolio/dividends`);
+        if (!r.ok) { el.innerHTML = '<p class="text-muted">No disponible.</p>'; return; }
+        d = await r.json();
+    } catch (e) { el.innerHTML = '<p class="text-muted">No disponible.</p>'; return; }
+    if (!d.total_received_eur) {
+        el.innerHTML = '<p class="text-muted">Aún no tienes dividendos registrados. Se irán sumando según registres transacciones de tipo "Dividendo".</p>';
+        return;
+    }
+    const eur = (v) => Math.round(v).toLocaleString('es-ES') + ' €';
+    const tile = (label, value) => `<div style="background:rgba(43,40,34,0.03); border-radius:8px; padding:10px 12px; min-width:120px; flex:1;">
+        <div style="font-size:11px; color:var(--text-secondary);">${label}</div>
+        <div style="font-size:18px; font-weight:700; margin-top:2px; color:var(--positive);">${value}</div></div>`;
+    const tiles = `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        ${tile(`Recibidos ${new Date().getFullYear()}`, eur(d.this_year_eur))}
+        ${tile('Total histórico', eur(d.total_received_eur))}
+    </div>`;
+
+    const years = d.by_year || [];
+    const maxY = Math.max(...years.map(y => y.amount_eur), 1);
+    const yearBars = years.length ? `<div style="margin-bottom:12px;">
+        <strong style="font-size:12.5px;">Por año</strong>
+        <div style="display:flex; align-items:flex-end; gap:6px; height:70px; margin-top:6px;">
+            ${years.map(y => `<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;" title="${y.year}: ${eur(y.amount_eur)}">
+                <div style="width:100%; background:var(--positive); border-radius:3px 3px 0 0; height:${Math.max(3, Math.round(y.amount_eur / maxY * 54))}px;"></div>
+                <span class="text-muted" style="font-size:10px;">${y.year}</span>
+            </div>`).join('')}
+        </div>
+    </div>` : '';
+
+    const byPos = (d.by_position || []).filter(p => p.still_held);
+    const posRows = byPos.length ? `<div class="table-container"><table class="manager-table"><thead><tr><th>Activo</th><th class="text-right">Recibido</th><th class="text-right">Yield-on-coste</th></tr></thead><tbody>${byPos.map(p => `<tr><td>${p.name} <span class="text-muted mono" style="font-size:11px;">${p.ticker}</span></td><td class="text-right mono value-positive">${eur(p.total_received_eur)}</td><td class="text-right mono">${p.yield_on_cost_pct != null ? p.yield_on_cost_pct + '%' : '—'}</td></tr>`).join('')}</tbody></table></div>`
+        : '';
+
+    el.innerHTML = tiles + yearBars + posRows + `<p class="text-muted" style="font-size:10.5px; margin:8px 0 0;">${d.note}</p>`;
 }
 
 async function loadStressTest() {
