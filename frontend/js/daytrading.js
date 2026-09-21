@@ -189,6 +189,8 @@ async function dtRefresh() {
         dtRenderOpen(trades.filter(t => t.status === 'open'));
         dtRenderClosed(trades.filter(t => t.status === 'closed'));
         dtRenderReport(reportData);
+        const ex = document.getElementById('dtHistorialExport');
+        if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('dtHistorialCard', 'trading-diario-historial');
     } catch (err) {
         console.error('Error loading day trading data:', err);
     }

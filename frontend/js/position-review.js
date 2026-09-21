@@ -29,6 +29,18 @@ async function loadPositionReview(force = false) {
     el.innerHTML = reviewHtml(data);
     const ex = document.getElementById('positionReviewExport');
     if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('positionReviewContent', 'vender-o-mantener');
+    filterReviewCards('all');
+}
+
+// Jump straight to just the 🔴 Rotar / 🟠 Reducir cards instead of scrolling
+// past everything — client-side only, the data's already loaded.
+function filterReviewCards(signal) {
+    document.querySelectorAll('#reviewFilterBar [data-review-filter]').forEach(b => {
+        b.classList.toggle('active', b.dataset.reviewFilter === signal);
+    });
+    document.querySelectorAll('[data-review-signal]').forEach(card => {
+        card.style.display = (signal === 'all' || card.dataset.reviewSignal === signal) ? '' : 'none';
+    });
 }
 
 // Real, inspectable breakdown of every factor the engine computed for this
@@ -87,16 +99,18 @@ function reviewHtml(data) {
     const pct = (v) => (v == null ? '—' : (v >= 0 ? '+' : '') + (+v).toFixed(1) + '%');
     const cls = (v) => (v == null ? '' : v >= 0 ? 'value-positive' : 'value-negative');
 
+    const chip = (signal, label) => `<button type="button" class="period-btn" data-review-filter="${signal}" onclick="filterReviewCards('${signal}')" style="font-size:13px;">${label}</button>`;
     const banner = `<div class="card" style="margin-bottom:16px;">
         <h3>🔄 ¿Vender o mantener?</h3>
         <p class="text-muted" style="font-size:13px; margin:6px 0 10px;">
             Señal por posición mirando <strong>hacia delante</strong> (salud del activo + tu concentración), <strong>no</strong> tu precio de entrada.
             Depende del <strong>horizonte</strong> que le pongas a cada activo. No es una orden — decide tú.</p>
-        <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:13px;">
-            <span>🔴 Rotar <strong>${s.rotar || 0}</strong></span>
-            <span>🟠 Reducir <strong>${s.reducir || 0}</strong></span>
-            <span>🟡 Vigilar <strong>${s.vigilar || 0}</strong></span>
-            <span>🟢 Mantener <strong>${s.mantener || 0}</strong></span>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;" id="reviewFilterBar">
+            ${chip('all', `Todas ${data.reviews.length}`)}
+            ${chip('ROTAR', `🔴 Rotar ${s.rotar || 0}`)}
+            ${chip('REDUCIR', `🟠 Reducir ${s.reducir || 0}`)}
+            ${chip('VIGILAR', `🟡 Vigilar ${s.vigilar || 0}`)}
+            ${chip('MANTENER', `🟢 Mantener ${s.mantener || 0}`)}
         </div>
     </div>`;
 
@@ -114,7 +128,7 @@ function reviewHtml(data) {
             ${m.drawdown_from_peak_pct != null ? ` · desde máx ${(+m.drawdown_from_peak_pct).toFixed(0)}%` : ''}
         </div>` : '';
         const dim = r.immaterial ? 'opacity:0.6;' : '';
-        return `<div class="card" style="margin-bottom:12px; border-left:3px solid ${meta.color}; ${dim}">
+        return `<div class="card" data-review-signal="${r.signal}" style="margin-bottom:12px; border-left:3px solid ${meta.color}; ${dim}">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
                 <div>
                     <strong>${meta.emoji} ${meta.label}</strong> ·

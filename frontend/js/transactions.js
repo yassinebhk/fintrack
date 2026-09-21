@@ -15,6 +15,8 @@ async function loadTransactions() {
         if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
         _txAll = Array.isArray(data) ? data : [];
         renderTransactions();
+        const ex = document.getElementById('transactionsExport');
+        if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('transactionsCard', 'transacciones');
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:24px; color:var(--negative);">No se pudieron cargar las transacciones: ${err.message}</td></tr>`;
     }
@@ -27,11 +29,21 @@ function renderTransactions() {
     const type = (document.getElementById('txType') || {}).value || 'all';
     const from = (document.getElementById('txDateFrom') || {}).value || '';
     const to = (document.getElementById('txDateTo') || {}).value || '';
+    const q = ((document.getElementById('txSearch') || {}).value || '').trim().toLowerCase();
 
     let list = _txAll.slice();
     if (type !== 'all') list = list.filter(t => t.type === type);
     if (from) list = list.filter(t => (t.executed_at || '').slice(0, 10) >= from);
     if (to) list = list.filter(t => (t.executed_at || '').slice(0, 10) <= to);
+    if (q) {
+        list = list.filter(t => {
+            const name = (typeof getAssetName === 'function' ? getAssetName(t.ticker) : '') || '';
+            return (t.ticker || '').toLowerCase().includes(q)
+                || name.toLowerCase().includes(q)
+                || (t.broker || '').toLowerCase().includes(q)
+                || (t.notes || '').toLowerCase().includes(q);
+        });
+    }
 
     if (!list.length) {
         const msg = _txAll.length
@@ -83,4 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', renderTransactions);
     });
+    const search = document.getElementById('txSearch');
+    if (search) search.addEventListener('input', renderTransactions);
 });

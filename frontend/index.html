@@ -601,11 +601,15 @@
                 <div class="page page-transactions" id="page-transactions">
                     <section class="transactions-header">
                         <h2>Registro de Transacciones</h2>
-                        <button class="btn-primary" id="btnAddTransaction">+ Nueva Transacción</button>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <div id="transactionsExport"></div>
+                            <button class="btn-primary" id="btnAddTransaction">+ Nueva Transacción</button>
+                        </div>
                     </section>
 
-                    <div class="card">
+                    <div class="card" id="transactionsCard">
                         <div class="transactions-filters">
+                            <input type="text" id="txSearch" class="input-date" placeholder="🔍 Ticker, nombre, broker o nota…" style="min-width:220px;">
                             <input type="date" id="txDateFrom" class="input-date">
                             <span>hasta</span>
                             <input type="date" id="txDateTo" class="input-date">
@@ -1579,11 +1583,12 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                 </div>
 
                 <div class="page page-watchlist" id="page-watchlist">
-                    <section class="manager-header">
+                    <section class="manager-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
                         <div>
                             <h2>👀 Watchlist</h2>
                             <p>Activos que vigilas para comprar, con su <strong>setup de entrada</strong> en vivo (RSI, tendencia, rango 52s, ADX).</p>
                         </div>
+                        <div id="watchlistExport"></div>
                     </section>
                     <div id="watchlistContent"></div>
                 </div>
@@ -1914,9 +1919,10 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                         </div>
                     </div>
 
-                    <div class="card" style="margin-bottom:16px;">
+                    <div class="card" style="margin-bottom:16px;" id="dtHistorialCard">
                         <div class="card-header">
                             <h3>Historial</h3>
+                            <div id="dtHistorialExport"></div>
                         </div>
                         <div style="overflow-x:auto;">
                             <table class="manager-table">
@@ -2009,15 +2015,15 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/opportunities.js?v=20260921reorder"></script>
     <script src="js/asset-deep-analysis.js?v=20260921catalyst"></script>
     <script src="js/asset-detail.js?v=20260921vsindex"></script>
-    <script src="js/transactions.js?v=20260916all"></script>
+    <script src="js/transactions.js?v=20260921export"></script>
     <script src="js/polymarket.js?v=20260912info"></script>
-    <script src="js/daytrading.js?v=20260912info"></script>
+    <script src="js/daytrading.js?v=20260921export"></script>
     <script src="js/journal.js?v=20260915repartos"></script>
-    <script src="js/watchlist.js?v=20260915vol"></script>
+    <script src="js/watchlist.js?v=20260921spark"></script>
     <script src="js/export-utils.js?v=20260913export"></script>
     <script src="js/scorecard.js?v=20260914tune"></script>
     <script src="js/daily-summary.js?v=20260913export"></script>
-    <script src="js/position-review.js?v=20260916gnews"></script>
+    <script src="js/position-review.js?v=20260921filter"></script>
     <script>
         // PWA: register the service worker (installable + offline app shell)
         if ('serviceWorker' in navigator) {

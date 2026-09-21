@@ -17,6 +17,32 @@ async function loadWatchlist() {
     } catch (e) { /* render form anyway */ }
     el.innerHTML = watchlistFormHtml() + watchlistListHtml(items);
     wireWatchlistForm();
+    const ex = document.getElementById('watchlistExport');
+    if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('watchlistContent', 'watchlist');
+    if (items.length && typeof renderSparkline === 'function') loadWatchlistSparklines(items);
+}
+
+// Real recent-trend sparklines per row — same renderSparkline() the portfolio
+// dashboard uses, but fetched via the generic (not portfolio-only) history
+// endpoint since a watched ticker isn't necessarily something you own.
+const _watchSparkCache = new Map();
+async function loadWatchlistSparklines(items) {
+    await Promise.all(items.map(async (it) => {
+        const cell = document.querySelector(`[data-watch-spark="${it.ticker}"]`);
+        if (!cell) return;
+        const cached = _watchSparkCache.get(it.ticker);
+        if (cached) { cell.innerHTML = renderSparkline(cached.values, cached.up); return; }
+        try {
+            const resp = await fetch(`${WATCHLIST_API}/asset/${encodeURIComponent(it.ticker)}/history?period=1mo&asset_type=auto`, { cache: 'no-store' });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const values = (data.history || []).map(h => h.close ?? h.price).filter(v => v > 0);
+            if (values.length < 2) return;
+            const up = values[values.length - 1] >= values[0];
+            _watchSparkCache.set(it.ticker, { values, up });
+            cell.innerHTML = renderSparkline(values, up);
+        } catch (err) { /* a missing sparkline isn't worth surfacing as an error */ }
+    }));
 }
 
 function watchlistFormHtml() {
@@ -46,6 +72,7 @@ function watchlistListHtml(items) {
         const color = c.startsWith('🟢') ? 'var(--positive)' : c.startsWith('🔵') ? 'var(--info)' : c.startsWith('🟡') ? 'var(--warning)' : 'var(--text-secondary)';
         return `<tr>
             <td>${it.name} <span class="text-muted mono" style="font-size:11px;">${it.ticker}</span>${it.note ? `<br><span class="text-muted" style="font-size:11px;">${it.note}</span>` : ''}</td>
+            <td data-watch-spark="${it.ticker}"></td>
             <td class="text-right mono">${it.price != null ? num(it.price, 2) : '—'}</td>
             <td class="text-right mono ${(it.ret_3m || 0) >= 0 ? 'value-positive' : 'value-negative'}">${it.ret_3m != null ? (it.ret_3m >= 0 ? '+' : '') + it.ret_3m + '%' : '—'}</td>
             <td class="text-right mono">${it.rsi != null ? num(it.rsi, 0) : '—'}</td>
@@ -56,7 +83,7 @@ function watchlistListHtml(items) {
         </tr>`;
     }).join('');
     return `<div class="card"><div class="table-container"><table class="manager-table">
-        <thead><tr><th>Activo</th><th class="text-right">Precio</th><th class="text-right">3m</th><th class="text-right">RSI</th><th class="text-right">Rango 52s</th><th class="text-right">ADX</th><th>Setup</th><th></th></tr></thead>
+        <thead><tr><th>Activo</th><th>Tendencia (1m)</th><th class="text-right">Precio</th><th class="text-right">3m</th><th class="text-right">RSI</th><th class="text-right">Rango 52s</th><th class="text-right">ADX</th><th>Setup</th><th></th></tr></thead>
         <tbody>${rows}</tbody></table></div>
         <p class="text-muted" style="font-size:10.5px; margin:8px 0 0;">Setup: 🟢 posible entrada · 🔵 fuerza/ruptura · 🟡 cerca de mínimos · gris sin setup claro. Son señales técnicas objetivas, no una recomendación.</p>
     </div>`;
