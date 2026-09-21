@@ -10,7 +10,7 @@ async function loadLearnPage(targetPage) {
     if (targetPage.dataset.loaded === 'true') return;
 
     try {
-        const response = await fetch('pages/learn.html?v=20260921graficos3', { cache: 'no-store' });
+        const response = await fetch('pages/learn.html?v=20260921cuentas', { cache: 'no-store' });
         if (response.ok) {
             targetPage.innerHTML = await response.text();
             targetPage.dataset.loaded = 'true';
@@ -1986,7 +1986,7 @@ function closeMobileSidebar() {
 const DOCS_ANCHORS = new Set(['que-es', 'guia-uso', 'el-cerebro', 'novedades', 'algoritmos',
     'autoentrenamiento', 'motor-sistematico', 'que-ia-usamos', 'trading-diario', 'glosario',
     'arquitectura', 'inicio-rapido', 'configuracion', 'añadir-posiciones', 'funcionalidades', 'api', 'faq']);
-const LEARN_ANCHORS = new Set(['conceptos-basicos', 'tipos-activos', 'metricas', 'estrategias', 'riesgos', 'fiscalidad', 'corto-plazo', 'dividendos', 'divisas', 'otros-conceptos', 'macro-noticias']);
+const LEARN_ANCHORS = new Set(['conceptos-basicos', 'que-es-invertir', 'cuentas-remuneradas', 'interes-compuesto', 'tipos-activos', 'mercados', 'metricas', 'estrategias', 'ejemplos', 'errores', 'primeros-pasos', 'riesgos', 'fiscalidad', 'corto-plazo', 'dividendos', 'divisas', 'otros-conceptos', 'macro-noticias', 'glosario', 'quiz', 'recursos']);
 
 function navigateFromHash() {
     const raw = decodeURIComponent((location.hash || '').replace(/^#/, '')).trim();
