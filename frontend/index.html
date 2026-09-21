@@ -268,8 +268,20 @@
                             <div class="chart-container">
                                 <canvas id="portfolioChart"></canvas>
                             </div>
+                            <p class="text-muted" style="font-size:11px; margin-top:4px;">💡 Pincha cualquier punto para ver el desglose completo de ese día.</p>
                         </div>
                     </section>
+
+                    <!-- Day Detail Modal -->
+                    <div class="modal" id="dayDetailModal">
+                        <div class="modal-content" style="max-width:640px;">
+                            <div class="modal-header">
+                                <h3 id="dayDetailTitle">Detalle del día</h3>
+                                <button class="modal-close" id="closeDayDetailModal">×</button>
+                            </div>
+                            <div id="dayDetailBody"><p class="text-muted">Cargando…</p></div>
+                        </div>
+                    </div>
 
                     <!-- Distributions Section -->
                     <section class="distributions-section">
@@ -2002,7 +2014,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="js/info-glossary.js?v=20260921dividendos"></script>
-    <script src="js/app.js?v=20260921realized"></script>
+    <script src="js/app.js?v=20260921daydetail"></script>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260912blue"></script>
     <script src="js/news.js?v=20260530a"></script>

@@ -550,6 +550,99 @@ function updateTopMovers(positions) {
 }
 
 // Chart Functions
+// Day-detail popup when a point on "Evolución de la Cartera" is clicked:
+// that day's real snapshot (value/change/P&L + the archived breakdown HTML
+// when one exists, same as "Resumen diario") plus the real transactions
+// executed that exact date. Both lists are fetched once and cached — a
+// second click on any day reuses them instead of re-fetching.
+let _dashDailySummaries = null;
+let _dashTxAll = null;
+
+async function _ensureDayDetailData() {
+    if (!_dashDailySummaries) {
+        try {
+            const r = await fetch(`${CONFIG.API_BASE_URL}/portfolio/daily-summaries?days=400`, { cache: 'no-store' });
+            const data = r.ok ? await r.json() : { summaries: [] };
+            _dashDailySummaries = {};
+            (data.summaries || []).forEach(s => { _dashDailySummaries[s.date] = s; });
+        } catch (e) { _dashDailySummaries = {}; }
+    }
+    if (!_dashTxAll) {
+        try {
+            const r = await fetch(`${CONFIG.API_BASE_URL}/transactions?limit=500`, { cache: 'no-store' });
+            _dashTxAll = r.ok ? await r.json() : [];
+        } catch (e) { _dashTxAll = []; }
+    }
+}
+
+async function showDayDetail(dateStr, chartValue) {
+    const modal = document.getElementById('dayDetailModal');
+    const body = document.getElementById('dayDetailBody');
+    const title = document.getElementById('dayDetailTitle');
+    if (!modal || !body || !title) return;
+    title.textContent = new Date(dateStr + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    body.innerHTML = '<p class="text-muted">Cargando…</p>';
+    modal.classList.add('active');
+
+    await _ensureDayDetailData();
+    const s = _dashDailySummaries[dateStr];
+    const txs = (_dashTxAll || []).filter(t => (t.executed_at || '').slice(0, 10) === dateStr);
+
+    const fmtEur = (v) => (v == null ? '—' : v.toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' €');
+    const fmtSigned = (v) => (v == null ? '—' : (v >= 0 ? '+' : '') + v.toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' €');
+    const cls = (v) => (v == null ? '' : v >= 0 ? 'value-positive' : 'value-negative');
+
+    let html = '';
+    if (s) {
+        html += `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+            <div style="background:rgba(43,40,34,0.03); border-radius:8px; padding:10px 12px; flex:1; min-width:130px;">
+                <div style="font-size:11px; color:var(--text-secondary);">Valor cartera</div>
+                <div style="font-size:18px; font-weight:700;">${fmtEur(s.total_value)}</div>
+            </div>
+            <div style="background:rgba(43,40,34,0.03); border-radius:8px; padding:10px 12px; flex:1; min-width:130px;">
+                <div style="font-size:11px; color:var(--text-secondary);">Cambio del día</div>
+                <div style="font-size:18px; font-weight:700;" class="${cls(s.daily_change)}">${fmtSigned(s.daily_change)} <span style="font-size:12px;">(${s.daily_change_pct >= 0 ? '+' : ''}${s.daily_change_pct}%)</span></div>
+            </div>
+            <div style="background:rgba(43,40,34,0.03); border-radius:8px; padding:10px 12px; flex:1; min-width:130px;">
+                <div style="font-size:11px; color:var(--text-secondary);">P/L total acumulado</div>
+                <div style="font-size:18px; font-weight:700;" class="${cls(s.total_gain_loss)}">${fmtSigned(s.total_gain_loss)} <span style="font-size:12px;">(${s.total_gain_loss_pct >= 0 ? '+' : ''}${s.total_gain_loss_pct}%)</span></div>
+            </div>
+        </div>`;
+        if (s.html) {
+            html += `<div style="white-space:pre-wrap; font-family:var(--font-mono); font-size:12px; line-height:1.5; background:rgba(43,40,34,0.04); border-radius:8px; padding:12px; margin-bottom:12px; overflow-x:auto;">${s.html}</div>`;
+        } else {
+            html += `<p class="text-muted" style="font-size:11.5px; margin:0 0 12px;">Sin desglose de posiciones archivado para este día — se archiva de ahora en adelante (mismo criterio que en Resumen diario).</p>`;
+        }
+    } else {
+        html += `<p class="text-muted" style="font-size:12px; margin-bottom:12px;">Sin snapshot detallado guardado para este día. Valor leído del gráfico: <strong>${fmtEur(chartValue)}</strong>.</p>`;
+    }
+
+    const typeLabel = { buy: '🟢 Compra', sell: '🔴 Venta', dividend: '💰 Dividendo', deposit: '⬆️ Ingreso', withdrawal: '⬇️ Retirada', fee: '💸 Comisión' };
+    if (txs.length) {
+        html += `<h4 style="margin:0 0 6px; font-size:14px;">📋 Operaciones este día</h4>
+            <div class="table-container"><table class="manager-table">
+            <thead><tr><th>Tipo</th><th>Activo</th><th class="text-right">Cantidad</th><th class="text-right">Precio</th><th>Broker</th></tr></thead>
+            <tbody>${txs.map(t => `<tr>
+                <td>${typeLabel[t.type] || t.type}</td>
+                <td>${(typeof getAssetName === 'function' && getAssetName(t.ticker)) || t.ticker}</td>
+                <td class="text-right mono">${(t.quantity || 0).toLocaleString('es-ES', { maximumFractionDigits: 6 })}</td>
+                <td class="text-right mono">${(t.price || 0).toLocaleString('es-ES', { maximumFractionDigits: 2 })} ${t.currency || 'EUR'}</td>
+                <td>${t.broker || '—'}</td>
+            </tr>`).join('')}</tbody></table></div>`;
+    } else {
+        html += `<p class="text-muted" style="font-size:12px;">Sin operaciones registradas este día.</p>`;
+    }
+
+    body.innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const modal = document.getElementById('dayDetailModal');
+    const closeBtn = document.getElementById('closeDayDetailModal');
+    if (closeBtn && modal) closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+    if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); });
+});
+
 function createPortfolioChart(history) {
     const ctx = document.getElementById('portfolioChart');
     if (!ctx) return;
@@ -599,6 +692,15 @@ function createPortfolioChart(history) {
             interaction: {
                 intersect: false,
                 mode: 'index'
+            },
+            onHover: (event, elements) => {
+                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+            },
+            onClick: (event, _elements, chart) => {
+                const points = chart.getElementsAtEventForMode(event, 'nearest', { intersect: false }, true);
+                if (!points.length) return;
+                const idx = points[0].index;
+                showDayDetail(chart.data.labels[idx], chart.data.datasets[0].data[idx]);
             },
             plugins: {
                 legend: {
