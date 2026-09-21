@@ -596,56 +596,63 @@ function selectAsset(ticker) {
 }
 
 /**
- * Show buy advice modal
+ * "¿Debería comprar más?" — this used to compare price to its own average and
+ * output a plain alert() verdict ("podría ser buen momento" / "espera una
+ * corrección"), a naive price-timing call that contradicted this app's own
+ * rule (never predict direction). Replaced with what the question can
+ * actually be answered with honestly: how much of this you ALREADY hold and
+ * how that sits against the allocation target you set for its block — pure
+ * sizing/concentration facts, zero opinion on where the price goes next.
+ * (Real trend/risk/catalyst data is one click away via "Análisis detallado".)
  */
-function showBuyAdvice() {
+async function showBuyAdvice() {
     if (!currentAssetData) return;
-    
     const ticker = currentAssetData.ticker;
-    const history = currentAssetData.history;
-    
-    // Simple analysis
-    const prices = history.map(h => h.close || h.price);
-    const currentPrice = prices[prices.length - 1];
-    const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-    
-    const percentFromMin = ((currentPrice - minPrice) / minPrice * 100).toFixed(1);
-    const percentFromMax = ((currentPrice - maxPrice) / maxPrice * 100).toFixed(1);
-    const percentFromAvg = ((currentPrice - avgPrice) / avgPrice * 100).toFixed(1);
-    
-    let advice = '';
-    let adviceClass = '';
-    
-    if (currentPrice < avgPrice * 0.95) {
-        advice = '🟢 El precio está por debajo de la media. Podría ser buen momento para comprar.';
-        adviceClass = 'advice-buy';
-    } else if (currentPrice > avgPrice * 1.1) {
-        advice = '🔴 El precio está significativamente por encima de la media. Considera esperar una corrección.';
-        adviceClass = 'advice-wait';
-    } else {
-        advice = '🟡 El precio está cerca de la media. Puedes comprar gradualmente (DCA).';
-        adviceClass = 'advice-neutral';
+    const section = document.getElementById('assetSizingSection');
+    const body = document.getElementById('assetSizingBody');
+    if (!section || !body) return;
+    section.style.display = '';
+    body.innerHTML = '<p class="text-muted">Calculando tu concentración real…</p>';
+    section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    try {
+        const r = await fetch(`${ASSET_API}/portfolio`, { cache: 'no-store' });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const p = await r.json();
+        const pos = (p.positions || []).find(x => x.ticker === ticker);
+        const fmtEur = (v) => (v || 0).toLocaleString('es-ES', { maximumFractionDigits: 0 }) + ' €';
+
+        let html = '';
+        if (pos) {
+            html += `<div style="background:rgba(43,40,34,0.03); border-radius:8px; padding:10px 12px; margin-bottom:10px;">
+                <div style="font-size:11px; color:var(--text-secondary);">Ya tienes</div>
+                <div style="font-size:18px; font-weight:700;">${fmtEur(pos.market_value_base)} <span style="font-size:12px; font-weight:400; color:var(--text-secondary);">(${pos.weight.toFixed(1)}% de tu cartera)</span></div>
+            </div>`;
+            if (pos.weight >= 8) {
+                html += `<div style="margin-bottom:10px; background:rgba(201,154,62,0.12); border:1px solid rgba(201,154,62,0.4); border-radius:6px; padding:8px 12px; font-size:12.5px;">⚠️ Ya es una posición grande (${pos.weight.toFixed(1)}% de tu cartera) — añadir más la concentra todavía más en un solo activo.</div>`;
+            }
+        } else {
+            html += `<p class="text-muted" style="font-size:13px; margin-bottom:10px;">No tienes posición en ${ticker} todavía — comprar sería abrir una posición nueva.</p>`;
+        }
+
+        const block = pos ? pos.block : null;
+        const blockData = block ? (p.by_block || {})[block] : null;
+        const blockTarget = block ? (p.block_targets || {})[block] : null;
+        if (block && blockData && blockTarget != null) {
+            const drift = blockData.weight - blockTarget;
+            const driftColor = drift > 5 ? 'var(--negative)' : drift < -5 ? 'var(--positive)' : 'var(--text-secondary)';
+            html += `<div style="padding:10px 14px; background:rgba(43,40,34,0.03); border-radius:8px;">
+                <strong>Bloque "${block}"</strong>: <span style="color:${driftColor};">${blockData.weight.toFixed(1)}% real vs ${blockTarget}% objetivo (${drift >= 0 ? '+' : ''}${drift.toFixed(1)}pp)</span>
+                ${drift > 5 ? '<div style="margin-top:4px; font-size:12.5px;">Este bloque ya está por encima de tu objetivo — añadir aquí te aleja más del reparto que definiste. Encajaría mejor una aportación al bloque que esté por debajo.</div>'
+                    : drift < -5 ? '<div style="margin-top:4px; font-size:12.5px; color:var(--positive);">Este bloque está por debajo de tu objetivo — encaja con el reparto que definiste.</div>' : ''}
+            </div>`;
+        }
+
+        html += `<p class="text-muted" style="font-size:11px; margin-top:10px;">Esto es solo tamaño y concentración — no dice nada sobre si el precio va a subir o bajar. Para tendencia, riesgo y catalizadores reales, usa "🔍 Análisis detallado".</p>`;
+        body.innerHTML = html;
+    } catch (err) {
+        body.innerHTML = `<p class="text-muted" style="color:var(--negative);">No se pudo calcular: ${err.message}</p>`;
     }
-    
-    // Show as toast or modal
-    const message = `
-        📊 Análisis de ${ticker}
-        
-        Precio actual: ${formatCurrencyLocal(currentPrice)}
-        Precio medio (${currentAssetPeriod}): ${formatCurrencyLocal(avgPrice)}
-        
-        📈 Desde mínimo: ${percentFromMin}%
-        📉 Desde máximo: ${percentFromMax}%
-        ⚖️ Vs media: ${percentFromAvg}%
-        
-        ${advice}
-        
-        ⚠️ Esto no es consejo financiero. Haz tu propia investigación.
-    `;
-    
-    alert(message);
 }
 
 /**
