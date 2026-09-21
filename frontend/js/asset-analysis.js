@@ -161,7 +161,11 @@ async function updateAssetInfo(ticker, data) {
     // Update price info
     if (data.current) {
         const price = data.current.price || data.current.price_eur || 0;
-        document.getElementById('assetCurrentPrice').textContent = formatCurrencyLocal(price);
+        // data.current.price_eur (crypto path) is already euros; data.current.price
+        // (stock/etf path) is the asset's own listing currency — show each correctly
+        // instead of always labeling it €.
+        const priceCcy = data.current.price_eur != null ? 'EUR' : (data.current.currency || 'EUR');
+        document.getElementById('assetCurrentPrice').textContent = formatCurrencyLocal(price, priceCcy);
 
         const changeEl = document.getElementById('assetPriceChange');
         const history = data.history || [];
@@ -191,11 +195,11 @@ async function updateAssetInfo(ticker, data) {
         if (position) {
             document.getElementById('assetPosition').textContent = 
                 `${position.quantity.toFixed(position.type === 'crypto' ? 6 : 4)} unidades`;
-            document.getElementById('assetValue').textContent = formatCurrencyLocal(position.market_value);
-            
+            document.getElementById('assetValue').textContent = formatCurrencyLocal(position.market_value_base);
+
             const gainLossEl = document.getElementById('assetGainLoss');
-            gainLossEl.textContent = `${position.gain_loss >= 0 ? '+' : ''}${formatCurrencyLocal(position.gain_loss)} (${position.gain_loss_pct.toFixed(2)}%)`;
-            gainLossEl.className = `stat-value ${position.gain_loss >= 0 ? 'positive' : 'negative'}`;
+            gainLossEl.textContent = `${position.gain_loss_base >= 0 ? '+' : ''}${formatCurrencyLocal(position.gain_loss_base)} (${position.gain_loss_pct.toFixed(2)}%)`;
+            gainLossEl.className = `stat-value ${position.gain_loss_base >= 0 ? 'positive' : 'negative'}`;
             
             document.getElementById('assetWeight').textContent = `${position.weight.toFixed(1)}%`;
         }
@@ -564,12 +568,12 @@ async function loadAssetQuickCards() {
                         <span class="quick-card-ticker">${info.name}</span>
                     </div>
                     <div class="quick-card-name">${pos.ticker}</div>
-                    <div class="quick-card-price">${formatCurrencyLocal(pos.current_price)}</div>
+                    <div class="quick-card-price">${formatCurrencyLocal(pos.current_price, pos.currency)}</div>
                     <div class="quick-card-change ${changeClass}">
                         ${changeSign}${pos.day_change_pct.toFixed(2)}% hoy
                     </div>
                     <div class="quick-card-value">
-                        Tu posición: ${formatCurrencyLocal(pos.market_value)}
+                        Tu posición: ${formatCurrencyLocal(pos.market_value_base)}
                     </div>
                 </div>
             `;
@@ -720,10 +724,10 @@ function showChartError(message, ticker = null) {
     }
 }
 
-function formatCurrencyLocal(value) {
+function formatCurrencyLocal(value, currency = 'EUR') {
     return new Intl.NumberFormat('es-ES', {
         style: 'currency',
-        currency: 'EUR',
+        currency: currency,
         minimumFractionDigits: 2,
         maximumFractionDigits: value < 1 ? 6 : 2
     }).format(value);

@@ -183,6 +183,10 @@ class PortfolioService:
             market_value_base = market_value * fx_rate
             cost_basis_base = cost_basis * fx_rate
             day_change_base = day_change * fx_rate
+            # market_value/cost_basis/gain_loss/day_change above stay in the position's
+            # OWN currency (e.g. USD) — callers that display a euro figure (this app's
+            # base currency) must use the _base fields instead, never the raw ones.
+            gain_loss_base = market_value_base - cost_basis_base
 
             position_data.append({
                 "ticker": ticker,
@@ -193,11 +197,14 @@ class PortfolioService:
                 "avg_price": avg_price,
                 "current_price": current_price,
                 "cost_basis": cost_basis,
+                "cost_basis_base": cost_basis_base,
                 "market_value": market_value,
                 "market_value_base": market_value_base,
                 "gain_loss": gain_loss,
+                "gain_loss_base": gain_loss_base,
                 "gain_loss_pct": round(gain_loss_pct, 2),
                 "day_change": day_change,
+                "day_change_base": day_change_base,
                 "day_change_pct": round(day_change_pct, 2),
                 "type": asset_type,
                 "currency": currency,

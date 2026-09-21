@@ -94,17 +94,22 @@ async function loadAssetDetailHeader(ticker) {
         const position = portfolio.positions?.find(p => p.ticker === ticker);
 
         if (position) {
-            document.getElementById('assetDetailPrice').textContent = formatCurrency(position.current_price);
+            // Market price stays in the asset's own listing currency (how everyone
+            // quotes it, e.g. $ for TSM) — but the position's value/gain are what THIS
+            // portfolio holds, so those must be the euro-converted _base fields, not
+            // the raw native-currency ones, or a USD position's value shows with a €
+            // symbol slapped on an unconverted dollar number.
+            document.getElementById('assetDetailPrice').textContent = formatCurrency(position.current_price, position.currency);
             const changeEl = document.getElementById('assetDetailChange');
             const chg = position.day_change_pct || 0;
             changeEl.textContent = `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`;
             changeEl.className = `price-change ${chg >= 0 ? 'positive' : 'negative'}`;
             document.getElementById('assetDetailQty').textContent =
                 `${position.quantity.toFixed(position.type === 'crypto' ? 6 : 4)} unidades`;
-            document.getElementById('assetDetailValue').textContent = formatCurrency(position.market_value);
+            document.getElementById('assetDetailValue').textContent = formatCurrency(position.market_value_base);
             const glEl = document.getElementById('assetDetailGainLoss');
-            glEl.textContent = `${position.gain_loss >= 0 ? '+' : ''}${formatCurrency(position.gain_loss)} (${position.gain_loss_pct.toFixed(2)}%)`;
-            glEl.className = `stat-value ${position.gain_loss >= 0 ? 'positive' : 'negative'}`;
+            glEl.textContent = `${position.gain_loss_base >= 0 ? '+' : ''}${formatCurrency(position.gain_loss_base)} (${position.gain_loss_pct.toFixed(2)}%)`;
+            glEl.className = `stat-value ${position.gain_loss_base >= 0 ? 'positive' : 'negative'}`;
             document.getElementById('assetDetailWeight').textContent = `${position.weight.toFixed(1)}%`;
         } else {
             // Position fully exited (or never held under this exact ticker) — still
