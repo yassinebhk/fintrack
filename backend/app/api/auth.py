@@ -6,7 +6,7 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user, google_client
+from app.auth import get_current_user, get_owner_user_id_cached, google_client
 from app.config import get_settings
 from app.db import get_session
 from app.models.user import User
@@ -25,7 +25,6 @@ async def login(request: Request):
 
 @router.get("/callback", name="auth_callback")
 async def callback(request: Request, session: AsyncSession = Depends(get_session)):
-    settings = get_settings()
     try:
         token = await google_client().authorize_access_token(request)
     except Exception as exc:
@@ -38,9 +37,11 @@ async def callback(request: Request, session: AsyncSession = Depends(get_session
     if not email or not google_sub:
         raise HTTPException(status_code=400, detail="Google no devolvió email/sub")
 
-    if not settings.public_signup and email not in settings.allowed_emails_set:
-        logger.warning("oauth: rejected email not in allowlist: {}", email)
-        raise HTTPException(status_code=403, detail="Este email no tiene acceso a FinTrack")
+    from app.services.allowlist import get_allowed_emails, get_public_signup
+    if not await get_public_signup():
+        if email not in await get_allowed_emails():
+            logger.warning("oauth: rejected email not in allowlist: {}", email)
+            raise HTTPException(status_code=403, detail="Este email no tiene acceso a FinTrack")
 
     result = await session.execute(select(User).where(User.google_sub == google_sub))
     user = result.scalar_one_or_none()
@@ -65,11 +66,13 @@ async def callback(request: Request, session: AsyncSession = Depends(get_session
 
 @router.get("/me")
 async def me(current_user: User = Depends(get_current_user)) -> dict:
+    owner_id = await get_owner_user_id_cached()
     return {
         "id": current_user.id,
         "email": current_user.email,
         "name": current_user.name,
         "picture_url": current_user.picture_url,
+        "is_admin": owner_id is not None and current_user.id == owner_id,
     }
 
 

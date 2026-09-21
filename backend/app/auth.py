@@ -59,6 +59,16 @@ async def get_current_user_optional(
     return await session.get(User, user_id)
 
 
+async def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Admin = the owner (no separate roles table yet — with a single real
+    admin, reusing the existing owner-only pattern is simplest; generalize if
+    a second admin is ever needed). Gates the admin panel (allowlist, etc)."""
+    owner_id = await get_owner_user_id_cached()
+    if owner_id is None or current_user.id != owner_id:
+        raise HTTPException(status_code=403, detail="Solo el administrador puede hacer esto")
+    return current_user
+
+
 async def get_owner_user_id(session: AsyncSession) -> int | None:
     """Resolve the original owner's user id for features not yet per-user (Fase 2)."""
     settings = get_settings()
