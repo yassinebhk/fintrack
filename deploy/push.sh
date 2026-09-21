@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Despliega FinTrack a la VM desde el Mac. Uso:
-#   bash deploy/push.sh <IP_PUBLICA> <ruta-al-ssh-key.key>
-# Copia el código + backend/.env, instala todo y arranca el servicio.
-# Vuelve a ejecutarse igual para cada redeploy futuro tras cambios de código.
+# Despliega FinTrack a la VM desde el Mac. Uso CANÓNICO (el que corre en vivo):
+#   bash deploy/push.sh 34.123.238.158 ~/.ssh/google_compute_engine
+# El servicio systemd corre como usuario 'yassinebouhaikbouhoussaine' desde
+# /home/yassinebouhaikbouhoussaine/fintrack, así que ese es el destino por
+# defecto. NO usar SSH_USER=fintrack (deja una copia huérfana que NO se ejecuta).
+# Para desplegar a otro usuario: SSH_USER=<otro> bash deploy/push.sh <IP> <key>.
 set -euo pipefail
 
 IP="${1:?Falta IP pública de la VM}"
 KEY="${2:?Falta ruta al SSH key}"
-USER="${SSH_USER:-ubuntu}"
+USER="${SSH_USER:-yassinebouhaikbouhoussaine}"
 REMOTE="$USER@$IP"
 SSH_OPTS="-o StrictHostKeyChecking=accept-new"
 
