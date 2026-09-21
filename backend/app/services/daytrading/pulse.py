@@ -50,7 +50,7 @@ async def build_pulse_html(user_id: int) -> str | None:
     if not positions:
         return None
 
-    excluded = await report_prefs.get_excluded()
+    excluded = await report_prefs.get_excluded(user_id)
     positions = [p for p in positions if str(p.get("ticker", "")).upper() not in excluded]
     if not positions:
         return None

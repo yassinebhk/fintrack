@@ -495,7 +495,7 @@ class TelegramBotHandler:
         await self.notifier.send_chat_action("typing")
         try:
             from app.services.position_review import review_portfolio
-            d = await review_portfolio()
+            d = await review_portfolio(await self._owner_id())
             reviews = d.get("reviews") or []
             if not reviews:
                 await self.notifier.send_text("No tengo posiciones que revisar.")
@@ -685,8 +685,9 @@ class TelegramBotHandler:
         from app.services.report_prefs import get_excluded
         from app.services.portfolio_report import build_summary_html
 
+        owner_id = await self._owner_id()
         p = await (await self._get_portfolio_service()).calculate_portfolio()
-        excluded = await get_excluded()
+        excluded = await get_excluded(owner_id)
         html = build_summary_html(p, excluded) + "\n" + PAGE_LINK
         await self.notifier.send_html(html)
 

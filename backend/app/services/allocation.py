@@ -60,15 +60,35 @@ def classify(ticker: str | None) -> str:
     return "tematico"
 
 
-async def get_targets() -> dict:
-    """User target % per block (defaults to the balanced reference split if unset)."""
+async def _resolve_user_id(user_id: int | None) -> int:
+    if user_id is not None:
+        return user_id
+    from app.auth import get_owner_user_id_cached
+    return await get_owner_user_id_cached() or 0
+
+
+async def get_targets(user_id: int | None = None) -> dict:
+    """User target % per block (defaults to the balanced reference split if unset).
+
+    user_id: whose targets. Defaults to the owner, preserving existing owner-only
+    callers unchanged. Any caller acting on behalf of a logged-in HTTP user MUST
+    pass current_user.id explicitly (2026-09-21 security fix: this was a single
+    global key shared by every logged-in user — one user's dashboard drift chart,
+    and Settings-page edits, silently used/overwrote everyone else's targets)."""
+    uid = await _resolve_user_id(user_id)
+    key = f"{_KEY}:{uid}"
     try:
         from sqlalchemy import select
 
+        from app.auth import get_owner_user_id_cached
         from app.db import session_scope
         from app.models import JsonCache
         async with session_scope() as s:
-            row = (await s.execute(select(JsonCache).where(JsonCache.key == _KEY))).scalar_one_or_none()
+            row = (await s.execute(select(JsonCache).where(JsonCache.key == key))).scalar_one_or_none()
+            if row is None and uid == (await get_owner_user_id_cached() or 0):
+                # Read-fallback to the pre-migration global key so the owner's
+                # already-configured targets survive the per-user namespacing.
+                row = (await s.execute(select(JsonCache).where(JsonCache.key == _KEY))).scalar_one_or_none()
         vals = (row.payload or {}).get("targets") if row and row.payload else None
         if vals:
             return {b: float(vals.get(b, 0)) for b in BLOCKS}
@@ -77,14 +97,16 @@ async def get_targets() -> dict:
     return dict(_DEFAULT_TARGETS)
 
 
-async def set_targets(targets: dict) -> dict:
+async def set_targets(targets: dict, user_id: int | None = None) -> dict:
+    uid = await _resolve_user_id(user_id)
+    key = f"{_KEY}:{uid}"
     clean = {b: round(float(targets.get(b, 0)), 1) for b in BLOCKS}
     payload = {"targets": clean}
     try:
         from app.db import session_scope, upsert_insert
         from app.models import JsonCache
         stmt = upsert_insert()(JsonCache).values(
-            key=_KEY, payload=payload, updated_at=datetime.now(timezone.utc)
+            key=key, payload=payload, updated_at=datetime.now(timezone.utc)
         ).on_conflict_do_update(index_elements=["key"],
                                 set_={"payload": payload, "updated_at": datetime.now(timezone.utc)})
         async with session_scope() as s:

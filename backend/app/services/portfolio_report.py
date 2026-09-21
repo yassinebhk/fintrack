@@ -120,21 +120,29 @@ async def _save_pin(message_id: int, date: str) -> None:
         await s.execute(stmt)
 
 
-async def build_live_summary(use_cache: bool = True) -> tuple[str, dict]:
+async def build_live_summary(user_id: int | None = None, use_cache: bool = True) -> tuple[str, dict]:
     """Assembles the exact same summary table used everywhere this report
     appears (Telegram sends, the in-app 'ver en tiempo real' preview) — one
     shared source of truth. use_cache=False forces a fresh computation instead
-    of the portfolio's normal 60s cache, for an on-demand real-time preview."""
-    from app.auth import get_owner_user_id_cached
+    of the portfolio's normal 60s cache, for an on-demand real-time preview.
+
+    user_id: whose portfolio to build this for. Defaults to the owner (the
+    Telegram send is still owner-only, Fase 1) — callers acting on behalf of
+    a logged-in HTTP user (the "ver en tiempo real" preview) MUST pass
+    current_user.id explicitly (2026-09-21 security fix: this used to always
+    resolve the owner regardless of who asked, so any logged-in user's
+    preview button showed the owner's real portfolio)."""
     from app.services import allocation
     from app.services.portfolio import PortfolioService
     from app.services.report_prefs import get_excluded
 
-    owner_id = await get_owner_user_id_cached()
-    svc = PortfolioService(owner_id or 0)
+    if user_id is None:
+        from app.auth import get_owner_user_id_cached
+        user_id = await get_owner_user_id_cached() or 0
+    svc = PortfolioService(user_id)
     p = await svc.calculate_portfolio(use_cache=use_cache)
-    excluded = await get_excluded()
-    targets = await allocation.get_targets()
+    excluded = await get_excluded(user_id)
+    targets = await allocation.get_targets(user_id)
     shown = sorted(
         (x for x in p.get("positions", []) if (x.get("ticker") or "").upper() not in excluded),
         key=lambda x: x.get("market_value_base") or 0, reverse=True,
@@ -147,8 +155,12 @@ async def build_live_summary(use_cache: bool = True) -> tuple[str, dict]:
 async def send_daily_summary_pinned(force: bool = False) -> dict:
     """Build the portfolio table, send it, unpin yesterday's, pin today's.
     Idempotent per day: if already sent today it skips (unless force=True), so several
-    morning cron times can fire as redundancy without spamming the user."""
+    morning cron times can fire as redundancy without spamming the user.
+    Telegram is owner-only (Fase 1) regardless of how many users are logged into
+    the app, so this always resolves and passes the owner's id explicitly."""
     from datetime import datetime, timezone
+
+    from app.auth import get_owner_user_id_cached
     from app.services.notifications.telegram import TelegramNotifier
 
     now = datetime.now(timezone.utc)
@@ -163,7 +175,8 @@ async def send_daily_summary_pinned(force: bool = False) -> dict:
     if not force and prev.get("date") == today:
         return {"skipped": "ya enviado hoy", "date": today}
 
-    base_html, p = await build_live_summary(use_cache=False)
+    owner_id = await get_owner_user_id_cached() or 0
+    base_html, p = await build_live_summary(owner_id, use_cache=False)
     html = base_html + "\n📌 <i>Resumen diario</i>"
     await _save_daily_summary(today, html, p)  # archive for the in-app history
     n = TelegramNotifier()

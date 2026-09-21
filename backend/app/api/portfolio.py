@@ -106,13 +106,16 @@ async def get_portfolio_tax(svc: PortfolioService = Depends(_get_service)) -> di
 async def get_portfolio_summary_preview(current_user: User = Depends(get_current_user)) -> dict:
     """The exact same table sent to Telegram (HOY/ACUMULADO/TENDENCIA/REPARTO),
     computed fresh right now (bypasses the 60s portfolio cache) — for the
-    "ver en tiempo real" button. Read-only: no archiving, no Telegram send."""
+    "ver en tiempo real" button. Read-only: no archiving, no Telegram send.
+
+    2026-09-21 security fix: this used to build the OWNER's summary for
+    whoever clicked the button. Now scoped to current_user.id."""
     from datetime import datetime, timezone
 
     from app.services.portfolio_report import build_live_summary
 
     try:
-        html, _p = await build_live_summary(use_cache=False)
+        html, _p = await build_live_summary(current_user.id, use_cache=False)
         return {"html": html, "generated_at": datetime.now(timezone.utc).isoformat()}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

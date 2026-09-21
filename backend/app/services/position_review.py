@@ -53,21 +53,25 @@ def _default_horizon(pos: dict) -> str:
     return "medio"
 
 
-async def get_horizons() -> dict:
-    """User-set holding horizons {TICKER: 'largo'|'medio'|'corto'}."""
+async def get_horizons(user_id: int) -> dict:
+    """User-set holding horizons {TICKER: 'largo'|'medio'|'corto'} — scoped per
+    user (2026-09-21 security fix: this used to be one global JsonCache row
+    shared by every account, so one user's horizon choice for a ticker leaked
+    into another's review, and even just multiple users' own per-ticker
+    settings collided in the same dict)."""
     try:
         from sqlalchemy import select
         from app.db import session_scope
         from app.models import JsonCache
         async with session_scope() as s:
-            row = (await s.execute(select(JsonCache).where(JsonCache.key == _HORIZON_KEY))).scalar_one_or_none()
+            row = (await s.execute(select(JsonCache).where(JsonCache.key == f"{_HORIZON_KEY}:{user_id}"))).scalar_one_or_none()
         return (row.payload or {}).get("horizons", {}) if row and row.payload else {}
     except Exception as exc:
         logger.debug("get_horizons failed: {}", exc)
         return {}
 
 
-async def set_horizon(ticker: str, horizon: str) -> dict:
+async def set_horizon(user_id: int, ticker: str, horizon: str) -> dict:
     horizon = (horizon or "").lower().strip()
     if horizon not in _HORIZONS:
         raise ValueError("horizon debe ser 'largo', 'medio' o 'corto'")
@@ -76,13 +80,14 @@ async def set_horizon(ticker: str, horizon: str) -> dict:
     from app.db import session_scope, upsert_insert
     from app.models import JsonCache
     tk = (ticker or "").upper().strip()
+    key = f"{_HORIZON_KEY}:{user_id}"
     async with session_scope() as s:
-        row = (await s.execute(select(JsonCache).where(JsonCache.key == _HORIZON_KEY))).scalar_one_or_none()
+        row = (await s.execute(select(JsonCache).where(JsonCache.key == key))).scalar_one_or_none()
         horizons = (row.payload or {}).get("horizons", {}) if row and row.payload else {}
         horizons[tk] = horizon
         payload = {"horizons": horizons}
         stmt = upsert_insert()(JsonCache).values(
-            key=_HORIZON_KEY, payload=payload, updated_at=datetime.now(timezone.utc)
+            key=key, payload=payload, updated_at=datetime.now(timezone.utc)
         ).on_conflict_do_update(
             index_elements=["key"], set_={"payload": payload, "updated_at": datetime.now(timezone.utc)}
         )
@@ -261,12 +266,16 @@ _REVIEW_KEY = "position_review"
 _REVIEW_TTL_HOURS = 6
 
 
-async def review_portfolio(force: bool = False) -> dict:
+async def review_portfolio(user_id: int, force: bool = False) -> dict:
     """Cached entry point: serve the last review (≤6h) unless force=True. The review
     fetches history for every holding (~slow on free tier), so caching keeps it
-    instant. Cache lives in json_cache (survives redeploys)."""
+    instant. Cache lives in json_cache (survives redeploys), keyed per user
+    (2026-09-21 security fix: this was ONE global cache row shared by every
+    account — whichever user's request populated it in the last 6h, every
+    other logged-in user was served THAT user's real positions/P&L)."""
     from datetime import datetime, timedelta, timezone
 
+    cache_key = f"{_REVIEW_KEY}:{user_id}"
     if not force:
         try:
             from sqlalchemy import select
@@ -274,7 +283,7 @@ async def review_portfolio(force: bool = False) -> dict:
             from app.db import session_scope
             from app.models import JsonCache
             async with session_scope() as s:
-                row = (await s.execute(select(JsonCache).where(JsonCache.key == _REVIEW_KEY))).scalar_one_or_none()
+                row = (await s.execute(select(JsonCache).where(JsonCache.key == cache_key))).scalar_one_or_none()
             if row and row.payload:
                 upd = row.updated_at
                 if upd and upd.tzinfo is None:
@@ -284,12 +293,12 @@ async def review_portfolio(force: bool = False) -> dict:
         except Exception as exc:
             logger.debug("position_review cache read failed: {}", exc)
 
-    result = await _compute_review()
+    result = await _compute_review(user_id)
     try:
         from app.db import session_scope, upsert_insert
         from app.models import JsonCache
         stmt = upsert_insert()(JsonCache).values(
-            key=_REVIEW_KEY, payload=result, updated_at=datetime.now(timezone.utc)
+            key=cache_key, payload=result, updated_at=datetime.now(timezone.utc)
         ).on_conflict_do_update(
             index_elements=["key"],
             set_={"payload": result, "updated_at": datetime.now(timezone.utc)},
@@ -301,16 +310,14 @@ async def review_portfolio(force: bool = False) -> dict:
     return result
 
 
-async def _compute_review() -> dict:
+async def _compute_review(user_id: int) -> dict:
     """Per-holding objective keep/trim/rotate signals with explanations + bias flags."""
-    from app.auth import get_owner_user_id_cached
     from app.services.portfolio import PortfolioService
 
-    owner_id = await get_owner_user_id_cached()
-    portfolio = await PortfolioService(owner_id or 0).calculate_portfolio()
+    portfolio = await PortfolioService(user_id).calculate_portfolio()
     positions = portfolio.get("positions") or []
     scanner = MarketScanner()
-    horizons = await get_horizons()
+    horizons = await get_horizons(user_id)
     # Web-grounded environment/catalyst briefs (fundamental context the technical
     # signal lacks); loaded once, looked up per holding. Empty if not configured.
     try:

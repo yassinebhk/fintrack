@@ -223,7 +223,7 @@ class PortfolioService:
         by_currency = await self._aggregate(position_data, "currency", total_value)
         by_block = await self._aggregate(position_data, "block", total_value)
         by_sector = await self._aggregate_stock_sectors(position_data)
-        block_targets = {allocation.BLOCK_LABEL[k]: v for k, v in (await allocation.get_targets()).items()}
+        block_targets = {allocation.BLOCK_LABEL[k]: v for k, v in (await allocation.get_targets(self.user_id)).items()}
 
         total_gain_loss = total_value - total_cost
         total_gain_loss_pct = (total_gain_loss / total_cost * 100) if total_cost > 0 else 0.0
@@ -842,11 +842,19 @@ class PortfolioService:
     async def get_daily_summaries(self, days: int = 120) -> list[dict]:
         """Historical record of the daily summary: one row per day from snapshots
         (value, day change, total P/L), enriched with the archived 08:00 summary
-        HTML for the days it was captured. Newest first."""
+        HTML for the days it was captured. Newest first.
+
+        The archived HTML is a single owner-only cache (Telegram send is still
+        owner-only, Fase 1) — only attach it when THIS user IS the owner
+        (2026-09-21 security fix: it used to be attached unconditionally, so
+        any logged-in user's "Resumen diario" showed the owner's real
+        position-by-position breakdown alongside their own numbers)."""
+        from app.auth import get_owner_user_id_cached
         from app.services.portfolio_report import load_daily_summaries
         async with session_scope() as session:
             rows = await SnapshotRepository(session, self.user_id).list_last_days(days=days)
-        archived = await load_daily_summaries()
+        owner_id = await get_owner_user_id_cached()
+        archived = await load_daily_summaries() if self.user_id == owner_id else {}
         out: list[dict] = []
         for r in rows:
             d = r.snapshot_date.strftime("%Y-%m-%d")
