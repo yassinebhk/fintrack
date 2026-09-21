@@ -54,6 +54,9 @@ async def _fetch_xml(url: str, label: str, query: str) -> ET.Element | None:
     return None
 
 
+_MIN_DT = datetime.min.replace(tzinfo=timezone.utc)
+
+
 async def _search_gnews(query: str, max_results: int, days: int) -> list[dict]:
     q = f"{query} when:{max(int(days), 1)}d"
     params = {"q": q, "hl": "en-US", "gl": "US", "ceid": "US:en"}
@@ -69,19 +72,29 @@ async def _search_gnews(query: str, max_results: int, days: int) -> list[dict]:
         src_el = item.find("source")
         publisher = _clean(src_el.text) if src_el is not None else ""
         when = ""
+        parsed_dt = None
         pub = item.findtext("pubDate")
         if pub:
             try:
-                when = parsedate_to_datetime(pub).date().isoformat()
+                parsed_dt = parsedate_to_datetime(pub)
+                when = parsed_dt.date().isoformat()
             except Exception:
                 pass
         # The headline carries the substance; annotate with publisher + date so
         # the LLM can weigh recency and cite the source.
         content = " · ".join(x for x in [publisher, when] if x)
-        out.append({"title": title, "url": link, "content": content})
-        if len(out) >= max_results:
-            break
-    return out
+        out.append({"title": title, "url": link, "content": content, "_dt": parsed_dt})
+        # NOTE: no early break here on purpose — see the sort below.
+    # Google ranks these by RELEVANCE, not recency. Within the `when:Nd` window a
+    # high-volume old story (e.g. an earnings miss) can out-rank a quieter but
+    # more decision-relevant recent one (e.g. an index-inclusion announcement) —
+    # confirmed live: a brief generated weeks after a Sept 4 S&P 500 addition
+    # announcement was still citing only early-August headlines. Re-sort
+    # newest-first before truncating so the freshest items always survive the cut.
+    out.sort(key=lambda r: r["_dt"] or _MIN_DT, reverse=True)
+    for r in out:
+        r.pop("_dt", None)
+    return out[:max_results]
 
 
 async def _search_bing(query: str, max_results: int, days: int) -> list[dict]:
@@ -99,6 +112,7 @@ async def _search_bing(query: str, max_results: int, days: int) -> list[dict]:
             continue
         link = (item.findtext("link") or "").strip()
         when = ""
+        parsed_dt = None
         pub = item.findtext("pubDate")
         if pub:
             try:
@@ -108,14 +122,17 @@ async def _search_bing(query: str, max_results: int, days: int) -> list[dict]:
                 if dt < cutoff:
                     continue
                 when = dt.date().isoformat()
+                parsed_dt = dt
             except Exception:
                 pass
         desc = _clean(item.findtext("description"))[:200]
         content = " · ".join(x for x in [desc, when] if x)
-        out.append({"title": title, "url": link, "content": content})
-        if len(out) >= max_results:
-            break
-    return out
+        out.append({"title": title, "url": link, "content": content, "_dt": parsed_dt})
+        # Same relevance-vs-recency issue as Google News — sort before truncating.
+    out.sort(key=lambda r: r["_dt"] or _MIN_DT, reverse=True)
+    for r in out:
+        r.pop("_dt", None)
+    return out[:max_results]
 
 
 async def search(query: str, max_results: int = 8, days: int = 30) -> list[dict]:
