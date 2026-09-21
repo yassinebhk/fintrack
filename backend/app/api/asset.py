@@ -103,6 +103,10 @@ async def get_asset_stats(
     if fast:
         out.update(fast)
 
+    descr = await _yahoo.get_description(lookup_ticker)
+    if descr:
+        out["description"] = descr
+
     if asset_type != "crypto":
         fund = await _yahoo.get_fundamentals(ticker)
         if fund:

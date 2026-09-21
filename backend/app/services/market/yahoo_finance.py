@@ -209,6 +209,44 @@ class YahooFinanceService:
         self._expiry[key] = datetime.now() + timedelta(hours=12)
         return res
 
+    async def get_description(self, ticker: str) -> dict | None:
+        """Real 'what is this asset' text via yfinance `.get_info()` — Yahoo's
+        own business summary for stocks/ETFs (longBusinessSummary, e.g. "Palo
+        Alto Networks, Inc. provides cybersecurity solutions...") or its coin
+        writeup for crypto (description, e.g. "Bitcoin (BTC) is a
+        cryptocurrency launched in 2010..." — already carries real historical
+        context in prose, not something we generate). None when Yahoo has no
+        summary for this ticker (illiquid/obscure listings). Cached 12h."""
+        key = f"descr:{ticker.upper()}"
+        if self._fresh(key):
+            return self._cache.get(key)
+
+        def _work() -> dict | None:
+            try:
+                info = yf.Ticker(ticker).get_info()
+            except Exception as exc:
+                logger.debug("description for {} failed: {}", ticker, exc)
+                return None
+            if not info:
+                return None
+            summary = info.get("longBusinessSummary") or info.get("description")
+            if not summary:
+                return None
+            return {
+                "summary": summary,
+                "long_name": info.get("longName") or info.get("shortName"),
+                "sector": info.get("sector"),
+                "industry": info.get("industry"),
+                "fund_family": info.get("fundFamily"),
+                "category": info.get("category"),
+            }
+
+        loop = asyncio.get_event_loop()
+        res = await loop.run_in_executor(self._executor, _work)
+        self._cache[key] = res
+        self._expiry[key] = datetime.now() + timedelta(hours=12)
+        return res
+
     async def get_fundamentals(self, ticker: str) -> dict | None:
         """Fundamental ratios for a STOCK via yfinance `.get_info()`. Best-effort:
         returns the fields present AND plausible (partial for banks/REITs — they

@@ -147,7 +147,17 @@ async function updateAssetInfo(ticker, data) {
     document.getElementById('assetIconLarge').style.color = assetInfo.color;
     document.getElementById('assetName').textContent = assetInfo.name;
     document.getElementById('assetTickerBadge').textContent = ticker;
-    
+
+    const aboutSection = document.getElementById('assetAboutSection');
+    const aboutEl = document.getElementById('assetAbout');
+    if (assetInfo.about) {
+        aboutEl.textContent = assetInfo.about;
+        aboutSection.style.display = '';
+    } else {
+        aboutSection.style.display = 'none';
+        if (typeof loadAssetAboutFallback === 'function') loadAssetAboutFallback(ticker, aboutSection, aboutEl);
+    }
+
     // Update price info
     if (data.current) {
         const price = data.current.price || data.current.price_eur || 0;

@@ -555,6 +555,14 @@ async def analyze_asset(ticker: str, name_override: str | None = None) -> dict:
         logger.warning("asset_analysis catalyst brief failed for {}: {}", ticker, exc)
         brief = None
 
+    # Real "what is this" description (Yahoo's own business/fund/coin summary
+    # — never generated), same source now shared with /api/asset/{t}/stats.
+    try:
+        description = await scanner.yahoo.get_description(yt)
+    except Exception as exc:
+        logger.warning("asset_analysis description failed for {}: {}", ticker, exc)
+        description = None
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "ticker": ticker,
@@ -579,4 +587,5 @@ async def analyze_asset(ticker: str, name_override: str | None = None) -> dict:
         "news_sentiment": sentiment,
         "narrative": narrative,
         "catalyst_brief": brief,
+        "description": description,
     }
