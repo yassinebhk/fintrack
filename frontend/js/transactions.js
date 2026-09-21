@@ -50,6 +50,7 @@ function renderTransactions() {
             ? 'No hay transacciones que coincidan con el filtro.'
             : 'Aún no hay transacciones registradas. Pulsa "+ Nueva Transacción", o registra aportaciones desde <strong>Gestionar Cartera</strong> o por <strong>Telegram</strong> (ej.: "mete 50€ al oro desde Kraken").';
         tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted" style="padding:30px;">${msg}</td></tr>`;
+        renderTransactionsFooter([]);
         return;
     }
 
@@ -75,6 +76,33 @@ function renderTransactions() {
             <td><button onclick="deleteTransaction(${t.id})" title="Eliminar" style="background:none; border:none; cursor:pointer; font-size:15px;">🗑️</button></td>
         </tr>`;
     }).join('');
+
+    renderTransactionsFooter(list);
+}
+
+// Totals footer for the (filtered) transaction list: gross money moved plus a
+// buy / sell+dividend breakdown, each grouped by currency. Responds to the
+// active filters, so filtering by "Compras" shows exactly what you've invested.
+function renderTransactionsFooter(list) {
+    const foot = document.getElementById('transactionsFoot');
+    if (!foot) return;
+    if (!list.length) { foot.innerHTML = ''; return; }
+
+    const money = t => (t.quantity || 0) * (t.price || 0);
+    const gross = sumByCurrency(list, t => Math.abs(money(t)), t => t.currency);
+    const buys = sumByCurrency(list.filter(t => t.type === 'buy'), money, t => t.currency);
+    const ins = sumByCurrency(list.filter(t => t.type === 'sell' || t.type === 'dividend'), money, t => t.currency);
+
+    const lines = [`<span class="text-muted">Movido</span>${formatByCurrency(gross)}`];
+    if (Object.keys(buys).length) lines.push(`<span class="text-muted">Compras</span>${formatByCurrency(buys)}`);
+    if (Object.keys(ins).length) lines.push(`<span class="text-muted">Ventas+div.</span>${formatByCurrency(ins)}`);
+
+    const n = list.length;
+    foot.innerHTML = `<tr class="totals-row">
+        <td colspan="5" style="font-weight:600;">Σ Totales · ${n} transacci${n === 1 ? 'ón' : 'ones'}</td>
+        <td class="text-right mono" style="line-height:1.75;">${lines.join('<br>')}</td>
+        <td colspan="2"></td>
+    </tr>`;
 }
 
 async function deleteTransaction(id) {

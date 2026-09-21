@@ -382,10 +382,32 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
             } catch (e) { /* keep no markers rather than fail the whole chart */ }
         }
 
+        // With many trades the per-marker text labels pile up, overlapping each
+        // other, the crosshair legend and the caption/buttons below. Past a small
+        // count, keep only the arrows (you still see WHERE you bought/sold) — the
+        // exact qty/price of each is in the "Tus aportaciones" table below.
+        const MAX_LABELS = 6;
+        const showLabels = markers.length <= MAX_LABELS;
+        if (!showLabels) markers = markers.map(m => ({ ...m, text: undefined }));
+
         markers.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
         if (markers.length) series.setMarkers(markers);
+        _setTradeMarkerNote(showLabels ? 0 : markers.length);
     } catch (err) {
         console.error('asset detail trade markers failed:', err);
+    }
+}
+
+// Toggle the "many trades → arrows only" hint shown under the market chart.
+function _setTradeMarkerNote(count) {
+    const note = document.getElementById('assetDetailMarkerNote');
+    if (!note) return;
+    if (count) {
+        note.textContent = `ℹ️ ${count} operaciones en este activo: se muestran solo las flechas para no saturar el gráfico. El detalle (cantidad y precio de cada una) está en la tabla «Tus aportaciones» de abajo.`;
+        note.style.display = '';
+    } else {
+        note.textContent = '';
+        note.style.display = 'none';
     }
 }
 
@@ -504,6 +526,8 @@ async function loadAssetDetailPositionChart(ticker) {
 async function loadAssetDetailTransactions(ticker) {
     const tbody = document.getElementById('assetDetailTxBody');
     if (!tbody) return;
+    const foot = document.getElementById('assetDetailTxFoot');
+    if (foot) foot.innerHTML = '';
     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:20px;">Cargando…</td></tr>';
     try {
         const resp = await assetDetailFetch(`${ASSET_DETAIL_API}/transactions?ticker=${encodeURIComponent(ticker)}`, { cache: 'no-store' });
@@ -560,9 +584,42 @@ async function loadAssetDetailTransactions(ticker) {
                 <td>${t.broker || '—'}</td>
             </tr>
         `).join('');
+        renderAssetDetailTxFooter(txs);
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding:20px; color:var(--negative);">No se pudieron cargar: ${err.message}<br>${_RETRY_BTN}</td></tr>`;
     }
+}
+
+// Totals footer for this single asset's transactions: net units held (buys −
+// sells — meaningful here since it's ONE ticker) and the money invested /
+// received, grouped by currency.
+function renderAssetDetailTxFooter(txs) {
+    const foot = document.getElementById('assetDetailTxFoot');
+    if (!foot) return;
+    const real = (Array.isArray(txs) ? txs : []).filter(t => t && t.type);
+    if (!real.length) { foot.innerHTML = ''; return; }
+
+    const money = t => (t.quantity || 0) * (t.price || 0);
+    const netUnits = real.reduce((s, t) =>
+        s + ((t.type === 'buy' ? 1 : t.type === 'sell' ? -1 : 0) * (t.quantity || 0)), 0);
+    const buys = sumByCurrency(real.filter(t => t.type === 'buy'), money, t => t.currency);
+    const sells = sumByCurrency(real.filter(t => t.type === 'sell'), money, t => t.currency);
+    const divs = sumByCurrency(real.filter(t => t.type === 'dividend'), money, t => t.currency);
+
+    const lines = [];
+    if (Object.keys(buys).length) lines.push(`<span class="text-muted">Invertido</span>${formatByCurrency(buys)}`);
+    if (Object.keys(sells).length) lines.push(`<span class="text-muted">Vendido</span>${formatByCurrency(sells)}`);
+    if (Object.keys(divs).length) lines.push(`<span class="text-muted">Dividendos</span>${formatByCurrency(divs)}`);
+    const fmt6 = n => (n || 0).toLocaleString('es-ES', { maximumFractionDigits: 6 });
+    const n = real.length;
+
+    foot.innerHTML = `<tr class="totals-row">
+        <td colspan="2" style="font-weight:600;">Σ Totales · ${n} mov.</td>
+        <td class="text-right mono" title="Unidades netas (compras − ventas)">${fmt6(netUnits)}</td>
+        <td></td>
+        <td class="text-right mono" style="line-height:1.75;">${lines.join('<br>') || '—'}</td>
+        <td></td>
+    </tr>`;
 }
 
 window.showAssetDetail = showAssetDetail;

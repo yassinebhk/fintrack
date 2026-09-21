@@ -1722,6 +1722,25 @@ body::before {
     color: var(--accent-primary);
 }
 
+/* Totals footer row — shared by the transactions, asset-detail and
+   portfolio-manager tables. Sits at the bottom, visually separated from the
+   data rows, and summarises the money columns (grouped by currency). */
+.transactions-table tfoot .totals-row td,
+.manager-table tfoot .totals-row td {
+    border-top: 2px solid var(--accent-primary);
+    border-bottom: none;
+    background: rgba(44, 74, 110, 0.05);
+    font-size: 0.85rem;
+    padding-top: var(--spacing-md);
+    padding-bottom: var(--spacing-md);
+}
+.totals-row .text-muted {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-right: 4px;
+}
+
 /* ============================================
    Loading Overlay
    ============================================ */

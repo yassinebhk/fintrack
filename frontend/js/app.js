@@ -191,6 +191,33 @@ function formatNumber(value, decimals = 2) {
     }).format(value);
 }
 
+// Sum money amounts grouped by currency so mixed-currency rows (EUR + US$…)
+// are never silently added together. `amountFn`/`currencyFn` pull the amount
+// and currency out of each row. Returns a { EUR: 1234.5, USD: 78 } map.
+function sumByCurrency(rows, amountFn, currencyFn) {
+    const map = {};
+    (rows || []).forEach(r => {
+        const amt = amountFn(r) || 0;
+        if (!amt) return;
+        const cur = (currencyFn(r) || 'EUR').toString().toUpperCase();
+        map[cur] = (map[cur] || 0) + amt;
+    });
+    return map;
+}
+
+// Render a { cur: amount } map compactly, e.g. "1.234,56 € · 78,00 US$".
+// EUR leads (main currency); falls back to a plain "<n> <code>" if Intl can't
+// format the currency code.
+function formatByCurrency(map) {
+    const curs = Object.keys(map || {});
+    if (!curs.length) return '—';
+    curs.sort((a, b) => (a === 'EUR' ? -1 : b === 'EUR' ? 1 : a < b ? -1 : 1));
+    return curs.map(c => {
+        try { return formatCurrency(map[c], c); }
+        catch (e) { return formatNumber(map[c]) + ' ' + c; }
+    }).join(' · ');
+}
+
 function formatPercent(value) {
     const sign = value >= 0 ? '+' : '';
     return `${sign}${formatNumber(value)}%`;

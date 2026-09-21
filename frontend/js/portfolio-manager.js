@@ -183,6 +183,7 @@ function renderManagerPositions(positionsArg) {
                 </td>
             </tr>
         `;
+        renderManagerFooter([]);
         return;
     }
 
@@ -216,6 +217,28 @@ function renderManagerPositions(positionsArg) {
             </td>
         </tr>
     `}).join('');
+
+    renderManagerFooter(positions);
+}
+
+// Totals footer for the manager table: total invested (Σ cantidad × coste/unidad)
+// grouped by currency, over the currently shown (filtered) positions. Quantity
+// isn't summed — adding units of different assets together is meaningless.
+function renderManagerFooter(positions) {
+    const foot = document.getElementById('managerPositionsFoot');
+    if (!foot) return;
+    if (!positions || !positions.length) { foot.innerHTML = ''; return; }
+
+    const invested = sumByCurrency(
+        positions, p => (p.quantity || 0) * (p.avg_price || 0), p => p.currency
+    );
+    const n = positions.length;
+    foot.innerHTML = `<tr class="totals-row">
+        <td colspan="3" style="font-weight:600;">Σ Totales · ${n} posici${n === 1 ? 'ón' : 'ones'}</td>
+        <td class="text-right mono">—</td>
+        <td class="text-right mono" colspan="2"><span class="text-muted">Invertido</span>${formatByCurrency(invested)}</td>
+        <td></td>
+    </tr>`;
 }
 
 // getTickerIcon lives in app.js (loaded before this file) — single source
