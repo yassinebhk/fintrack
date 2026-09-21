@@ -6,6 +6,8 @@ doesn't distort them (per-position fx via market_value_base / market_value)."""
 
 from __future__ import annotations
 
+import asyncio
+
 from loguru import logger
 
 _PIN_KEY = "pinned_daily_summary"
@@ -68,12 +70,15 @@ async def _asset_trends(svc, positions: list[dict]) -> dict:
 
     This is the asset's own trend (1m≈21 sesiones, 3m≈63), NOT the user's P/L.
     Reuses the portfolio's Yahoo service so ISIN→symbol mapping is applied; crypto
-    falls back to the -EUR pair. Failures are skipped (the row just shows '–')."""
-    out: dict[str, dict] = {}
-    for x in positions:
+    falls back to the -EUR pair. Failures are skipped (the row just shows '–').
+    Fetched CONCURRENTLY (was a sequential loop — 14 positions x ~1.3s each made
+    the on-demand 'ver en tiempo real' preview take ~19s; this is the dominant
+    cost, well above the FX-fetch or portfolio-calc time)."""
+
+    async def _one(x: dict) -> tuple[str, dict] | None:
         t = (x.get("ticker") or "")
         if not t:
-            continue
+            return None
         tu = t.upper()
         try:
             hist = await svc.yahoo.get_history(t, period="3mo")
@@ -83,10 +88,13 @@ async def _asset_trends(svc, positions: list[dict]) -> dict:
             if len(closes) >= 25:
                 m1 = (closes[-1] / closes[-22] - 1) * 100 if len(closes) > 22 else None
                 m3 = (closes[-1] / closes[0] - 1) * 100
-                out[tu] = {"m1": m1, "m3": m3}
+                return tu, {"m1": m1, "m3": m3}
         except Exception as exc:
             logger.debug("trend fetch failed for {}: {}", t, exc)
-    return out
+        return None
+
+    results = await asyncio.gather(*(_one(x) for x in positions))
+    return dict(r for r in results if r)
 
 
 async def _load_pin() -> dict:

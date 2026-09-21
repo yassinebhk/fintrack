@@ -6,7 +6,7 @@ import httpx
 from loguru import logger
 
 
-ECB_URL = "https://api.frankfurter.app"  # free wrapper around ECB reference rates
+ECB_URL = "https://api.frankfurter.dev/v1"  # free wrapper around ECB reference rates (moved from frankfurter.app, which now 301s here)
 FALLBACK_URL = "https://api.exchangerate-api.com/v4/latest"
 
 
