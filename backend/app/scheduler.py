@@ -57,6 +57,8 @@ async def _briefing_job() -> None:
     except Exception as exc:
         logger.error("daily portfolio summary failed: {}", exc)
 
+    # (AI briefing continues below, only in this 08:00 run.)
+
     # 2) AI briefing (analysis)
     try:
         result = await BriefingService().generate_today(force=True)
@@ -69,6 +71,28 @@ async def _briefing_job() -> None:
         )
     except Exception as exc:
         logger.error("scheduled briefing failed: {}", exc)
+
+
+async def _portfolio_summary_extra_job() -> None:
+    """Second/third daily portfolio summary — same real, live data as the 08:00
+    one (PortfolioService, not a cached/stale snapshot), just re-sent + re-pinned
+    later in the day so the pinned Telegram message stays current. force=True:
+    send_daily_summary_pinned()'s per-day idempotency guard is designed for
+    same-message redundancy (multiple CRON firings of the SAME scheduled time),
+    not for skipping a genuinely different, later time of day.
+
+    Replaces tools/daily_status.py + .github/workflows/daily-status-standalone.yml
+    (2026-09-21): that one computed its own numbers from a positions list
+    hand-frozen weeks earlier — real data drifted out from under it (new
+    positions bought since then were silently missing), so its afternoon send
+    started contradicting the correct 08:00 one instead of backing it up."""
+    try:
+        from app.services.portfolio_report import send_daily_summary_pinned
+
+        res = await send_daily_summary_pinned(force=True)
+        logger.info("extra portfolio summary sent (pinned={})", res.get("pinned"))
+    except Exception as exc:
+        logger.error("extra portfolio summary failed: {}", exc)
 
 
 async def _scorecard_job() -> None:
@@ -458,6 +482,32 @@ def setup_jobs() -> None:
         )
         logger.info("scheduled: daily_briefing @ 08:00 {}", settings.timezone)
 
+    # Two more portfolio-summary sends (real, live data — not gated behind
+    # settings.has_gemini/has_groq since this needs no LLM), replacing the
+    # standalone-script afternoon send that had drifted stale.
+    sched.add_job(
+        _portfolio_summary_extra_job,
+        trigger=CronTrigger(day_of_week="mon-fri", hour=14, minute=0, timezone=settings.timezone),
+        id="portfolio_summary_midday",
+        name="Portfolio summary at 14:00",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    logger.info("scheduled: portfolio_summary_midday @ 14:00 {}", settings.timezone)
+
+    sched.add_job(
+        _portfolio_summary_extra_job,
+        trigger=CronTrigger(day_of_week="mon-fri", hour=21, minute=30, timezone=settings.timezone),
+        id="portfolio_summary_evening",
+        name="Portfolio summary at 21:30",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    logger.info("scheduled: portfolio_summary_evening @ 21:30 {}", settings.timezone)
+
+    if settings.has_gemini or settings.has_groq:
         # NOTE: the heavy opportunities scan is now done off-box by the GitHub-Actions
         # worker (opportunities-scan.yml) → /api/opportunities/ingest-scan, because it
         # OOMs Render's 512MB free tier. So we no longer pre-warm it here.

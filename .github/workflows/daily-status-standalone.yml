@@ -1,27 +1,31 @@
 name: daily-status-standalone
 
+# DISABLED (2026-09-21): its own reason for existing — a Render/Neon-outage
+# fallback — no longer applies now that the app is self-hosted on the VM with
+# a local Postgres (if the VM is down, everything is down; this script pulling
+# from an embedded snapshot doesn't add resilience anymore). Worse, its
+# POSITIONS snapshot below is manually maintained and had silently drifted
+# weeks out of date (missing positions bought since), so its afternoon send
+# started CONTRADICTING the real one from the backend instead of backing it
+# up. Replaced by two extra live-data sends on the VM's own scheduler
+# (backend/app/scheduler.py::_portfolio_summary_extra_job, 14:00 + 21:30
+# Europe/Madrid) — same real PortfolioService data as the 08:00 one, no
+# hand-maintained snapshot to go stale. Kept here (not deleted) with
+# workflow_dispatch only, in case a real standalone fallback is ever needed
+# again — but update the embedded POSITIONS snapshot first if you do.
+#
+# Original doc, for context:
 # Sends the daily portfolio table to Telegram, computed from LIVE prices
 # (Yahoo/Coingecko) against an embedded positions snapshot. Depends on NOTHING
 # in the backend, Render, or Neon — so it keeps working during an outage, unlike:
 #   - daily-summary.yml            (needs the Render backend up)
 #   - daily-summary-direct-stopgap (needs the Neon DB up)
 #
-# Reliability: GitHub's scheduled crons are best-effort and are often delayed by
-# hours (or, rarely, skipped). So there are TWO cron times — a primary and a
-# later backup. The script itself is NOT idempotent, so a "guard" step makes the
-# SYSTEM idempotent: a scheduled run skips sending if another run of this same
-# workflow already succeeded today. Result: exactly one message/day even with two
-# crons, and it still goes out if the earlier one was skipped entirely. Manual
-# "Run workflow" (workflow_dispatch) ALWAYS sends (bypasses the guard).
-#
 # Required GitHub Secrets (already used by daily-summary-direct-stopgap.yml):
 #   TELEGRAM_BOT_TOKEN
 #   TELEGRAM_CHAT_ID
 
 on:
-  schedule:
-    - cron: "15 6 * * 1-5"   # primary  ≈ 08:15 Europe/Madrid (07:15 winter), Mon–Fri
-    - cron: "0 11 * * 1-5"   # backup   ≈ 13:00 Europe/Madrid, in case the primary is skipped/very late
   workflow_dispatch: {}
 
 permissions:
