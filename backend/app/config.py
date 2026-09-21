@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     gemini_model_agent: str = "gemini-2.5-flash"
     gemini_model_cheap: str = "gemini-2.5-flash-lite"
     gemini_model_fallback: str = "gemini-2.5-flash-lite"
+    # Third tier, a DIFFERENT model generation from the 2.5 pair above — Google
+    # tracks free-tier quota per model, so when both 2.5-flash and 2.5-flash-lite
+    # are exhausted (verified live: 429 RESOURCE_EXHAUSTED on both, 2026-09),
+    # a same-account, differently-versioned model can still have quota left.
+    # Confirmed working live on this key/date; not a "-preview" build so it
+    # shouldn't vanish without notice the way an experimental one could.
+    gemini_model_fallback2: str = "gemini-3.1-flash-lite"
     groq_api_key: str = ""
     anthropic_api_key: str = ""
     # Additional free OpenAI-compatible providers for the fallback chain.

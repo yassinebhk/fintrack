@@ -27,6 +27,7 @@ class GeminiClient:
         self._client = genai.Client(api_key=self.api_key)
         self.default_model = settings.gemini_model_agent
         self.fallback_model = settings.gemini_model_fallback
+        self.fallback_model2 = settings.gemini_model_fallback2
 
     def _to_contents(self, messages: list[LLMMessage]) -> tuple[str | None, list[dict]]:
         """Split messages into (system_instruction, contents)."""
@@ -65,6 +66,11 @@ class GeminiClient:
         attempted_models = [model]
         if model != self.fallback_model:
             attempted_models.append(self.fallback_model)
+        # Third tier: a different model GENERATION (not just a different tier of
+        # the same 2.5 family), so it draws from a separate free-tier quota —
+        # only reached if both of the above are exhausted.
+        if self.fallback_model2 not in attempted_models:
+            attempted_models.append(self.fallback_model2)
 
         last_exc: Exception | None = None
         response = None
