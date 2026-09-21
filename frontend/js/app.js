@@ -1225,6 +1225,7 @@ function showApp() {
     if (gate) gate.style.display = 'none';
     if (app) app.style.display = '';
     if (window.initTicker) window.initTicker();
+    if (window.initAdminNav) window.initAdminNav();  // reveal the admin tab for the owner
     const nameEl = document.getElementById('userChipName');
     if (nameEl && currentUser) nameEl.textContent = currentUser.name || currentUser.email;
     const logoutLink = document.getElementById('logoutLink');

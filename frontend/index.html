@@ -126,6 +126,10 @@
                     <span class="nav-icon">📖</span>
                     <span class="nav-label">Documentación</span>
                 </li>
+                <li class="nav-item" data-page="admin" id="navAdmin" style="display:none;">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-label">Administración</span>
+                </li>
             </ul>
             
             <div class="sidebar-footer">
@@ -2020,6 +2024,57 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                 <div class="page page-docs" id="page-docs">
                     <!-- Content loaded from docs.html -->
                 </div>
+
+                <div class="page page-admin" id="page-admin">
+                    <style>
+                    .admin-list{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:6px;}
+                    .admin-list li{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(43,40,34,.04);border:1px solid rgba(43,40,34,.08);border-radius:8px;padding:8px 12px;font-size:14px;}
+                    .admin-list .you{font-size:11px;color:var(--text-secondary,#6b6456);border:1px solid rgba(43,40,34,.15);border-radius:6px;padding:1px 6px;margin-left:6px;}
+                    .admin-del{background:none;border:none;cursor:pointer;font-size:15px;color:var(--negative,#dc2626);}
+                    .admin-del[disabled]{opacity:.3;cursor:not-allowed;}
+                    .admin-msg{font-size:13px;margin:6px 0;min-height:18px;}
+                    .admin-msg.ok{color:var(--positive,#16a34a);} .admin-msg.err{color:var(--negative,#dc2626);}
+                    .admin-toggle{display:inline-flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;margin-top:6px;}
+                    .admin-toggle input{width:18px;height:18px;accent-color:var(--accent-primary,#2C4A6E);}
+                    </style>
+                    <div class="page-header">
+                        <h1>⚙️ Administración</h1>
+                        <p class="text-muted">Gestiona quién puede acceder a FinTrack y la configuración general. Esta página solo la ves tú (administrador).</p>
+                    </div>
+
+                    <div class="card">
+                        <h3>👥 Acceso permitido (lista de correos)</h3>
+                        <p class="text-muted" style="font-size:13px;">Solo estos correos de Google pueden iniciar sesión. Añade el de quien quieras dar acceso; quítalo para revocarlo (bloquea su próximo inicio de sesión).</p>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 4px;">
+                            <input type="email" id="adminNewEmail" placeholder="correo@gmail.com" onkeydown="if(event.key==='Enter')adminAddEmail()"
+                                   style="flex:1; min-width:220px; padding:9px 12px; border:1px solid rgba(43,40,34,.2); border-radius:8px; font-size:14px;">
+                            <button class="btn-primary" onclick="adminAddEmail()">➕ Añadir acceso</button>
+                        </div>
+                        <div class="admin-msg" id="adminAllowlistMsg"></div>
+                        <ul class="admin-list" id="adminAllowlist"><li>Cargando…</li></ul>
+                    </div>
+
+                    <div class="card">
+                        <h3>🌐 Registro abierto</h3>
+                        <p class="text-muted" style="font-size:13px;">Si lo activas, <strong>cualquier</strong> cuenta de Google podrá entrar y la lista de arriba se ignora por completo. Úsalo solo si sabes lo que haces.</p>
+                        <label class="admin-toggle">
+                            <input type="checkbox" id="adminSignupToggle" onchange="adminToggleSignup(this)">
+                            <span id="adminSignupState">Cargando…</span>
+                        </label>
+                        <div class="admin-msg" id="adminSignupMsg"></div>
+                    </div>
+
+                    <div class="card">
+                        <h3>🧾 Usuarios registrados</h3>
+                        <p class="text-muted" style="font-size:13px;">Cuentas que ya han iniciado sesión alguna vez (distinto de la lista de acceso: esto es quién YA entró). Para revocar a alguien, quita su correo de la lista de arriba.</p>
+                        <div style="overflow-x:auto;">
+                            <table class="data-table" id="adminUsersTable">
+                                <thead><tr><th>Email</th><th>Nombre</th><th>Alta</th><th>Último acceso</th><th>Admin</th></tr></thead>
+                                <tbody id="adminUsersBody"><tr><td colspan="5" class="text-center text-muted" style="padding:16px;">Cargando…</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </main>
         </div>
     </div>
@@ -2036,7 +2091,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="js/info-glossary.js?v=20260921dividendos"></script>
-    <script src="js/app.js?v=20260921rebalcalc"></script>
+    <script src="js/app.js?v=20260921admin"></script>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260921fire"></script>
     <script src="js/news.js?v=20260921tally"></script>
@@ -2056,6 +2111,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/alerts.js?v=20260921real"></script>
     <script src="js/export-utils.js?v=20260913export"></script>
     <script src="js/scorecard.js?v=20260921equity"></script>
+    <script src="js/admin.js?v=20260921admin"></script>
     <script src="js/daily-summary.js?v=20260913export"></script>
     <script src="js/position-review.js?v=20260921filter"></script>
     <script>
