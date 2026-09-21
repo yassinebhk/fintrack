@@ -227,6 +227,8 @@ function renderBtResults(data) {
     `).join('');
 
     document.getElementById('btResults').style.display = 'block';
+    const ex = document.getElementById('btExport');
+    if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('btResults', 'backtest');
 }
 
 document.addEventListener('DOMContentLoaded', () => {

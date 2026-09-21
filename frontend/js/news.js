@@ -99,7 +99,7 @@ async function renderNews(filter = 'all') {
                 <p class="news-excerpt">${news.excerpt || ''}</p>
                 ${news.impactedAssets && news.impactedAssets.length > 0 ? `
                     <div class="news-assets">
-                        ${news.impactedAssets.map(asset => `<span class="asset-tag">${asset}</span>`).join('')}
+                        ${news.impactedAssets.map(asset => `<span class="asset-tag" style="cursor:pointer;" title="Ver análisis de ${asset}" onclick="event.stopPropagation(); if (typeof openDeepAnalysis === 'function') openDeepAnalysis('${asset.replace(/'/g, "\\'")}', '${asset.replace(/'/g, "\\'")}');">${asset}</span>`).join('')}
                     </div>
                 ` : ''}
                 <div class="news-meta">
@@ -119,6 +119,25 @@ async function renderNews(filter = 'all') {
     
     // Update last update indicator
     updateNewsTimestamp();
+    updateNewsSentimentTally(newsData);
+}
+
+/**
+ * Aggregate sentiment count for the currently shown headlines (already
+ * classified server-side per article — this is just a client-side tally,
+ * not a new judgment).
+ */
+function updateNewsSentimentTally(newsData) {
+    const el = document.getElementById('newsSentimentTally');
+    if (!el) return;
+    const counts = { bullish: 0, bearish: 0, neutral: 0 };
+    (newsData || []).forEach(n => { counts[n.impact] = (counts[n.impact] || 0) + 1; });
+    const total = newsData.length;
+    if (!total) { el.innerHTML = ''; return; }
+    el.innerHTML = `<span class="text-muted">De estas ${total}:</span>
+        <span style="color:var(--positive); font-weight:600;">📈 ${counts.bullish} alcistas</span> ·
+        <span style="color:var(--negative); font-weight:600;">📉 ${counts.bearish} bajistas</span> ·
+        <span class="text-muted">➡️ ${counts.neutral} neutrales</span>`;
 }
 
 /**

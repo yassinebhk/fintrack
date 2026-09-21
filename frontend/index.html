@@ -1584,11 +1584,12 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
 
                 <!-- Backtest Lab Page -->
                 <div class="page page-journal" id="page-journal">
-                    <section class="manager-header">
+                    <section class="manager-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
                         <div>
                             <h2>📔 Diario de decisiones</h2>
                             <p>Registra <strong>por qué</strong> decides (tesis) y, al revisar, <strong>qué aprendiste</strong> (lección) — el hábito que más mejora tus decisiones con el tiempo.</p>
                         </div>
+                        <div id="journalExport"></div>
                     </section>
                     <div id="journalContent"></div>
                 </div>
@@ -1724,6 +1725,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                     </div>
 
                     <div id="btResults" style="display:none;">
+                        <div style="display:flex; justify-content:flex-end; margin-bottom:8px;" id="btExport"></div>
                         <div class="card card-kpi" id="btMetrics" style="margin-bottom:16px;"></div>
                         <div class="card card-chart">
                             <div class="card-header"><h3>Curva de capital</h3></div>
@@ -1985,8 +1987,9 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                                 </ul>
                             </div>
                         </details>
+                        <div id="newsSentimentTally" style="margin-top:10px; font-size:13px;"></div>
                     </section>
-                    
+
                     <div class="news-grid" id="newsGrid">
                         <!-- News loaded dynamically -->
                     </div>
@@ -2020,18 +2023,18 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/app.js?v=20260921livesum"></script>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260912blue"></script>
-    <script src="js/news.js?v=20260530a"></script>
+    <script src="js/news.js?v=20260921tally"></script>
     <script src="js/portfolio-manager.js?v=20260916pdf"></script>
     <script src="js/ai-advisor.js?v=20260530a"></script>
     <script src="js/asset-analysis.js?v=20260921about"></script>
-    <script src="js/backtest.js?v=20260912info"></script>
+    <script src="js/backtest.js?v=20260921export"></script>
     <script src="js/opportunities.js?v=20260921reorder"></script>
     <script src="js/asset-deep-analysis.js?v=20260921about"></script>
     <script src="js/asset-detail.js?v=20260921about"></script>
     <script src="js/transactions.js?v=20260921export"></script>
     <script src="js/polymarket.js?v=20260912info"></script>
     <script src="js/daytrading.js?v=20260921equity"></script>
-    <script src="js/journal.js?v=20260915repartos"></script>
+    <script src="js/journal.js?v=20260921filter"></script>
     <script src="js/watchlist.js?v=20260921spark"></script>
     <script src="js/goals.js?v=20260921real"></script>
     <script src="js/alerts.js?v=20260921real"></script>

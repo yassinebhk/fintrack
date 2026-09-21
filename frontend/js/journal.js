@@ -13,16 +13,45 @@ function _jEsc(s) {
     return (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
+let _journalAll = [];
+
 async function loadJournal() {
     const el = document.getElementById('journalContent');
     if (!el) return;
-    let entries = [];
     try {
         const r = await fetch(`${JOURNAL_API}/journal`);
-        if (r.ok) entries = (await r.json()).entries || [];
-    } catch (e) { /* still render the form */ }
-    el.innerHTML = journalIntroHtml() + journalFormHtml() + journalStatsHtml(entries) + journalListHtml(entries);
+        if (r.ok) _journalAll = (await r.json()).entries || [];
+    } catch (e) { _journalAll = []; /* still render the form */ }
+    el.innerHTML = journalIntroHtml() + journalFormHtml() + journalStatsHtml(_journalAll)
+        + journalFilterBarHtml() + '<div id="journalListContainer"></div>';
     wireJournalForm();
+    renderJournalList();
+    const ex = document.getElementById('journalExport');
+    if (ex && window.exportToolbarHTML) ex.innerHTML = exportToolbarHTML('journalContent', 'diario-decisiones');
+}
+
+function journalFilterBarHtml() {
+    if (_journalAll.length < 2) return '';
+    return `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+        <input type="text" id="jSearch" placeholder="🔍 Ticker o nombre…" class="input-date" style="min-width:200px;" oninput="renderJournalList()">
+        <select id="jStatusFilter" class="select-filter" onchange="renderJournalList()">
+            <option value="all">Todas</option>
+            <option value="pendiente">Pendientes de revisar</option>
+            <option value="revisada">Revisadas</option>
+        </select>
+    </div>`;
+}
+
+function renderJournalList() {
+    const container = document.getElementById('journalListContainer');
+    if (!container) return;
+    const q = ((document.getElementById('jSearch') || {}).value || '').trim().toLowerCase();
+    const statusFilter = (document.getElementById('jStatusFilter') || {}).value || 'all';
+    let entries = _journalAll;
+    if (q) entries = entries.filter(e => (e.ticker || '').toLowerCase().includes(q) || (e.name || '').toLowerCase().includes(q));
+    if (statusFilter === 'pendiente') entries = entries.filter(e => e.status !== 'revisada');
+    if (statusFilter === 'revisada') entries = entries.filter(e => e.status === 'revisada');
+    container.innerHTML = journalListHtml(entries);
 }
 
 function journalIntroHtml() {
