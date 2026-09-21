@@ -1,6 +1,7 @@
 """Async repositories — single point of contact with the DB for each aggregate."""
 
 from app.repositories.day_trades import DayTradeRepository
+from app.repositories.goals import GoalRepository
 from app.repositories.journal import JournalRepository
 from app.repositories.positions import PositionRepository
 from app.repositories.price_cache import PriceCacheRepository
@@ -11,6 +12,7 @@ from app.repositories.watchlist import WatchlistRepository
 
 __all__ = [
     "DayTradeRepository",
+    "GoalRepository",
     "JournalRepository",
     "PositionRepository",
     "PriceCacheRepository",

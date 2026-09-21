@@ -14,6 +14,7 @@ from app.api import (
     creators,
     daytrading,
     fx,
+    goals,
     health,
     imports,
     journal,
@@ -56,6 +57,7 @@ def build_api_router() -> APIRouter:
     router.include_router(backtest.router)
     router.include_router(creators.router)
     router.include_router(daytrading.router)
+    router.include_router(goals.router)
     router.include_router(polymarket.router)
     router.include_router(opportunities.router)
     router.include_router(plans.router)

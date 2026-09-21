@@ -831,46 +831,44 @@
                     </section>
 
                     <div class="goals-grid" id="goalsContainer">
-                        <!-- Example goals -->
-                        <div class="goal-card">
-                            <div class="goal-icon">🏠</div>
-                            <h4>Entrada casa</h4>
-                            <div class="goal-progress">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 35%"></div>
-                                </div>
-                                <div class="progress-info">
-                                    <span>17.500 € / 50.000 €</span>
-                                    <span>35%</span>
-                                </div>
-                            </div>
-                            <div class="goal-details">
-                                <span>📅 Meta: Dic 2027</span>
-                                <span>💰 400 €/mes necesarios</span>
-                            </div>
-                        </div>
+                        <p class="text-muted">Cargando objetivos…</p>
+                    </div>
 
-                        <div class="goal-card">
-                            <div class="goal-icon">🚗</div>
-                            <h4>Coche nuevo</h4>
-                            <div class="goal-progress">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 60%"></div>
-                                </div>
-                                <div class="progress-info">
-                                    <span>12.000 € / 20.000 €</span>
-                                    <span>60%</span>
-                                </div>
+                    <!-- Goal Modal -->
+                    <div class="modal" id="goalModal">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 id="goalModalTitle">Nuevo Objetivo</h3>
+                                <button class="modal-close" id="closeGoalModal">×</button>
                             </div>
-                            <div class="goal-details">
-                                <span>📅 Meta: Jun 2026</span>
-                                <span>💰 500 €/mes necesarios</span>
-                            </div>
-                        </div>
-
-                        <div class="goal-card goal-add">
-                            <span class="add-icon">+</span>
-                            <span>Añadir objetivo</span>
+                            <form id="goalForm">
+                                <input type="hidden" id="goalId">
+                                <div class="form-group">
+                                    <label>Nombre</label>
+                                    <input type="text" id="goalName" placeholder="Entrada casa" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Icono (emoji, opcional)</label>
+                                    <input type="text" id="goalIcon" placeholder="🏠" maxlength="4">
+                                </div>
+                                <div class="form-group">
+                                    <label>Importe objetivo (€)</label>
+                                    <input type="number" id="goalTarget" step="0.01" min="0.01" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Ahorrado hasta ahora (€)</label>
+                                    <input type="number" id="goalCurrent" step="0.01" min="0" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label>Fecha objetivo (opcional)</label>
+                                    <input type="date" id="goalDate">
+                                </div>
+                                <span id="goalMsg" style="font-size:13px;"></span>
+                                <div class="modal-actions" style="display:flex; gap:10px; margin-top:14px;">
+                                    <button type="submit" class="btn-primary" id="goalSubmitBtn">Guardar</button>
+                                    <button type="button" class="btn-secondary" id="goalDeleteBtn" style="display:none; color:var(--negative);">Eliminar objetivo</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
 
@@ -2039,6 +2037,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/daytrading.js?v=20260921equity"></script>
     <script src="js/journal.js?v=20260915repartos"></script>
     <script src="js/watchlist.js?v=20260921spark"></script>
+    <script src="js/goals.js?v=20260921real"></script>
     <script src="js/export-utils.js?v=20260913export"></script>
     <script src="js/scorecard.js?v=20260921equity"></script>
     <script src="js/daily-summary.js?v=20260913export"></script>
