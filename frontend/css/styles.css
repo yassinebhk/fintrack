@@ -293,6 +293,72 @@ body::before {
     color: var(--text-primary);
 }
 
+/* Grouped nav (compacted sidebar): a top-level header whose member pages appear
+   in the sub-tab bar. Styled like a nav-item, plus a caret. */
+.nav-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    margin-bottom: var(--spacing-xs);
+}
+.nav-group > .nav-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
+}
+.nav-group:hover { background: var(--bg-tertiary); }
+.nav-group:hover > .nav-label { color: var(--text-primary); }
+.nav-group.active {
+    background: rgba(44, 74, 110, 0.15);
+    border-left: 3px solid var(--accent-primary);
+}
+.nav-group.active > .nav-label { color: var(--text-primary); font-weight: 600; }
+.nav-caret {
+    margin-left: auto;
+    color: var(--text-tertiary);
+    font-size: 1.1rem;
+    line-height: 1;
+    transition: transform var(--transition-fast);
+}
+.nav-group.active .nav-caret { transform: rotate(90deg); color: var(--accent-primary); }
+.nav-subitems { display: none; }  /* kept in the DOM only for the page-switch machinery */
+
+/* Secondary sub-tab bar shown under the header for grouped sections. */
+.subtab-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px var(--spacing-xl);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+}
+.subtab-group-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+    margin-right: 4px;
+}
+.subtab-btn {
+    background: transparent;
+    border: 1px solid var(--border-primary);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 5px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.subtab-btn:hover { background: rgba(44, 74, 110, 0.10); color: var(--accent-primary); }
+.subtab-btn.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+
 /* Sidebar Footer */
 .sidebar-footer {
     padding: var(--spacing-md);

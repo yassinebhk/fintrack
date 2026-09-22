@@ -1907,18 +1907,24 @@ function initNavigation() {
                 'dashboard': 'Dashboard',
                 'analysis': 'Análisis',
                 'transactions': 'Transacciones',
-                'portfolio-manager': 'Gestionar Cartera',
+                'portfolio-manager': 'Posiciones',
+                'journal': 'Diario',
                 'goals': 'Objetivos',
+                'watchlist': 'Watchlist',
+                'position-review': '¿Vender o mantener?',
+                'daily-summary': 'Resumen diario',
                 'alerts': 'Alertas',
                 'calculators': 'Calculadoras',
                 'ai-advisor': 'Asesor IA',
                 'news': 'Noticias',
                 'opportunities': 'Oportunidades',
+                'scorecard': 'Eficacia',
                 'backtest': 'Backtest',
                 'polymarket': 'Polymarket Lab',
                 'daytrading': 'Trading Diario',
                 'learn': 'Aprender',
-                'docs': 'Documentación'
+                'docs': 'Documentación',
+                'admin': 'Administración'
             };
             pageTitle.textContent = titles[pageName] || 'Dashboard';
 

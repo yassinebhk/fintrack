@@ -42,6 +42,8 @@ function showAssetDetail(ticker) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     const page = document.getElementById('page-asset-detail');
     if (page) page.classList.add('active');
+    // Asset detail isn't part of any nav group — clear the sub-tab bar + highlight.
+    if (window.syncSubtabs) window.syncSubtabs('asset-detail');
 
     const info = ASSET_DISPLAY_NAMES[currentAssetDetailTicker];
     const titleEl = document.getElementById('pageTitle');

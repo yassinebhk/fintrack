@@ -17,7 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260922dyn">
+    <link rel="stylesheet" href="css/styles.css?v=20260922nav">
 </head>
 <body>
     <div id="loginGate" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:24px;">
@@ -39,93 +39,83 @@
                 <span class="version">v2.0</span>
             </div>
             
+            <!-- Compacted nav: a few top-level entries, related pages grouped into a
+                 sub-tab bar under the header. The .nav-subitems below are kept in the
+                 DOM (hidden) so the existing page-switch machinery, hash router and
+                 all inline [data-page].click() calls keep working untouched — the
+                 sub-tabs and group headers ultimately click these. -->
             <ul class="nav-menu">
                 <li class="nav-item active" data-page="dashboard">
                     <span class="nav-icon">📊</span>
                     <span class="nav-label">Dashboard</span>
                 </li>
-                <li class="nav-item" data-page="portfolio-manager">
+
+                <li class="nav-group" data-group="cartera">
                     <span class="nav-icon">💼</span>
-                    <span class="nav-label">Gestionar Cartera</span>
+                    <span class="nav-label">Cartera</span>
+                    <span class="nav-caret">›</span>
+                    <ul class="nav-subitems" hidden>
+                        <li class="nav-item" data-page="portfolio-manager"><span class="nav-icon">💼</span><span class="nav-label">Posiciones</span></li>
+                        <li class="nav-item" data-page="transactions"><span class="nav-icon">💸</span><span class="nav-label">Transacciones</span></li>
+                        <li class="nav-item" data-page="journal"><span class="nav-icon">📔</span><span class="nav-label">Diario</span></li>
+                        <li class="nav-item" data-page="goals"><span class="nav-icon">🎯</span><span class="nav-label">Objetivos</span></li>
+                    </ul>
                 </li>
-                <li class="nav-item" data-page="transactions">
-                    <span class="nav-icon">💸</span>
-                    <span class="nav-label">Transacciones</span>
+
+                <li class="nav-group" data-group="analisis">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-label">Análisis</span>
+                    <span class="nav-caret">›</span>
+                    <ul class="nav-subitems" hidden>
+                        <li class="nav-item" data-page="analysis"><span class="nav-icon">📈</span><span class="nav-label">Mercado</span></li>
+                        <li class="nav-item" data-page="position-review"><span class="nav-icon">🔄</span><span class="nav-label">¿Vender o mantener?</span></li>
+                        <li class="nav-item" data-page="daily-summary"><span class="nav-icon">📅</span><span class="nav-label">Resumen diario</span></li>
+                        <li class="nav-item" data-page="calculators"><span class="nav-icon">🧮</span><span class="nav-label">Calculadoras</span></li>
+                    </ul>
                 </li>
-                <li class="nav-item" data-page="journal">
-                    <span class="nav-icon">📔</span>
-                    <span class="nav-label">Diario</span>
-                </li>
+
                 <li class="nav-item" data-page="watchlist">
                     <span class="nav-icon">👀</span>
                     <span class="nav-label">Watchlist</span>
-                </li>
-                <li class="nav-item" data-page="analysis">
-                    <span class="nav-icon">📈</span>
-                    <span class="nav-label">Análisis</span>
-                </li>
-                <li class="nav-item" data-page="position-review">
-                    <span class="nav-icon">🔄</span>
-                    <span class="nav-label">¿Vender o mantener?</span>
-                </li>
-                <li class="nav-item" data-page="daily-summary">
-                    <span class="nav-icon">📅</span>
-                    <span class="nav-label">Resumen diario</span>
-                </li>
-                <li class="nav-item" data-page="goals">
-                    <span class="nav-icon">🎯</span>
-                    <span class="nav-label">Objetivos</span>
                 </li>
                 <li class="nav-item" data-page="alerts">
                     <span class="nav-icon">🔔</span>
                     <span class="nav-label">Alertas</span>
                 </li>
 
-                <li class="nav-section-label"><span>Inteligencia</span></li>
-                <li class="nav-item" data-page="opportunities">
-                    <span class="nav-icon">💡</span>
-                    <span class="nav-label">Oportunidades</span>
-                </li>
-                <li class="nav-item" data-page="ai-advisor">
-                    <span class="nav-icon">🤖</span>
-                    <span class="nav-label">Asesor IA</span>
-                </li>
-                <li class="nav-item" data-page="news">
-                    <span class="nav-icon">📰</span>
-                    <span class="nav-label">Noticias</span>
+                <li class="nav-group" data-group="inteligencia">
+                    <span class="nav-icon">🧠</span>
+                    <span class="nav-label">Inteligencia</span>
+                    <span class="nav-caret">›</span>
+                    <ul class="nav-subitems" hidden>
+                        <li class="nav-item" data-page="opportunities"><span class="nav-icon">💡</span><span class="nav-label">Oportunidades</span></li>
+                        <li class="nav-item" data-page="ai-advisor"><span class="nav-icon">🤖</span><span class="nav-label">Asesor IA</span></li>
+                        <li class="nav-item" data-page="news"><span class="nav-icon">📰</span><span class="nav-label">Noticias</span></li>
+                    </ul>
                 </li>
 
-                <li class="nav-section-label"><span>Laboratorios</span></li>
-                <li class="nav-item" data-page="scorecard">
-                    <span class="nav-icon">🎯</span>
-                    <span class="nav-label">Eficacia</span>
-                </li>
-                <li class="nav-item" data-page="daytrading">
-                    <span class="nav-icon">📓</span>
-                    <span class="nav-label">Trading Diario</span>
-                </li>
-                <li class="nav-item" data-page="backtest">
-                    <span class="nav-icon">🔬</span>
-                    <span class="nav-label">Backtest Lab</span>
-                </li>
-                <li class="nav-item" data-page="polymarket">
-                    <span class="nav-icon">🎲</span>
-                    <span class="nav-label">Polymarket Lab</span>
+                <li class="nav-group" data-group="labs">
+                    <span class="nav-icon">🧪</span>
+                    <span class="nav-label">Labs</span>
+                    <span class="nav-caret">›</span>
+                    <ul class="nav-subitems" hidden>
+                        <li class="nav-item" data-page="scorecard"><span class="nav-icon">🎯</span><span class="nav-label">Eficacia</span></li>
+                        <li class="nav-item" data-page="daytrading"><span class="nav-icon">📓</span><span class="nav-label">Trading Diario</span></li>
+                        <li class="nav-item" data-page="backtest"><span class="nav-icon">🔬</span><span class="nav-label">Backtest Lab</span></li>
+                        <li class="nav-item" data-page="polymarket"><span class="nav-icon">🎲</span><span class="nav-label">Polymarket Lab</span></li>
+                    </ul>
                 </li>
 
-                <li class="nav-section-label"><span>Más</span></li>
-                <li class="nav-item" data-page="calculators">
-                    <span class="nav-icon">🧮</span>
-                    <span class="nav-label">Calculadoras</span>
-                </li>
-                <li class="nav-item" data-page="learn">
+                <li class="nav-group" data-group="aprender">
                     <span class="nav-icon">📚</span>
                     <span class="nav-label">Aprender</span>
+                    <span class="nav-caret">›</span>
+                    <ul class="nav-subitems" hidden>
+                        <li class="nav-item" data-page="learn"><span class="nav-icon">📚</span><span class="nav-label">Guía</span></li>
+                        <li class="nav-item" data-page="docs"><span class="nav-icon">📖</span><span class="nav-label">Documentación</span></li>
+                    </ul>
                 </li>
-                <li class="nav-item" data-page="docs">
-                    <span class="nav-icon">📖</span>
-                    <span class="nav-label">Documentación</span>
-                </li>
+
                 <li class="nav-item" data-page="admin" id="navAdmin" style="display:none;">
                     <span class="nav-icon">⚙️</span>
                     <span class="nav-label">Administración</span>
@@ -168,6 +158,11 @@
                     </button>
                 </div>
             </header>
+
+            <!-- Secondary sub-tab bar: appears when a grouped section (Cartera,
+                 Análisis, Inteligencia, Labs, Aprender) is active. Populated by
+                 nav-groups.js. -->
+            <div class="subtab-bar" id="subtabBar" hidden></div>
 
             <!-- Page Content -->
             <main class="main" id="mainContent">
@@ -2106,7 +2101,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/backtest.js?v=20260921export"></script>
     <script src="js/opportunities.js?v=20260921reorder"></script>
     <script src="js/asset-deep-analysis.js?v=20260922dyn"></script>
-    <script src="js/asset-detail.js?v=20260922dyn"></script>
+    <script src="js/asset-detail.js?v=20260922nav"></script>
     <script src="js/transactions.js?v=20260921totals"></script>
     <script src="js/polymarket.js?v=20260921equity"></script>
     <script src="js/daytrading.js?v=20260921equity"></script>
@@ -2127,6 +2122,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
             });
         }
     </script>
-    <script src="js/pages.js?v=20260921cuentas"></script>
+    <script src="js/pages.js?v=20260922nav"></script>
+    <script src="js/nav-groups.js?v=20260922nav"></script>
 </body>
 </html>
