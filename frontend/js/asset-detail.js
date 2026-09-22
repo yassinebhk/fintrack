@@ -373,7 +373,13 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates, chart, 
                 if (!day) return null;
                 const isBuy = t.type === 'buy';
                 const time = snapToChart(day);
-                addInfo(time, `${isBuy ? '🟢 Compra' : '🔴 Venta'} ${fmtQty(t.quantity)} @ ${fmtPrice(t.price, t.currency)} · ${fmtDate(day)}`);
+                addInfo(time, {
+                    kind: isBuy ? 'buy' : 'sell',
+                    qty: fmtQty(t.quantity),
+                    price: fmtPrice(t.price, t.currency),
+                    total: fmtPrice((t.quantity || 0) * (t.price || 0), t.currency),
+                    date: fmtDate(day),
+                });
                 return {
                     time,
                     position: isBuy ? 'belowBar' : 'aboveBar',
@@ -395,9 +401,14 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates, chart, 
                     if (pos && pos.created_at && pos.quantity > 0) {
                         const time = snapToChart(pos.created_at.slice(0, 10));
                         markers = [{ time, position: 'belowBar', color: '#9C9689', shape: 'circle' }];
-                        const info = `⚪ Posición reconstruida: ≈${fmtQty(pos.quantity)} @ ${fmtPrice(pos.avg_price, pos.currency)} (no es tu fecha real de compra)`;
-                        addInfo(time, info);
-                        syntheticNote = info;
+                        addInfo(time, {
+                            kind: 'recon',
+                            qty: '≈' + fmtQty(pos.quantity),
+                            price: fmtPrice(pos.avg_price, pos.currency),
+                            total: fmtPrice((pos.quantity || 0) * (pos.avg_price || 0), pos.currency),
+                            date: '',
+                        });
+                        syntheticNote = `⚪ Posición reconstruida: ≈${fmtQty(pos.quantity)} @ ${fmtPrice(pos.avg_price, pos.currency)} — no es tu fecha real de compra.`;
                     }
                 }
             } catch (e) { /* keep no markers rather than fail the whole chart */ }
@@ -416,8 +427,15 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates, chart, 
     }
 }
 
-// Click a marker's bar → small popup with that trade's details (no text on the
-// chart itself, broker-style). Forgiving: matches the nearest trade within ~4 days.
+// Click a marker's bar → a polished card with that trade's details (no text on
+// the chart itself, broker-style). Forgiving: matches the nearest trade within
+// ~4 days. Auto-closes on pan/zoom so it never floats out of place.
+const _TRADE_POPUP_META = {
+    buy: { badge: '🟢 Compra', cls: 'kind-buy' },
+    sell: { badge: '🔴 Venta', cls: 'kind-sell' },
+    recon: { badge: '⚪ Posición reconstruida', cls: 'kind-recon' },
+};
+
 function _wireTradePopup(chart, canvasEl, byTime) {
     let pop = canvasEl.querySelector('.trade-popup');
     if (!pop) {
@@ -428,22 +446,40 @@ function _wireTradePopup(chart, canvasEl, byTime) {
     }
     const hide = () => { pop.style.display = 'none'; };
     const keys = Object.keys(byTime);
+
+    const cardHtml = (o) => {
+        const m = _TRADE_POPUP_META[o.kind] || _TRADE_POPUP_META.buy;
+        return `<div class="trade-popup-card ${m.cls}">
+            <div class="trade-popup-head">
+                <span class="trade-popup-badge">${m.badge}</span>
+                ${o.date ? `<span class="trade-popup-date">${o.date}</span>` : ''}
+            </div>
+            <div class="trade-popup-row"><span>Cantidad</span><b>${o.qty}</b></div>
+            <div class="trade-popup-row"><span>Precio</span><b>${o.price}</b></div>
+            <div class="trade-popup-row"><span>Total</span><b>${o.total}</b></div>
+            ${o.kind === 'recon' ? '<div class="trade-popup-note">No es tu fecha real de compra (posición reconstruida a partir de tu posición actual).</div>' : ''}
+        </div>`;
+    };
+
     chart.subscribeClick((param) => {
         if (!param || param.time == null || !keys.length) { hide(); return; }
         const clicked = _timeToMs(param.time);
         let bestKey = null, bestDiff = Infinity;
         for (const k of keys) { const diff = Math.abs(_timeToMs(k) - clicked); if (diff < bestDiff) { bestDiff = diff; bestKey = k; } }
         if (bestKey == null || bestDiff > 4 * 86400000) { hide(); return; }  // must click near a marker
-        pop.innerHTML = byTime[bestKey].map(s => `<div>${s}</div>`).join('') + '<div class="trade-popup-close">✕</div>';
+        pop.innerHTML = '<button class="trade-popup-close" title="Cerrar">✕</button>' + byTime[bestKey].map(cardHtml).join('');
         pop.style.display = 'block';
         const w = canvasEl.clientWidth;
-        const pw = pop.offsetWidth || 240;
+        const pw = pop.offsetWidth || 250;
         const x = param.point ? param.point.x : w / 2;
         pop.style.left = Math.min(Math.max(8, x - pw / 2), Math.max(8, w - pw - 8)) + 'px';
         pop.style.top = '8px';
         const closeBtn = pop.querySelector('.trade-popup-close');
         if (closeBtn) closeBtn.onclick = (e) => { e.stopPropagation(); hide(); };
     });
+
+    // Close it if the user pans/zooms/changes range, so it never sits misaligned.
+    try { chart.timeScale().subscribeVisibleTimeRangeChange(hide); } catch (e) { /* older LWC */ }
 }
 
 // Show a small hint under the market chart (many-trades notice, or reconstructed-

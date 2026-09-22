@@ -1867,21 +1867,57 @@ body::before {
     z-index: 4;
     background: var(--bg-card, #fff);
     border: 1px solid var(--border-primary);
-    border-radius: 8px;
-    box-shadow: 0 4px 14px rgba(5, 10, 20, 0.18);
-    padding: 8px 26px 8px 10px;
-    font-size: 12px;
-    line-height: 1.5;
-    max-width: 280px;
+    border-radius: 10px;
+    box-shadow: 0 6px 22px rgba(5, 10, 20, 0.22);
+    padding: 6px;
+    min-width: 210px;
+    max-width: 300px;
+    font-size: 12.5px;
 }
 .trade-popup-close {
     position: absolute;
-    top: 4px;
-    right: 6px;
+    top: 6px;
+    right: 8px;
+    background: none;
+    border: none;
     cursor: pointer;
     color: var(--text-secondary);
-    font-size: 12px;
+    font-size: 14px;
     line-height: 1;
+    z-index: 1;
+}
+.trade-popup-card {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border-left: 4px solid var(--text-tertiary);
+}
+.trade-popup-card + .trade-popup-card { margin-top: 6px; border-top: 1px solid var(--border-primary); }
+.trade-popup-card.kind-buy { border-left-color: #4A9B8E; }
+.trade-popup-card.kind-sell { border-left-color: #C6473C; }
+.trade-popup-card.kind-recon { border-left-color: #9C9689; }
+.trade-popup-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 5px;
+    padding-right: 16px;
+}
+.trade-popup-badge { font-weight: 700; }
+.trade-popup-date { color: var(--text-secondary); font-size: 11.5px; white-space: nowrap; }
+.trade-popup-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 1px 0;
+}
+.trade-popup-row span { color: var(--text-secondary); }
+.trade-popup-row b { font-family: var(--font-mono); font-weight: 600; }
+.trade-popup-note {
+    margin-top: 5px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
 }
 
 /* Clickable best/worst performer names on the dashboard */
