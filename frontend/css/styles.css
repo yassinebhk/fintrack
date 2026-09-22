@@ -1825,12 +1825,44 @@ body::before {
    Interactive price-chart range toggles
    (Hoy / 1S / 1M / 3M / 6M / 1A / 2A / 5A / Máx)
    ============================================ */
+.pchart-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
 .pchart-ranges {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-bottom: 8px;
 }
+.pchart-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.pchart-change { font-size: 13px; font-weight: 600; }
+.pchart-mode { display: inline-flex; gap: 4px; }
+.pchart-mode-btn {
+    background: rgba(43, 40, 34, 0.05);
+    border: 1px solid var(--border-primary);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.pchart-mode-btn:hover { background: rgba(44, 74, 110, 0.10); color: var(--accent-primary); }
+.pchart-mode-btn.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+
+/* Clickable best/worst performer names on the dashboard */
+.perf-link { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.perf-link:hover { opacity: 0.8; }
 .pchart-range-btn {
     background: rgba(43, 40, 34, 0.05);
     border: 1px solid var(--border-primary);

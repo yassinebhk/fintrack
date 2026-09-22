@@ -439,14 +439,30 @@ function loadAssetDetailMarketChart(ticker) {
 // (the backend already serves every one of these periods, intraday included), so
 // the chart is dynamic instead of a fixed 1-year snapshot or a static image.
 // Shared by the asset-detail page and the deep-analysis modal.
+// [period, short label, tooltip]. "Hoy" = today's live session (5-min candles);
+// the others are trailing windows ending today.
 const PRICE_CHART_PERIODS = [
-    ['1d', 'Hoy'], ['5d', '1S'], ['1mo', '1M'], ['3mo', '3M'],
-    ['6mo', '6M'], ['1y', '1A'], ['2y', '2A'], ['5y', '5A'], ['max', 'Máx'],
+    ['1d', 'Hoy', 'Sesión de hoy (velas de 5 min, casi en tiempo real)'],
+    ['5d', '1S', 'Última semana (5 días de cotización)'],
+    ['1mo', '1M', 'Último mes'],
+    ['3mo', '3M', 'Últimos 3 meses'],
+    ['6mo', '6M', 'Últimos 6 meses'],
+    ['1y', '1A', 'Último año'],
+    ['2y', '2A', 'Últimos 2 años'],
+    ['5y', '5A', 'Últimos 5 años'],
+    ['max', 'Máx', 'Todo el histórico disponible'],
 ];
 
-function _drawPriceSeries(chart, history, timeKey) {
+// Remembered per browser so the chart type you prefer sticks across assets.
+function _priceChartMode() {
+    try { return localStorage.getItem('fintrack_pchart_mode') === 'line' ? 'line' : 'candles'; }
+    catch (e) { return 'candles'; }
+}
+function _savePriceChartMode(m) { try { localStorage.setItem('fintrack_pchart_mode', m); } catch (e) { /* private mode */ } }
+
+function _drawPriceSeries(chart, history, timeKey, mode) {
     const hasOHLC = history.length > 0 && history[0].open !== undefined && history[0].high !== undefined;
-    if (hasOHLC) {
+    if (mode === 'candles' && hasOHLC) {
         const s = chart.addCandlestickSeries({
             upColor: '#2C4A6E', downColor: '#C6473C',
             borderUpColor: '#2C4A6E', borderDownColor: '#C6473C',
@@ -455,6 +471,8 @@ function _drawPriceSeries(chart, history, timeKey) {
         s.setData(history.map(h => ({ time: h[timeKey], open: h.open, high: h.high, low: h.low, close: h.close })));
         return s;
     }
+    // Line/area — also the fallback when candles are requested but the source has
+    // no OHLC (some funds / CoinGecko crypto only give close prices).
     const first = history[0]?.close ?? history[0]?.price ?? 0;
     const last = history[history.length - 1]?.close ?? history[history.length - 1]?.price ?? 0;
     const up = last >= first;
@@ -472,19 +490,48 @@ function mountPriceChart(container, ticker, opts = {}) {
     const height = opts.height || 380;
     const defaultPeriod = opts.defaultPeriod || '1y';
     const withMarkers = !!opts.withTradeMarkers;
+    let mode = _priceChartMode();       // 'candles' | 'line'
+    let currentPeriod = defaultPeriod;
 
     container.innerHTML = `
-        <div class="pchart-ranges" role="tablist" aria-label="Rango temporal">
-            ${PRICE_CHART_PERIODS.map(([p, label]) =>
-                `<button type="button" class="pchart-range-btn" data-period="${p}">${label}</button>`).join('')}
+        <div class="pchart-toolbar">
+            <div class="pchart-ranges" role="tablist" aria-label="Rango temporal">
+                ${PRICE_CHART_PERIODS.map(([p, label, tip]) =>
+                    `<button type="button" class="pchart-range-btn" data-period="${p}" title="${tip}">${label}</button>`).join('')}
+            </div>
+            <div class="pchart-right">
+                <span class="pchart-change" title="Variación en el rango mostrado"></span>
+                <div class="pchart-mode" role="group" aria-label="Tipo de gráfico">
+                    <button type="button" class="pchart-mode-btn" data-mode="candles" title="Velas japonesas (apertura · máximo · mínimo · cierre)">🕯 Velas</button>
+                    <button type="button" class="pchart-mode-btn" data-mode="line" title="Línea de precio de cierre">📈 Línea</button>
+                </div>
+            </div>
         </div>
         <div class="pchart-canvas" style="position:relative; width:100%; height:${height}px;"></div>`;
     const rangesEl = container.querySelector('.pchart-ranges');
     const canvasEl = container.querySelector('.pchart-canvas');
+    const changeEl = container.querySelector('.pchart-change');
+    const modeBtns = container.querySelectorAll('.pchart-mode-btn');
     let chart = null;
     let resizeHandler = null;
 
+    const paintMode = () => modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+
+    // Broker-style % change over the shown range (period label + Δ% + absolute).
+    function setChange(history) {
+        if (!changeEl) return;
+        const first = history[0]?.close ?? history[0]?.price;
+        const last = history[history.length - 1]?.close ?? history[history.length - 1]?.price;
+        if (first == null || last == null || !first) { changeEl.textContent = ''; return; }
+        const pct = (last - first) / first * 100;
+        const abs = last - first;
+        const lbl = (PRICE_CHART_PERIODS.find(p => p[0] === currentPeriod) || [, ''])[1];
+        changeEl.className = 'pchart-change mono ' + (pct >= 0 ? 'value-positive' : 'value-negative');
+        changeEl.textContent = `${lbl}: ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}% (${abs >= 0 ? '+' : ''}${abs.toLocaleString('es-ES', { maximumFractionDigits: 2 })})`;
+    }
+
     async function draw(period) {
+        currentPeriod = period;
         rangesEl.querySelectorAll('.pchart-range-btn').forEach(b =>
             b.classList.toggle('active', b.dataset.period === period));
         canvasEl.innerHTML = '<p class="text-muted" style="position:absolute; top:50%; left:0; right:0; text-align:center; transform:translateY(-50%); margin:0;">Cargando…</p>';
@@ -499,6 +546,7 @@ function mountPriceChart(container, ticker, opts = {}) {
             canvasEl.innerHTML = '';
             if (!history.length) {
                 canvasEl.innerHTML = '<p class="text-muted" style="padding:20px;">Sin datos para este rango.</p>';
+                if (changeEl) changeEl.textContent = '';
                 return;
             }
             const useTime = !!data.intraday;
@@ -511,10 +559,11 @@ function mountPriceChart(container, ticker, opts = {}) {
                 timeScale: { borderColor: '#D8D0C0', timeVisible: useTime, secondsVisible: false },
                 crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
             });
-            const series = _drawPriceSeries(chart, history, timeKey);
+            const series = _drawPriceSeries(chart, history, timeKey, mode);
             if (!useTime) addSMAOverlays(chart, history);  // SMA50/200 need daily bars
             attachCrosshairLegend(chart, canvasEl, history, timeKey);
             chart.timeScale().fitContent();
+            setChange(history);
             // Trade markers only make sense on the asset-detail chart, and only for
             // daily bars (a buy date snaps to a daily bar, not an intraday candle).
             if (withMarkers && !useTime) loadAssetDetailTradeMarkers(ticker, series, history.map(h => h.date));
@@ -531,6 +580,10 @@ function mountPriceChart(container, ticker, opts = {}) {
 
     rangesEl.querySelectorAll('.pchart-range-btn').forEach(b =>
         b.addEventListener('click', () => draw(b.dataset.period)));
+    modeBtns.forEach(b => b.addEventListener('click', () => {
+        mode = b.dataset.mode; _savePriceChartMode(mode); paintMode(); draw(currentPeriod);
+    }));
+    paintMode();
     draw(defaultPeriod);
     return { draw };
 }

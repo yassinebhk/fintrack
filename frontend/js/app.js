@@ -401,7 +401,7 @@ function updateQuickStats(data) {
     const bestEl = document.getElementById('bestPerformer');
     if (bestEl && bestPerformer) {
         const bestName = getAssetName(bestPerformer.ticker) || bestPerformer.name || bestPerformer.ticker;
-        bestEl.innerHTML = `<span style="color: var(--positive)">${bestName}</span> ${formatPercent(bestPerformer.gain_loss_pct)}`;
+        bestEl.innerHTML = `<span class="perf-link" style="color: var(--positive)" onclick="showAssetDetail('${bestPerformer.ticker}')" title="Ver detalle de ${bestName}">${bestName}</span> ${formatPercent(bestPerformer.gain_loss_pct)}`;
     }
     
     // Worst performer
@@ -412,7 +412,7 @@ function updateQuickStats(data) {
     const worstEl = document.getElementById('worstPerformer');
     if (worstEl && worstPerformer) {
         const worstName = getAssetName(worstPerformer.ticker) || worstPerformer.name || worstPerformer.ticker;
-        worstEl.innerHTML = `<span style="color: var(--negative)">${worstName}</span> ${formatPercent(worstPerformer.gain_loss_pct)}`;
+        worstEl.innerHTML = `<span class="perf-link" style="color: var(--negative)" onclick="showAssetDetail('${worstPerformer.ticker}')" title="Ver detalle de ${worstName}">${worstName}</span> ${formatPercent(worstPerformer.gain_loss_pct)}`;
     }
 }
 
