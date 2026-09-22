@@ -17,7 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260922popup">
+    <link rel="stylesheet" href="css/styles.css?v=20260922smafix">
 </head>
 <body>
     <div id="loginGate" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:24px;">
@@ -395,14 +395,29 @@
                     </section>
 
                     <!-- Analyze ANY asset (not just held/recommended) -->
-                    <section class="card" style="margin-bottom:16px;">
-                        <h3>🔬 Analiza cualquier activo</h3>
-                        <p class="text-muted" style="font-size:12px; margin:-4px 0 10px;">Escribe un ticker, ISIN o nombre (AAPL, «Apple», IE00B4L5Y983, VWCE.DE, BTC…) y te hago el análisis profesional completo — no hace falta que lo tengas ni que te lo hayamos recomendado.</p>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                            <input type="text" id="assetSearchInput" placeholder="Ej. NVDA, Tesla, IE00B4L5Y983, BTC" autocomplete="off" style="flex:1; min-width:220px;" onkeydown="if(event.key==='Enter'){event.preventDefault();analyzeAnyAsset();}">
-                            <button class="btn-primary" onclick="analyzeAnyAsset()">🔬 Analizar</button>
+                    <section class="card analyze-card" style="margin-bottom:16px;">
+                        <div class="analyze-head">
+                            <span class="analyze-icon">🔬</span>
+                            <div>
+                                <h3 style="margin:0;">Analiza cualquier activo</h3>
+                                <p class="text-muted" style="font-size:12.5px; margin:3px 0 0;">Ticker, ISIN o nombre (AAPL, «Apple», IE00B4L5Y983, VWCE.DE, BTC…) y te hago el análisis profesional completo — no hace falta que lo tengas ni que te lo hayamos recomendado.</p>
+                            </div>
                         </div>
-                        <div id="assetSearchMsg" style="font-size:13px; margin-top:6px;"></div>
+                        <div class="analyze-search">
+                            <div class="analyze-input-wrap">
+                                <span class="analyze-search-icon" aria-hidden="true">🔍</span>
+                                <input type="text" id="assetSearchInput" placeholder="Escribe un activo… (NVDA, Tesla, IE00B4L5Y983, BTC)" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();analyzeAnyAsset();}">
+                            </div>
+                            <button class="btn-primary analyze-btn" onclick="analyzeAnyAsset()">Analizar</button>
+                        </div>
+                        <div class="analyze-examples">
+                            <span class="text-muted">Prueba:</span>
+                            <button type="button" class="analyze-chip" onclick="analyzeExample('NVDA')">NVDA</button>
+                            <button type="button" class="analyze-chip" onclick="analyzeExample('Tesla')">Tesla</button>
+                            <button type="button" class="analyze-chip" onclick="analyzeExample('VWCE.DE')">VWCE.DE</button>
+                            <button type="button" class="analyze-chip" onclick="analyzeExample('BTC')">BTC</button>
+                        </div>
+                        <div id="assetSearchMsg" style="font-size:13px; margin-top:8px;"></div>
                     </section>
 
                     <!-- Asset Charts Section -->
@@ -2110,8 +2125,8 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/asset-analysis.js?v=20260921fxfix"></script>
     <script src="js/backtest.js?v=20260921export"></script>
     <script src="js/opportunities.js?v=20260921reorder"></script>
-    <script src="js/asset-deep-analysis.js?v=20260922interact"></script>
-    <script src="js/asset-detail.js?v=20260922popup"></script>
+    <script src="js/asset-deep-analysis.js?v=20260922smafix"></script>
+    <script src="js/asset-detail.js?v=20260922smafix"></script>
     <script src="js/transactions.js?v=20260922interact"></script>
     <script src="js/polymarket.js?v=20260921equity"></script>
     <script src="js/daytrading.js?v=20260921equity"></script>

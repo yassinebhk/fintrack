@@ -198,26 +198,29 @@ function computeSMASeries(history, period) {
     return out;
 }
 
-// Draw SMA50 (gold, dashed) and SMA200 (terracotta, dashed) on top of the price
-// series — same colors as the static chart in the deep-analysis modal, just
-// interactive here. Shared by both the asset-detail and asset-analysis pages.
-function addSMAOverlays(chart, history) {
-    const sma50 = computeSMASeries(history, 50);
-    const sma200 = computeSMASeries(history, 200);
-    if (sma50.length) {
+// How much history to pull for a CORRECT SMA over the shown range: the SMA needs
+// ~200 sessions of warm-up BEFORE the first visible bar, or it can't be computed
+// (that's why it looked wrong/absent on short ranges). We compute over this longer
+// series and then only plot the points inside the visible window.
+const SMA_WARMUP = { '1mo': '2y', '3mo': '2y', '6mo': '2y', '1y': '5y', '2y': '5y', '5y': 'max', 'max': 'max' };
+
+// Draw SMA50 (gold) and SMA200 (muted blue) as clean solid lines. Computes over
+// `history` (pass a warm-up series) and, when d0/d1 are given, plots only the
+// points inside [d0, d1]. Returns which lines actually rendered.
+function addSMAOverlays(chart, history, d0, d1) {
+    const within = (arr) => (d0 && d1) ? arr.filter(p => p.time >= d0 && p.time <= d1) : arr;
+    const sma50 = within(computeSMASeries(history, 50));
+    const sma200 = within(computeSMASeries(history, 200));
+    const line = (data, color) => {
         const s = chart.addLineSeries({
-            color: '#C99A3E', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+            color, lineWidth: 2,
             priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
         });
-        s.setData(sma50);
-    }
-    if (sma200.length) {
-        const s = chart.addLineSeries({
-            color: '#C6473C', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
-            priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-        });
-        s.setData(sma200);
-    }
+        s.setData(data);
+    };
+    if (sma50.length) line(sma50, '#C99A3E');    // gold
+    if (sma200.length) line(sma200, '#6E8BAF');  // muted blue (terracotta clashed with sell arrows)
+    return { has50: sma50.length > 0, has200: sma200.length > 0 };
 }
 
 // Floating O/H/L/C (or price) readout that follows the crosshair, TradingView-
@@ -642,15 +645,36 @@ function mountPriceChart(container, ticker, opts = {}) {
                 timeScale: { borderColor: '#D8D0C0', timeVisible: useTime, secondsVisible: false },
                 crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
             });
+            const localChart = chart;  // guard against a newer draw() replacing it mid-fetch
             const series = _drawPriceSeries(chart, history, timeKey, mode);
-            // SMA50/200 need daily bars, and are OFF by default (toggle) so the
-            // chart is clean; a legend explains them when shown.
-            const smaShown = smaOn && !useTime;
-            if (smaShown) addSMAOverlays(chart, history);
-            if (smaLegendEl) smaLegendEl.hidden = !smaShown;
             attachCrosshairLegend(chart, canvasEl, history, timeKey);
             chart.timeScale().fitContent();
             setChange(history);
+
+            // SMA50/200 (daily only, OFF by default). Computed over a longer warm-up
+            // series so they're CORRECT across the visible range, then clipped to it.
+            if (smaOn && !useTime) {
+                try {
+                    const warmPeriod = SMA_WARMUP[period] || '5y';
+                    let warm = history;
+                    if (warmPeriod !== period) {
+                        const wr = await assetDetailFetch(`${ASSET_DETAIL_API}/asset/${encodeURIComponent(ticker)}/history?period=${warmPeriod}&asset_type=auto`, { cache: 'no-store' });
+                        if (wr.ok) { const wd = await wr.json(); if ((wd.history || []).length > history.length) warm = wd.history; }
+                    }
+                    if (chart === localChart) {  // still the active chart?
+                        const res = addSMAOverlays(localChart, warm, history[0].date, history[history.length - 1].date);
+                        if (smaLegendEl) {
+                            const parts = [];
+                            if (res.has50) parts.push('<span style="color:#C99A3E;">▬</span> SMA 50');
+                            if (res.has200) parts.push('<span style="color:#6E8BAF;">▬</span> SMA 200');
+                            smaLegendEl.innerHTML = parts.length ? parts.join(' · ') + ' <span class="text-muted">(medias móviles)</span>' : '';
+                            smaLegendEl.hidden = parts.length === 0;
+                        }
+                    }
+                } catch (e) { if (smaLegendEl) smaLegendEl.hidden = true; }
+            } else if (smaLegendEl) {
+                smaLegendEl.hidden = true;
+            }
             // Trade markers only make sense on the asset-detail chart, and only for
             // daily bars (a buy date snaps to a daily bar, not an intraday candle).
             if (withMarkers && !useTime) loadAssetDetailTradeMarkers(ticker, series, history.map(h => h.date), chart, canvasEl);

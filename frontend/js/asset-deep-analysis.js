@@ -31,6 +31,14 @@ async function analyzeAnyAsset() {
     }
 }
 
+// Example chips under the search box: fill the input and run the analysis.
+function analyzeExample(q) {
+    const input = document.getElementById('assetSearchInput');
+    if (input) input.value = q;
+    analyzeAnyAsset();
+}
+window.analyzeExample = analyzeExample;
+
 function _ensureDeepModal() {
     let m = document.getElementById('deepAnalysisModal');
     if (m) return m;

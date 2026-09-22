@@ -1996,6 +1996,55 @@ body::before {
 .ticker-link { border-bottom: 1px dotted transparent; transition: border-color 0.15s ease; }
 .ticker-link:hover { border-bottom-color: currentColor; }
 
+/* "Analiza cualquier activo" search widget */
+.analyze-card {
+    background: linear-gradient(135deg, rgba(44, 74, 110, 0.06), rgba(201, 154, 62, 0.05));
+    border: 1px solid var(--border-primary);
+}
+.analyze-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.analyze-icon {
+    flex: 0 0 auto;
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    background: rgba(44, 74, 110, 0.12);
+}
+.analyze-search { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+.analyze-input-wrap { position: relative; flex: 1; min-width: 220px; display: flex; }
+.analyze-search-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    font-size: 15px; opacity: 0.55; pointer-events: none;
+}
+.analyze-input-wrap input {
+    width: 100%;
+    padding: 12px 14px 12px 40px;
+    border: 1px solid var(--border-primary);
+    border-radius: 10px;
+    font-size: 15px;
+    background: var(--bg-card, #fff);
+    color: var(--text-primary);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.analyze-input-wrap input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(44, 74, 110, 0.15);
+}
+.analyze-btn { padding: 12px 22px; border-radius: 10px; font-size: 15px; white-space: nowrap; }
+.analyze-examples { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; }
+.analyze-chip {
+    background: rgba(43, 40, 34, 0.05);
+    border: 1px solid var(--border-primary);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12.5px; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.analyze-chip:hover { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+
 /* Watchlist rich per-asset panel (conclusion + mini-chart + what-if) */
 .watch-panel-grid {
     display: grid;
