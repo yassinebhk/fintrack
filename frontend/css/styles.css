@@ -1935,6 +1935,25 @@ body::before {
 /* Clickable asset names across sections */
 .ticker-link { border-bottom: 1px dotted transparent; transition: border-color 0.15s ease; }
 .ticker-link:hover { border-bottom-color: currentColor; }
+
+/* Watchlist rich per-asset panel (conclusion + mini-chart + what-if) */
+.watch-panel-grid {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.2fr);
+    gap: 18px;
+    align-items: start;
+}
+@media (max-width: 760px) { .watch-panel-grid { grid-template-columns: 1fr; } }
+.watch-conclusion { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
+.watch-conclusion li { margin: 2px 0; }
+.watch-mini-chart { width: 100%; }
+.watch-rank-chip {
+    background: rgba(43, 40, 34, 0.05);
+    border: 1px solid var(--border-primary);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12.5px;
+}
 .pchart-range-btn {
     background: rgba(43, 40, 34, 0.05);
     border: 1px solid var(--border-primary);
