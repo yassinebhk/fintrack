@@ -54,6 +54,10 @@ function showAssetDetail(ticker) {
     loadAssetDetailPositionChart(currentAssetDetailTicker);
     loadAssetDetailTransactions(currentAssetDetailTicker);
     renderAssetStatsStrip(currentAssetDetailTicker, document.getElementById('assetDetailStatsStrip'));
+    if (window.renderFavButton) {
+        window.renderFavButton(document.getElementById('assetDetailFav'),
+            currentAssetDetailTicker, info ? info.name : currentAssetDetailTicker);
+    }
 
     if (window.innerWidth <= 900) {
         document.querySelector('.sidebar')?.classList.remove('open');
@@ -416,47 +420,116 @@ function _setTradeMarkerNote(count) {
     }
 }
 
-async function loadAssetDetailMarketChart(ticker) {
+function loadAssetDetailMarketChart(ticker) {
     const container = document.getElementById('assetDetailTvContainer');
-    if (!container || typeof LightweightCharts === 'undefined') return;
-    try {
-        const resp = await fetch(`${ASSET_DETAIL_API}/asset/${ticker}/history?period=1y&asset_type=auto`);
-        const data = await resp.json();
-        const history = data.history || [];
-        if (!history.length) return;
-
-        if (assetDetailTvChart) {
-            try { assetDetailTvChart.remove(); } catch (e) { /* noop */ }
-            assetDetailTvChart = null;
-        }
-        container.innerHTML = '';
-
-        const chart = LightweightCharts.createChart(container, {
-            width: container.clientWidth,
-            height: 400,
-            layout: { background: { color: 'transparent' }, textColor: '#746E63' },
-            grid: { vertLines: { color: 'rgba(30,41,59,0.5)' }, horzLines: { color: 'rgba(30,41,59,0.5)' } },
-            rightPriceScale: { borderColor: '#D8D0C0' },
-            timeScale: { borderColor: '#D8D0C0' },
-            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-        });
-        assetDetailTvChart = chart;
-        const series = renderAssetDetailMarketSeries(chart, history);
-        addSMAOverlays(chart, history);
-        attachCrosshairLegend(chart, container, history);
-        chart.timeScale().fitContent();
-        loadAssetDetailTradeMarkers(ticker, series, history.map(h => h.date));
-
-        if (!container._resizeHandler) {
-            container._resizeHandler = () => {
-                if (assetDetailTvChart) assetDetailTvChart.applyOptions({ width: container.clientWidth });
-            };
-            window.addEventListener('resize', container._resizeHandler);
-        }
-    } catch (err) {
-        console.error('asset detail market chart failed:', err);
-    }
+    if (!container) return;
+    // The container had a fixed 400px height for the old single chart; mountPriceChart
+    // now builds its own range bar + canvas, so let it size itself.
+    container.style.height = '';
+    mountPriceChart(container, ticker, { height: 400, defaultPeriod: '1y', withTradeMarkers: true });
 }
+
+// Reusable interactive price chart with time-range toggles (Hoy / 1S / 1M / 3M /
+// 6M / 1A / 2A / 5A / Máx). Pulls each range live from /asset/{ticker}/history
+// (the backend already serves every one of these periods, intraday included), so
+// the chart is dynamic instead of a fixed 1-year snapshot or a static image.
+// Shared by the asset-detail page and the deep-analysis modal.
+const PRICE_CHART_PERIODS = [
+    ['1d', 'Hoy'], ['5d', '1S'], ['1mo', '1M'], ['3mo', '3M'],
+    ['6mo', '6M'], ['1y', '1A'], ['2y', '2A'], ['5y', '5A'], ['max', 'Máx'],
+];
+
+function _drawPriceSeries(chart, history, timeKey) {
+    const hasOHLC = history.length > 0 && history[0].open !== undefined && history[0].high !== undefined;
+    if (hasOHLC) {
+        const s = chart.addCandlestickSeries({
+            upColor: '#2C4A6E', downColor: '#C6473C',
+            borderUpColor: '#2C4A6E', borderDownColor: '#C6473C',
+            wickUpColor: '#2C4A6E', wickDownColor: '#C6473C',
+        });
+        s.setData(history.map(h => ({ time: h[timeKey], open: h.open, high: h.high, low: h.low, close: h.close })));
+        return s;
+    }
+    const first = history[0]?.close ?? history[0]?.price ?? 0;
+    const last = history[history.length - 1]?.close ?? history[history.length - 1]?.price ?? 0;
+    const up = last >= first;
+    const s = chart.addAreaSeries({
+        lineColor: up ? '#2C4A6E' : '#C6473C',
+        topColor: up ? 'rgba(44, 74, 110,0.4)' : 'rgba(198, 71, 60,0.4)',
+        bottomColor: 'rgba(0,0,0,0)', lineWidth: 2,
+    });
+    s.setData(history.map(h => ({ time: h[timeKey], value: h.close ?? h.price })));
+    return s;
+}
+
+function mountPriceChart(container, ticker, opts = {}) {
+    if (!container || typeof LightweightCharts === 'undefined') return null;
+    const height = opts.height || 380;
+    const defaultPeriod = opts.defaultPeriod || '1y';
+    const withMarkers = !!opts.withTradeMarkers;
+
+    container.innerHTML = `
+        <div class="pchart-ranges" role="tablist" aria-label="Rango temporal">
+            ${PRICE_CHART_PERIODS.map(([p, label]) =>
+                `<button type="button" class="pchart-range-btn" data-period="${p}">${label}</button>`).join('')}
+        </div>
+        <div class="pchart-canvas" style="position:relative; width:100%; height:${height}px;"></div>`;
+    const rangesEl = container.querySelector('.pchart-ranges');
+    const canvasEl = container.querySelector('.pchart-canvas');
+    let chart = null;
+    let resizeHandler = null;
+
+    async function draw(period) {
+        rangesEl.querySelectorAll('.pchart-range-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.period === period));
+        canvasEl.innerHTML = '<p class="text-muted" style="position:absolute; top:50%; left:0; right:0; text-align:center; transform:translateY(-50%); margin:0;">Cargando…</p>';
+        try {
+            const resp = await assetDetailFetch(
+                `${ASSET_DETAIL_API}/asset/${encodeURIComponent(ticker)}/history?period=${period}&asset_type=auto`,
+                { cache: 'no-store' });
+            if (resp.status === 401) { canvasEl.innerHTML = '<p class="text-muted" style="padding:20px;">Inicia sesión para ver el gráfico.</p>'; return; }
+            const data = await resp.json();
+            const history = data.history || [];
+            if (chart) { try { chart.remove(); } catch (e) { /* noop */ } chart = null; }
+            canvasEl.innerHTML = '';
+            if (!history.length) {
+                canvasEl.innerHTML = '<p class="text-muted" style="padding:20px;">Sin datos para este rango.</p>';
+                return;
+            }
+            const useTime = !!data.intraday;
+            const timeKey = useTime ? 'time' : 'date';
+            chart = LightweightCharts.createChart(canvasEl, {
+                width: canvasEl.clientWidth, height,
+                layout: { background: { color: 'transparent' }, textColor: '#746E63' },
+                grid: { vertLines: { color: 'rgba(30,41,59,0.5)' }, horzLines: { color: 'rgba(30,41,59,0.5)' } },
+                rightPriceScale: { borderColor: '#D8D0C0' },
+                timeScale: { borderColor: '#D8D0C0', timeVisible: useTime, secondsVisible: false },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            });
+            const series = _drawPriceSeries(chart, history, timeKey);
+            if (!useTime) addSMAOverlays(chart, history);  // SMA50/200 need daily bars
+            attachCrosshairLegend(chart, canvasEl, history, timeKey);
+            chart.timeScale().fitContent();
+            // Trade markers only make sense on the asset-detail chart, and only for
+            // daily bars (a buy date snaps to a daily bar, not an intraday candle).
+            if (withMarkers && !useTime) loadAssetDetailTradeMarkers(ticker, series, history.map(h => h.date));
+            else if (withMarkers) _setTradeMarkerNote(0);
+            if (!resizeHandler) {
+                resizeHandler = () => { if (chart) chart.applyOptions({ width: canvasEl.clientWidth }); };
+                window.addEventListener('resize', resizeHandler);
+            }
+        } catch (err) {
+            console.error('price chart failed:', err);
+            canvasEl.innerHTML = '<p class="text-muted" style="padding:20px; color:var(--negative);">No se pudo cargar el gráfico. ' + _RETRY_BTN + '</p>';
+        }
+    }
+
+    rangesEl.querySelectorAll('.pchart-range-btn').forEach(b =>
+        b.addEventListener('click', () => draw(b.dataset.period)));
+    draw(defaultPeriod);
+    return { draw };
+}
+window.mountPriceChart = mountPriceChart;
 
 async function loadAssetDetailPositionChart(ticker) {
     const canvas = document.getElementById('assetDetailPositionChart');

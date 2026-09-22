@@ -5,6 +5,72 @@
  */
 const WATCHLIST_API = window.API_BASE_URL || '/api';
 
+// ⭐ Favorite / watchlist quick-toggle — reusable across the app (asset-detail
+// page, deep-analysis modal). One click adds the asset to the watchlist, another
+// removes it. Relies on the idempotent POST (get-or-create, returns the id), so
+// it works with no prior lookup; the light /watchlist/ids endpoint, when present,
+// is used only to paint the correct INITIAL state (☆ vs ⭐).
+let _watchIdsCache = null;
+async function _watchIds(force) {
+    if (_watchIdsCache && !force) return _watchIdsCache;
+    try {
+        const r = await fetch(`${WATCHLIST_API}/watchlist/ids`);
+        if (r.ok) {
+            const items = (await r.json()).items || [];
+            _watchIdsCache = new Map(items.map(it => [String(it.ticker).toUpperCase(), it.id]));
+            return _watchIdsCache;
+        }
+    } catch (e) { /* endpoint not deployed yet — degrade to no pre-check */ }
+    return null;  // membership unknown
+}
+
+async function renderFavButton(container, ticker, name) {
+    if (!container) return;
+    const T = String(ticker || '').toUpperCase();
+    if (!T) { container.innerHTML = ''; return; }
+    container.innerHTML = `<button type="button" class="btn-action fav-btn">☆ Guardar en watchlist</button>`;
+    const btn = container.querySelector('.fav-btn');
+    const paint = (on) => {
+        btn.dataset.on = on ? '1' : '0';
+        btn.classList.toggle('is-fav', on);
+        btn.innerHTML = on ? '⭐ En tu watchlist' : '☆ Guardar en watchlist';
+        btn.title = on ? 'Quitar de la watchlist' : 'Guardar en la watchlist (favorito)';
+    };
+    paint(false);
+    const ids = await _watchIds();
+    if (ids && ids.has(T)) { btn.dataset.wid = ids.get(T); paint(true); }
+
+    btn.addEventListener('click', async () => {
+        const on = btn.dataset.on === '1';
+        btn.disabled = true;
+        btn.innerHTML = '…';
+        try {
+            if (on) {
+                const id = btn.dataset.wid;
+                if (id) await fetch(`${WATCHLIST_API}/watchlist/${id}`, { method: 'DELETE' });
+                delete btn.dataset.wid;
+                if (_watchIdsCache) _watchIdsCache.delete(T);
+                paint(false);
+            } else {
+                const r = await fetch(`${WATCHLIST_API}/watchlist`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticker: T, name: name || '' }),
+                });
+                if (!r.ok) throw new Error();
+                const d = await r.json();
+                btn.dataset.wid = d.id;
+                if (_watchIdsCache) _watchIdsCache.set(T, d.id);
+                paint(true);
+            }
+        } catch (e) {
+            btn.innerHTML = '⚠️ No se pudo';
+            setTimeout(() => paint(btn.dataset.on === '1'), 1500);
+        }
+        btn.disabled = false;
+    });
+}
+window.renderFavButton = renderFavButton;
+
 async function loadWatchlist() {
     const el = document.getElementById('watchlistContent');
     if (!el) return;

@@ -75,6 +75,11 @@ async function openDeepAnalysis(ticker, name) {
         }
         if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
         body.innerHTML = renderDeepAnalysis(data);
+        // Interactive price chart with range toggles (replaces the old static image)
+        // + ⭐ favorite quick-add, both mounted after the HTML is in the DOM.
+        const pc = body.querySelector('#deepPriceChart');
+        if (pc && window.mountPriceChart) window.mountPriceChart(pc, data.ticker, { height: 360, defaultPeriod: '1y' });
+        if (window.renderFavButton) window.renderFavButton(body.querySelector('#deepFav'), data.ticker, data.name);
         const ex = m.querySelector('#deepExport');
         if (ex && window.exportToolbarHTML) {
             const safe = String(ticker).replace(/[^A-Za-z0-9._-]/g, '');
@@ -250,6 +255,8 @@ function renderDeepAnalysis(d) {
         ${isFund ? ` · <a href="${je}" target="_blank" rel="noopener" style="color:var(--info);">justETF (ISIN / dónde comprar)</a>` : ''}
     </p>
 
+    <div id="deepFav" style="margin:6px 0 12px;"></div>
+
     ${_descriptionBlock(d.description)}
 
     ${_horizonBlock(d.horizon)}
@@ -267,7 +274,10 @@ function renderDeepAnalysis(d) {
     ${_breakdownBars(d.score_breakdown || {})}
 
     <h3 style="margin-top:22px;">📈 Gráficas</h3>
-    ${chartImg(charts.price_with_smas, 'Precio con SMA50 y SMA200', 'chart_precio_sma')}
+    <div style="margin:14px 0;">
+        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Precio con SMA50/200 · elige el rango (Hoy → Máx)${_gi('chart_precio_sma')}</div>
+        <div id="deepPriceChart"></div>
+    </div>
     ${chartImg(charts.drawdown, 'Drawdown histórico', 'drawdown_historico')}
     ${chartImg(charts.returns_histogram, 'Distribución de retornos diarios', 'distribucion_retornos')}
     ${chartImg(charts.rolling_volatility, 'Volatilidad rodante 60d', 'chart_rolling_vol')}

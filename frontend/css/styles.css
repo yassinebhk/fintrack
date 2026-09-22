@@ -1756,6 +1756,44 @@ body::before {
 }
 
 /* ============================================
+   Interactive price-chart range toggles
+   (Hoy / 1S / 1M / 3M / 6M / 1A / 2A / 5A / Máx)
+   ============================================ */
+.pchart-ranges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.pchart-range-btn {
+    background: rgba(43, 40, 34, 0.05);
+    border: 1px solid var(--border-primary);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.pchart-range-btn:hover {
+    background: rgba(44, 74, 110, 0.10);
+    color: var(--accent-primary);
+}
+.pchart-range-btn.active {
+    background: var(--accent-primary);
+    color: #fff;
+    border-color: var(--accent-primary);
+}
+
+/* ⭐ Favorite / watchlist quick-toggle button (base style from .btn-action) */
+.fav-btn.is-fav {
+    background: rgba(201, 154, 62, 0.15);
+    border-color: rgba(201, 154, 62, 0.5);
+    color: #9a7420;
+}
+
+/* ============================================
    Loading Overlay
    ============================================ */
 .loading-overlay {

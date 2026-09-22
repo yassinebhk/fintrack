@@ -17,7 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260921totals">
+    <link rel="stylesheet" href="css/styles.css?v=20260922dyn">
 </head>
 <body>
     <div id="loginGate" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:24px;">
@@ -808,7 +808,8 @@
                                 <div id="assetDetailStatsStrip"></div>
                             </div>
 
-                            <div class="asset-actions" style="display: flex;">
+                            <div class="asset-actions" style="display: flex; gap:10px; flex-wrap:wrap;">
+                                <div id="assetDetailFav" style="display:inline-flex;"></div>
                                 <button class="btn-action btn-analyze" id="assetDetailDeepBtn">🔬 Análisis profesional del activo</button>
                             </div>
                         </div>
@@ -2104,13 +2105,13 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/asset-analysis.js?v=20260921fxfix"></script>
     <script src="js/backtest.js?v=20260921export"></script>
     <script src="js/opportunities.js?v=20260921reorder"></script>
-    <script src="js/asset-deep-analysis.js?v=20260921about"></script>
-    <script src="js/asset-detail.js?v=20260921fxfix"></script>
+    <script src="js/asset-deep-analysis.js?v=20260922dyn"></script>
+    <script src="js/asset-detail.js?v=20260922dyn"></script>
     <script src="js/transactions.js?v=20260921totals"></script>
     <script src="js/polymarket.js?v=20260921equity"></script>
     <script src="js/daytrading.js?v=20260921equity"></script>
     <script src="js/journal.js?v=20260921filter"></script>
-    <script src="js/watchlist.js?v=20260921spark"></script>
+    <script src="js/watchlist.js?v=20260922dyn"></script>
     <script src="js/goals.js?v=20260921real"></script>
     <script src="js/alerts.js?v=20260921real"></script>
     <script src="js/export-utils.js?v=20260913export"></script>
