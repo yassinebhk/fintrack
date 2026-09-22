@@ -507,6 +507,7 @@ function mountPriceChart(container, ticker, opts = {}) {
                     <button type="button" class="pchart-mode-btn" data-mode="candles" title="Velas japonesas (apertura · máximo · mínimo · cierre)">🕯 Velas</button>
                     <button type="button" class="pchart-mode-btn" data-mode="line" title="Línea de precio de cierre">📈 Línea</button>
                 </div>
+                <button type="button" class="pchart-expand" title="Ampliar a pantalla grande">⤢</button>
             </div>
         </div>
         <div class="pchart-canvas" style="position:relative; width:100%; height:${height}px;"></div>`;
@@ -585,6 +586,14 @@ function mountPriceChart(container, ticker, opts = {}) {
     modeBtns.forEach(b => b.addEventListener('click', () => {
         mode = b.dataset.mode; _savePriceChartMode(mode); paintMode(); draw(currentPeriod);
     }));
+    const expandBtn = container.querySelector('.pchart-expand');
+    if (expandBtn) expandBtn.addEventListener('click', () => {
+        if (!window.openChartModal) return;
+        window.openChartModal(ticker, (c) => window.mountPriceChart(c, ticker, {
+            height: Math.min(Math.round(window.innerHeight * 0.72), 640),
+            defaultPeriod: currentPeriod, withTradeMarkers: withMarkers,
+        }));
+    });
     paintMode();
     draw(defaultPeriod);
     return { draw };

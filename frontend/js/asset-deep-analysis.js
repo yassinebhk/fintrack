@@ -374,18 +374,41 @@ async function mountAnalyticsCharts(container, ticker, opts = {}) {
         </div>
         <div class="deep-analytics-grid">
             ${cards.map(([k, title]) => `<div class="card metric-card" style="margin:0;">
-                <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">${title}</div>
-                <div class="ad-canvas-wrap" style="position:relative; height:200px;"><canvas data-chart="${k}"></canvas></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span style="font-size:12px; color:var(--text-secondary);">${title}</span>
+                    <button type="button" class="chart-expand-btn" data-expand="${k}" title="Ampliar">⤢</button>
+                </div>
+                <div class="ad-canvas-wrap" style="position:relative; height:200px;">
+                    <canvas data-chart="${k}"></canvas>
+                    <div class="ad-note text-muted" data-note="${k}" hidden></div>
+                </div>
             </div>`).join('')}
         </div>`;
     const rangesEl = container.querySelector('.pchart-ranges');
     const wrapOf = (k) => container.querySelector(`canvas[data-chart="${k}"]`);
-    const noteInto = (k, txt) => { const c = wrapOf(k); if (c) c.parentElement.innerHTML = `<p class="text-muted" style="font-size:12px; padding:20px 0; text-align:center;">${txt}</p>`; };
+    const noteEl = (k) => container.querySelector(`[data-note="${k}"]`);
+    const byKey = {};
+    const KEYS = ['dd', 'hist', 'vol', 'sharpe', 'rel'];
+
+    // Show a note in a card WITHOUT destroying its canvas (so switching back to a
+    // longer range can redraw it).
+    const noteInto = (k, txt) => {
+        const cv = wrapOf(k), n = noteEl(k);
+        if (cv) cv.style.display = 'none';
+        if (n) { n.hidden = false; n.textContent = txt; }
+    };
+    const resetCard = (k) => {
+        const cv = wrapOf(k), n = noteEl(k);
+        if (cv) cv.style.display = '';
+        if (n) { n.hidden = true; n.textContent = ''; }
+    };
+    const mk = (k, cfg) => { const c = new Chart(wrapOf(k), cfg); _deepCharts.push(c); byKey[k] = c; return c; };
 
     async function draw(p) {
         period = p;
         rangesEl.querySelectorAll('.pchart-range-btn').forEach(b => b.classList.toggle('active', b.dataset.period === p));
         _destroyDeepCharts();
+        KEYS.forEach(k => { delete byKey[k]; resetCard(k); });
         const base = window.API_BASE_URL || '/api';
         const url = (t) => `${base}/asset/${encodeURIComponent(t)}/history?period=${p}&asset_type=auto`;
         const [aR, bR] = await Promise.all([
@@ -394,7 +417,7 @@ async function mountAnalyticsCharts(container, ticker, opts = {}) {
         ]);
         const cl = _clClose(aR && aR.history);
         if (cl.length < 5) {
-            ['dd', 'hist', 'vol', 'sharpe', 'rel'].forEach(k => noteInto(k, 'Pocos datos para este rango.'));
+            KEYS.forEach(k => noteInto(k, 'Pocos datos para este rango.'));
             return;
         }
         const labels = cl.map(x => x.date);
@@ -403,11 +426,11 @@ async function mountAnalyticsCharts(container, ticker, opts = {}) {
         // 1) Drawdown
         let peak = -Infinity;
         const dd = cl.map(x => { peak = Math.max(peak, x.c); return (x.c / peak - 1) * 100; });
-        _deepCharts.push(new Chart(wrapOf('dd'), _adLine(labels, dd, '#C6473C', true, 'rgba(198,71,60,0.12)')));
+        mk('dd', _adLine(labels, dd, '#C6473C', true, 'rgba(198,71,60,0.12)'));
 
         // 2) Histogram of daily returns (%)
         const { bins, counts } = _histogram(rets.map(r => r * 100), 21);
-        _deepCharts.push(new Chart(wrapOf('hist'), _adBar(bins, counts, '#2C4A6E')));
+        mk('hist', _adBar(bins, counts, '#2C4A6E'));
 
         // 3/4) Rolling vol + Sharpe (annualized), window sized to the range
         const W = Math.max(10, Math.min(60, Math.floor(cl.length / 4)));
@@ -420,11 +443,11 @@ async function mountAnalyticsCharts(container, ticker, opts = {}) {
                 shS.push(annVol > 0 ? (annMean - rfPct / 100) / annVol : 0);
                 rollLabels.push(cl[i + 1] ? cl[i + 1].date : labels[i]);
             }
-            _deepCharts.push(new Chart(wrapOf('vol'), _adLine(rollLabels, volS, '#C99A3E', true, 'rgba(201,154,62,0.10)')));
-            _deepCharts.push(new Chart(wrapOf('sharpe'), _adLine(rollLabels, shS, '#4A9B8E', false, 'rgba(74,155,142,0.10)')));
+            mk('vol', _adLine(rollLabels, volS, '#C99A3E', true, 'rgba(201,154,62,0.10)'));
+            mk('sharpe', _adLine(rollLabels, shS, '#4A9B8E', false, 'rgba(74,155,142,0.10)'));
         } else {
-            noteInto('vol', `Rango corto: se necesitan más sesiones para la ventana rodante.`);
-            noteInto('sharpe', `Rango corto: se necesitan más sesiones para la ventana rodante.`);
+            noteInto('vol', 'Rango corto: se necesitan más sesiones para la ventana rodante.');
+            noteInto('sharpe', 'Rango corto: se necesitan más sesiones para la ventana rodante.');
         }
 
         // 5) Relative performance vs benchmark (aligned by date)
@@ -435,7 +458,7 @@ async function mountAnalyticsCharts(container, ticker, opts = {}) {
             if (common.length > 2) {
                 const a0 = common[0].c, b0 = bmap[common[0].date];
                 const rel = common.map(x => ((x.c / a0) / (bmap[x.date] / b0) - 1) * 100);
-                _deepCharts.push(new Chart(wrapOf('rel'), _adLine(common.map(x => x.date), rel, '#2C4A6E', true, 'rgba(44,74,110,0.10)')));
+                mk('rel', _adLine(common.map(x => x.date), rel, '#2C4A6E', true, 'rgba(44,74,110,0.10)'));
             } else { noteInto('rel', 'Sin fechas comunes con el benchmark en este rango.'); }
         } else {
             noteInto('rel', `Sin datos del benchmark (${benchName}).`);
@@ -443,6 +466,21 @@ async function mountAnalyticsCharts(container, ticker, opts = {}) {
     }
 
     rangesEl.querySelectorAll('.pchart-range-btn').forEach(b => b.addEventListener('click', () => draw(b.dataset.period)));
+    // ⤢ expand a single analytics chart into the fullscreen modal (clones the
+    // current instance's config into a larger canvas).
+    container.querySelectorAll('.chart-expand-btn').forEach(b => b.addEventListener('click', () => {
+        const k = b.dataset.expand, inst = byKey[k];
+        const title = (cards.find(c => c[0] === k) || [, ''])[1];
+        if (!inst || !window.openChartModal) return;
+        window.openChartModal(title, (c) => {
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:relative; width:100%; height:70vh;';
+            const cv = document.createElement('canvas');
+            wrap.appendChild(cv); c.appendChild(wrap);
+            const data = { labels: (inst.config.data.labels || []).slice(), datasets: inst.config.data.datasets.map(ds => Object.assign({}, ds)) };
+            window._zoomChart = new Chart(cv, { type: inst.config.type, data, options: inst.config.options });
+        });
+    }));
     draw(period);
 }
 window.mountAnalyticsCharts = mountAnalyticsCharts;

@@ -68,7 +68,7 @@ function renderTransactions() {
         return `<tr${title}>
             <td>${date}</td>
             <td>${typeLabel[t.type] || t.type}</td>
-            <td>${assetName ? `${assetName}<br><span class="text-muted" style="font-family: var(--font-mono); font-size:12px;">${t.ticker}</span>` : `<span style="font-family: var(--font-mono); font-weight: 600;">${t.ticker}</span>`}</td>
+            <td><span class="ticker-link" onclick="showAssetDetail('${t.ticker}')" style="cursor:pointer;" title="Ver detalle de ${(assetName || t.ticker).replace(/"/g, '&quot;')}">${assetName ? `${assetName}<br><span class="text-muted" style="font-family: var(--font-mono); font-size:12px;">${t.ticker}</span>` : `<span style="font-family: var(--font-mono); font-weight: 600;">${t.ticker}</span>`}</span></td>
             <td class="text-right mono">${fmt(t.quantity, 6)}</td>
             <td class="text-right mono">${fmt(t.price)} ${cur}</td>
             <td class="text-right mono">${fmt(total)} ${cur}</td>

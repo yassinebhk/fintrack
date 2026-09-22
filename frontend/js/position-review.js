@@ -132,7 +132,7 @@ function reviewHtml(data) {
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
                 <div>
                     <strong>${meta.emoji} ${meta.label}</strong> ·
-                    ${r.name} <span class="text-muted mono" style="font-size:11px;">${r.ticker}</span>
+                    <span class="ticker-link" onclick="showAssetDetail('${(r.ticker + '').replace(/'/g, '')}')" style="cursor:pointer;" title="Ver detalle de ${(r.name || r.ticker).replace(/"/g, '&quot;')}">${r.name} <span class="text-muted mono" style="font-size:11px;">${r.ticker}</span></span>
                     <div class="text-muted" style="font-size:11.5px; margin-top:2px;">
                         Peso ${r.weight_pct != null ? r.weight_pct + '%' : '—'}
                         ${r.pnl_pct != null ? ` · P/L <span class="${cls(r.pnl_pct)}">${pct(r.pnl_pct)}</span>` : ''}

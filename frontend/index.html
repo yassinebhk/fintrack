@@ -17,7 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260922analytics">
+    <link rel="stylesheet" href="css/styles.css?v=20260922interact">
 </head>
 <body>
     <div id="loginGate" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:24px;">
@@ -262,8 +262,10 @@
                                     <button class="chart-btn" data-period="180">6M</button>
                                     <button class="chart-btn" data-period="365">1A</button>
                                     <button class="chart-btn" data-period="all">Todo</button>
+                                    <button class="chart-btn" id="measureBtn" onclick="toggleMeasure()" title="Medir la diferencia entre dos puntos" style="margin-left:8px;">📏 Medir</button>
                                 </div>
                             </div>
+                            <div id="measurePanel" class="measure-panel" hidden></div>
                             <div class="chart-container">
                                 <canvas id="portfolioChart"></canvas>
                             </div>
@@ -2099,7 +2101,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="js/info-glossary.js?v=20260921dividendos"></script>
-    <script src="js/app.js?v=20260922fixes"></script>
+    <script src="js/app.js?v=20260922interact"></script>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260921fire"></script>
     <script src="js/news.js?v=20260921tally"></script>
@@ -2108,20 +2110,20 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/asset-analysis.js?v=20260921fxfix"></script>
     <script src="js/backtest.js?v=20260921export"></script>
     <script src="js/opportunities.js?v=20260921reorder"></script>
-    <script src="js/asset-deep-analysis.js?v=20260922analytics"></script>
-    <script src="js/asset-detail.js?v=20260922fixes"></script>
-    <script src="js/transactions.js?v=20260921totals"></script>
+    <script src="js/asset-deep-analysis.js?v=20260922interact"></script>
+    <script src="js/asset-detail.js?v=20260922interact"></script>
+    <script src="js/transactions.js?v=20260922interact"></script>
     <script src="js/polymarket.js?v=20260921equity"></script>
     <script src="js/daytrading.js?v=20260921equity"></script>
     <script src="js/journal.js?v=20260921filter"></script>
-    <script src="js/watchlist.js?v=20260922pins"></script>
+    <script src="js/watchlist.js?v=20260922interact"></script>
     <script src="js/goals.js?v=20260921real"></script>
     <script src="js/alerts.js?v=20260921real"></script>
     <script src="js/export-utils.js?v=20260913export"></script>
     <script src="js/scorecard.js?v=20260921equity"></script>
     <script src="js/admin.js?v=20260921admin"></script>
     <script src="js/daily-summary.js?v=20260913export"></script>
-    <script src="js/position-review.js?v=20260921filter"></script>
+    <script src="js/position-review.js?v=20260922interact"></script>
     <script>
         // PWA: register the service worker (installable + offline app shell)
         if ('serviceWorker' in navigator) {

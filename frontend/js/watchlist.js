@@ -255,7 +255,7 @@ function watchlistListHtml(items) {
         const c = it.setup || '';
         const color = c.startsWith('🟢') ? 'var(--positive)' : c.startsWith('🔵') ? 'var(--info)' : c.startsWith('🟡') ? 'var(--warning)' : 'var(--text-secondary)';
         return `<tr>
-            <td>${it.name} <span class="text-muted mono" style="font-size:11px;">${it.ticker}</span>${it.note ? `<br><span class="text-muted" style="font-size:11px;">${it.note}</span>` : ''}</td>
+            <td><span class="ticker-link" onclick="showAssetDetail('${it.ticker}')" style="cursor:pointer;" title="Ver detalle de ${(it.name || it.ticker).replace(/"/g, '&quot;')}">${it.name} <span class="text-muted mono" style="font-size:11px;">${it.ticker}</span></span>${it.note ? `<br><span class="text-muted" style="font-size:11px;">${it.note}</span>` : ''}</td>
             <td data-watch-spark="${it.ticker}"></td>
             <td class="text-right mono">${it.price != null ? num(it.price, 2) : '—'}</td>
             <td class="text-right mono ${(it.ret_3m || 0) >= 0 ? 'value-positive' : 'value-negative'}">${it.ret_3m != null ? (it.ret_3m >= 0 ? '+' : '') + it.ret_3m + '%' : '—'}</td>

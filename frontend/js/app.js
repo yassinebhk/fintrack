@@ -781,7 +781,10 @@ function createPortfolioChart(history) {
                 const points = chart.getElementsAtEventForMode(event, 'nearest', { intersect: false }, true);
                 if (!points.length) return;
                 const idx = points[0].index;
-                showDayDetail(chart.data.labels[idx], chart.data.datasets[0].data[idx]);
+                const date = chart.data.labels[idx];
+                const val = chart.data.datasets[0].data[idx];
+                if (_measureMode) { _measurePick(date, val); return; }
+                showDayDetail(date, val);
             },
             plugins: {
                 legend: {
@@ -836,6 +839,78 @@ function createPortfolioChart(history) {
         }
     });
 }
+
+// ===== Measure tool on the portfolio chart: pick two points, see the difference =====
+let _measureMode = false;
+let _measureA = null;
+
+function toggleMeasure() {
+    _measureMode = !_measureMode;
+    _measureA = null;
+    const btn = document.getElementById('measureBtn');
+    if (btn) btn.classList.toggle('active', _measureMode);
+    const panel = document.getElementById('measurePanel');
+    if (panel) {
+        panel.hidden = !_measureMode;
+        panel.innerHTML = _measureMode
+            ? '📏 <strong>Modo medir</strong>: pincha el <strong>primer</strong> punto del tramo…'
+            : '';
+    }
+}
+window.toggleMeasure = toggleMeasure;
+
+function _measurePick(date, val) {
+    const panel = document.getElementById('measurePanel');
+    if (!_measureA) {
+        _measureA = { date, val };
+        if (panel) panel.innerHTML = `📏 Punto A: <strong>${formatDate(date)}</strong> (${formatCurrency(val, 'EUR')}). Ahora pincha el <strong>segundo</strong> punto.`;
+        return;
+    }
+    const a = _measureA, b = { date, val };
+    const [p1, p2] = new Date(a.date) <= new Date(b.date) ? [a, b] : [b, a];
+    const dV = p2.val - p1.val;
+    const dPct = p1.val ? (p2.val / p1.val - 1) * 100 : null;
+    const days = Math.round((new Date(p2.date) - new Date(p1.date)) / 86400000);
+    _measureA = null;
+    const cls = dV >= 0 ? 'value-positive' : 'value-negative';
+    if (panel) panel.innerHTML = `📏 <strong>${formatDate(p1.date)}</strong> → <strong>${formatDate(p2.date)}</strong> (${days} día${days === 1 ? '' : 's'}):
+        <span class="${cls}" style="font-weight:700;">${dV >= 0 ? '+' : ''}${formatCurrency(dV, 'EUR')}${dPct == null ? '' : ` (${dPct >= 0 ? '+' : ''}${dPct.toFixed(2)}%)`}</span>
+        <span class="text-muted"> · pincha dos puntos para medir otro tramo</span>`;
+}
+
+// ===== Generic "⤢ ampliar" fullscreen modal for any chart =====
+// mountFn(container) draws the chart into the given (large) container.
+function openChartModal(title, mountFn) {
+    let m = document.getElementById('chartZoomModal');
+    if (!m) {
+        m = document.createElement('div');
+        m.id = 'chartZoomModal';
+        m.className = 'chart-zoom-modal';
+        m.innerHTML = `<div class="chart-zoom-inner">
+            <div class="chart-zoom-head"><span class="chart-zoom-title"></span><button class="chart-zoom-close" title="Cerrar">×</button></div>
+            <div class="chart-zoom-body"></div>
+        </div>`;
+        document.body.appendChild(m);
+        m.addEventListener('click', (e) => { if (e.target === m) closeChartModal(); });
+        m.querySelector('.chart-zoom-close').addEventListener('click', closeChartModal);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChartModal(); });
+    }
+    m.querySelector('.chart-zoom-title').textContent = title || '';
+    const body = m.querySelector('.chart-zoom-body');
+    if (window._zoomChart) { try { window._zoomChart.destroy(); } catch (e) { /* LWC has no destroy */ } window._zoomChart = null; }
+    body.innerHTML = '';
+    m.style.display = 'flex';
+    try { mountFn(body); } catch (e) { body.innerHTML = '<p class="text-muted" style="padding:20px;">No se pudo ampliar el gráfico.</p>'; }
+}
+function closeChartModal() {
+    const m = document.getElementById('chartZoomModal');
+    if (!m) return;
+    if (window._zoomChart) { try { window._zoomChart.destroy(); } catch (e) { /* noop */ } window._zoomChart = null; }
+    m.style.display = 'none';
+    m.querySelector('.chart-zoom-body').innerHTML = '';
+}
+window.openChartModal = openChartModal;
+window.closeChartModal = closeChartModal;
 
 function createDoughnutChart(canvasId, data, legendId) {
     const ctx = document.getElementById(canvasId);

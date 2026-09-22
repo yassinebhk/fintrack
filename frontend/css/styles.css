@@ -1871,6 +1871,70 @@ body::before {
     gap: 12px;
     margin-top: 8px;
 }
+.ad-note {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 12px;
+    padding: 10px;
+}
+
+/* ⤢ expand buttons on charts */
+.chart-expand-btn, .pchart-expand {
+    background: rgba(43, 40, 34, 0.05);
+    border: 1px solid var(--border-primary);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    padding: 2px 9px;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.chart-expand-btn:hover, .pchart-expand:hover { background: rgba(44, 74, 110, 0.10); color: var(--accent-primary); }
+
+/* Fullscreen chart zoom modal */
+.chart-zoom-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(5, 10, 20, 0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+.chart-zoom-inner {
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-primary);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 1100px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+}
+.chart-zoom-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.chart-zoom-title { font-weight: 700; color: var(--text-primary); }
+.chart-zoom-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); line-height: 1; }
+.chart-zoom-body { position: relative; width: 100%; min-height: 60vh; }
+
+/* Measure tool panel under the portfolio chart */
+.measure-panel {
+    background: rgba(44, 74, 110, 0.06);
+    border: 1px solid rgba(44, 74, 110, 0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    margin: 6px 0;
+}
+
+/* Clickable asset names across sections */
+.ticker-link { border-bottom: 1px dotted transparent; transition: border-color 0.15s ease; }
+.ticker-link:hover { border-bottom-color: currentColor; }
 .pchart-range-btn {
     background: rgba(43, 40, 34, 0.05);
     border: 1px solid var(--border-primary);
