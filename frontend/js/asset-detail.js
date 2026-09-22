@@ -60,6 +60,9 @@ function showAssetDetail(ticker) {
         window.renderFavButton(document.getElementById('assetDetailFav'),
             currentAssetDetailTicker, info ? info.name : currentAssetDetailTicker);
     }
+    if (window.renderPinsSection) {
+        window.renderPinsSection(document.getElementById('assetDetailPins'), currentAssetDetailTicker, {});
+    }
 
     if (window.innerWidth <= 900) {
         document.querySelector('.sidebar')?.classList.remove('open');

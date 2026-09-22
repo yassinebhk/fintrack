@@ -1859,6 +1859,29 @@ body::before {
     color: #9a7420;
 }
 
+/* 📌 Chinchetas (pins): date+price snapshots per watched asset */
+.pins-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pins-list { margin-top: 8px; }
+.pin-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 2px;
+    border-bottom: 1px solid var(--border-primary);
+    font-size: 13px;
+}
+.pin-row:last-child { border-bottom: none; }
+.pin-del {
+    background: none;
+    border: none;
+    color: var(--negative);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+}
+.pins-expand-row > td { background: rgba(43, 40, 34, 0.03); padding: 8px 14px; }
+
 /* ============================================
    Loading Overlay
    ============================================ */

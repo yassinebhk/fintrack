@@ -71,6 +71,124 @@ async function renderFavButton(container, ticker, name) {
 }
 window.renderFavButton = renderFavButton;
 
+// ===== 📌 Chinchetas (pins): date+price snapshots per watched asset =====
+// One asset can have many pins over time; each captures the price server-side at
+// the moment you pin it, so you can track evolution from the day it caught your eye.
+async function pinAsset(ticker, note) {
+    const r = await fetch(`${WATCHLIST_API}/watchlist/${encodeURIComponent(ticker)}/pin`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: note || '' }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+}
+async function fetchPins(ticker) {
+    const r = await fetch(`${WATCHLIST_API}/watchlist/${encodeURIComponent(ticker)}/pins`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return (await r.json()).items || [];
+}
+async function deletePin(pinId) {
+    const r = await fetch(`${WATCHLIST_API}/watchlist/pins/${pinId}`, { method: 'DELETE' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return true;
+}
+async function _currentPriceFor(ticker) {
+    try {
+        const r = await fetch(`${WATCHLIST_API}/asset/${encodeURIComponent(ticker)}/history?period=5d&asset_type=auto`, { cache: 'no-store' });
+        if (!r.ok) return null;
+        const d = await r.json();
+        if (d.current && d.current.price != null) return d.current.price;
+        const h = d.history || [];
+        return h.length ? (h[h.length - 1].close ?? h[h.length - 1].price) : null;
+    } catch (e) { return null; }
+}
+
+// Render the pins panel for one ticker: a "📌 Fijar precio de hoy" button + the
+// list of existing pins (date · price · Δ% vs ahora), each removable. Degrades to
+// a friendly note if the backend endpoints aren't deployed yet.
+async function renderPinsSection(container, ticker, opts = {}) {
+    if (!container) return;
+    const T = String(ticker || '').toUpperCase();
+    container.innerHTML = `
+        <div class="pins-head">
+            <button type="button" class="btn-secondary pin-add-btn">📌 Fijar precio de hoy</button>
+            <span class="pins-msg" style="font-size:12px;"></span>
+        </div>
+        <div class="pins-list"></div>`;
+    const addBtn = container.querySelector('.pin-add-btn');
+    const msg = container.querySelector('.pins-msg');
+    const listEl = container.querySelector('.pins-list');
+    let current = opts.currentPrice != null ? opts.currentPrice : null;
+
+    async function paint() {
+        let pins;
+        try { pins = await fetchPins(T); }
+        catch (e) {
+            listEl.innerHTML = '<p class="text-muted" style="font-size:12px; margin:6px 0 0;">Las chinchetas estarán disponibles en cuanto se actualice la app (recarga en unos minutos).</p>';
+            addBtn.disabled = true;
+            return;
+        }
+        if (current == null) current = await _currentPriceFor(T);
+        if (!pins.length) {
+            listEl.innerHTML = '<p class="text-muted" style="font-size:12px; margin:6px 0 0;">Sin chinchetas. Pulsa «📌 Fijar precio de hoy» para empezar a seguirlo desde hoy.</p>';
+            return;
+        }
+        const money = (p) => p.price == null ? '—'
+            : (+p.price).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (p.currency ? ' ' + p.currency : '');
+        listEl.innerHTML = pins.map(p => {
+            const date = (p.pinned_at || '').slice(0, 10);
+            // pin.price and `current` are both in the asset's native currency (Yahoo
+            // quote), so the % is apples-to-apples without any FX conversion.
+            const chg = (current != null && p.price) ? ((current - p.price) / p.price * 100) : null;
+            const chgHtml = chg == null ? '' : `<span class="mono ${chg >= 0 ? 'value-positive' : 'value-negative'}" title="Variación desde que la fijaste">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>`;
+            const note = p.note ? ` <span class="text-muted">— ${(p.note + '').replace(/</g, '&lt;')}</span>` : '';
+            return `<div class="pin-row">
+                <span>📌 <strong>${date}</strong> · ${money(p)}${note}</span>
+                <span style="display:flex; gap:10px; align-items:center;">${chgHtml}<button type="button" class="pin-del" title="Quitar chincheta" data-pin="${p.id}">✕</button></span>
+            </div>`;
+        }).join('');
+        listEl.querySelectorAll('.pin-del').forEach(b => b.addEventListener('click', async () => {
+            b.disabled = true;
+            try { await deletePin(b.dataset.pin); await paint(); } catch (e) { b.disabled = false; }
+        }));
+    }
+
+    addBtn.addEventListener('click', async () => {
+        addBtn.disabled = true; msg.textContent = 'Fijando…'; msg.style.color = 'var(--text-secondary)';
+        try {
+            const p = await pinAsset(T, '');
+            // Ensure it's also in the watchlist (pinning implies tracking).
+            if (_watchIdsCache && !_watchIdsCache.has(T)) { try { await fetch(`${WATCHLIST_API}/watchlist`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticker: T }) }); } catch (e) {} }
+            const captured = (p && p.price != null)
+                ? p.price.toLocaleString('es-ES', { maximumFractionDigits: 2 }) + (p.currency ? ' ' + p.currency : '')
+                : 'precio no disponible';
+            msg.textContent = `✓ Guardada (${captured})`;
+            msg.style.color = 'var(--positive)';
+            await paint();
+        } catch (e) {
+            msg.textContent = 'No se pudo fijar ahora.'; msg.style.color = 'var(--negative)';
+        }
+        setTimeout(() => { msg.textContent = ''; }, 3500);
+        addBtn.disabled = false;
+    });
+
+    paint();
+}
+window.renderPinsSection = renderPinsSection;
+
+// Expand/collapse a watchlist row's pins panel (loaded lazily on first open).
+function toggleWatchPins(ticker, price) {
+    const T = String(ticker);
+    const row = document.getElementById(`wpins-row-${T}`);
+    if (!row) return;
+    row.hidden = !row.hidden;
+    if (!row.hidden && !row.dataset.loaded) {
+        row.dataset.loaded = '1';
+        renderPinsSection(document.getElementById(`wpins-${T}`), T, { currentPrice: price });
+    }
+}
+window.toggleWatchPins = toggleWatchPins;
+
 async function loadWatchlist() {
     const el = document.getElementById('watchlistContent');
     if (!el) return;
@@ -145,13 +263,17 @@ function watchlistListHtml(items) {
             <td class="text-right mono">${it.range_pos_52w != null ? num(it.range_pos_52w, 0) + '%' : '—'}</td>
             <td class="text-right mono">${it.adx != null ? num(it.adx, 0) : '—'}</td>
             <td style="color:${color}; font-weight:600;">${it.setup}</td>
-            <td class="text-right"><button class="btn-secondary" style="background:transparent; color:var(--negative); padding:2px 8px;" onclick="deleteWatch(${it.id})" title="Quitar">✕</button></td>
-        </tr>`;
+            <td class="text-right" style="white-space:nowrap;">
+                <button class="btn-secondary" style="background:transparent; padding:2px 8px;" onclick="toggleWatchPins('${it.ticker}', ${it.price != null ? it.price : 'null'})" title="Chinchetas de seguimiento (fecha y precio)">📌</button>
+                <button class="btn-secondary" style="background:transparent; color:var(--negative); padding:2px 8px;" onclick="deleteWatch(${it.id})" title="Quitar">✕</button>
+            </td>
+        </tr>
+        <tr class="pins-expand-row" id="wpins-row-${it.ticker}" hidden><td colspan="9"><div id="wpins-${it.ticker}"></div></td></tr>`;
     }).join('');
     return `<div class="card"><div class="table-container"><table class="manager-table">
         <thead><tr><th>Activo</th><th>Tendencia (1m)</th><th class="text-right">Precio</th><th class="text-right">3m</th><th class="text-right">RSI</th><th class="text-right">Rango 52s</th><th class="text-right">ADX</th><th>Setup</th><th></th></tr></thead>
         <tbody>${rows}</tbody></table></div>
-        <p class="text-muted" style="font-size:10.5px; margin:8px 0 0;">Setup: 🟢 posible entrada · 🔵 fuerza/ruptura · 🟡 cerca de mínimos · gris sin setup claro. Son señales técnicas objetivas, no una recomendación.</p>
+        <p class="text-muted" style="font-size:10.5px; margin:8px 0 0;">Setup: 🟢 posible entrada · 🔵 fuerza/ruptura · 🟡 cerca de mínimos · gris sin setup claro. Son señales técnicas objetivas, no una recomendación. · 📌 abre las chinchetas de seguimiento (fecha y precio de cada día que lo marcaste).</p>
     </div>`;
 }
 
