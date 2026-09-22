@@ -1863,6 +1863,14 @@ body::before {
 /* Clickable best/worst performer names on the dashboard */
 .perf-link { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .perf-link:hover { opacity: 0.8; }
+
+/* Range-aware analytics charts grid in the deep-analysis modal */
+.deep-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+    margin-top: 8px;
+}
 .pchart-range-btn {
     background: rgba(43, 40, 34, 0.05);
     border: 1px solid var(--border-primary);

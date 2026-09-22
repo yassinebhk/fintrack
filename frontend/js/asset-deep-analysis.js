@@ -79,6 +79,15 @@ async function openDeepAnalysis(ticker, name) {
         // + ⭐ favorite quick-add, both mounted after the HTML is in the DOM.
         const pc = body.querySelector('#deepPriceChart');
         if (pc && window.mountPriceChart) window.mountPriceChart(pc, data.ticker, { height: 360, defaultPeriod: '1y' });
+        // Analytics charts (drawdown, distribución, vol/Sharpe rodante, vs benchmark)
+        // recomputed client-side per range — no longer static images.
+        const ac = body.querySelector('#deepAnalyticsCharts');
+        if (ac && window.mountAnalyticsCharts) window.mountAnalyticsCharts(ac, data.ticker, {
+            benchTicker: (data.benchmark || {}).ticker,
+            benchName: (data.benchmark || {}).name || 'benchmark',
+            rfAnnualPct: (data.metrics || {}).rf_annual_pct,
+            defaultPeriod: '1y',
+        });
         if (window.renderFavButton) window.renderFavButton(body.querySelector('#deepFav'), data.ticker, data.name);
         const ex = m.querySelector('#deepExport');
         if (ex && window.exportToolbarHTML) {
@@ -278,11 +287,7 @@ function renderDeepAnalysis(d) {
         <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Precio con SMA50/200 · elige el rango (Hoy → Máx)${_gi('chart_precio_sma')}</div>
         <div id="deepPriceChart"></div>
     </div>
-    ${chartImg(charts.drawdown, 'Drawdown histórico', 'drawdown_historico')}
-    ${chartImg(charts.returns_histogram, 'Distribución de retornos diarios', 'distribucion_retornos')}
-    ${chartImg(charts.rolling_volatility, 'Volatilidad rodante 60d', 'chart_rolling_vol')}
-    ${chartImg(charts.rolling_sharpe, 'Sharpe rodante 60d', 'chart_rolling_sharpe')}
-    ${chartImg(charts.relative_vs_benchmark, 'Rendimiento vs benchmark', 'chart_relative_benchmark')}
+    <div id="deepAnalyticsCharts" style="margin-top:14px;"></div>
 
     <h3 style="margin-top:18px;">📰 Noticias del activo (varias fuentes)</h3>
     ${_newsBlock(d.news, d.news_sentiment || {}, d.news_sources || [])}
@@ -296,3 +301,148 @@ function renderDeepAnalysis(d) {
     <p class="text-muted" style="font-size:11px; margin-top:14px;">Generado ${new Date(d.generated_at).toLocaleString('es-ES')} · Esto es análisis educativo, no recomendación de compra/venta.</p>
     `;
 }
+
+// ===== Range-aware analytics charts (client-side, replace the static images) =====
+// Recomputed from the asset's own price history (and the benchmark's) for the
+// selected range, using Chart.js — so drawdown, return distribution, rolling
+// vol/Sharpe and relative-vs-benchmark all respond to the range you pick.
+const ANALYTICS_PERIODS = [['3mo', '3M'], ['6mo', '6M'], ['1y', '1A'], ['2y', '2A'], ['5y', '5A'], ['max', 'Máx']];
+const _deepCharts = [];
+function _destroyDeepCharts() { while (_deepCharts.length) { try { _deepCharts.pop().destroy(); } catch (e) { /* noop */ } } }
+
+function _mean(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0; }
+function _std(a) { if (a.length < 2) return 0; const m = _mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / (a.length - 1)); }
+function _clClose(history) { return (history || []).map(h => ({ date: h.date, c: (h.close ?? h.price) })).filter(x => x.c > 0); }
+function _dailyReturns(cl) { const r = []; for (let i = 1; i < cl.length; i++) r.push(cl[i].c / cl[i - 1].c - 1); return r; }
+
+function _adScales(yPct) {
+    return {
+        x: { ticks: { maxTicksLimit: 7, color: '#9C9689' }, grid: { display: false } },
+        y: { ticks: { color: '#9C9689', callback: v => yPct ? v + '%' : v }, grid: { color: '#EFEBE3' } },
+    };
+}
+function _adLine(labels, data, color, yPct, fill) {
+    return {
+        type: 'line',
+        data: { labels, datasets: [{ data, borderColor: color, backgroundColor: fill || 'transparent', fill: !!fill, tension: 0.15, pointRadius: 0, borderWidth: 2 }] },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${(+c.parsed.y).toFixed(2)}${yPct ? '%' : ''}` } } },
+            scales: _adScales(yPct),
+        },
+    };
+}
+function _adBar(labels, data, color) {
+    return {
+        type: 'bar',
+        data: { labels, datasets: [{ data, backgroundColor: color }] },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { title: it => `retorno ${it[0].label}`, label: c => `${c.parsed.y} días` } } },
+            scales: { x: { ticks: { maxTicksLimit: 8, color: '#9C9689' }, grid: { display: false } }, y: { ticks: { color: '#9C9689' }, grid: { color: '#EFEBE3' } } },
+        },
+    };
+}
+function _histogram(vals, nbins) {
+    const min = Math.min(...vals), max = Math.max(...vals);
+    if (!isFinite(min) || !isFinite(max) || min === max) return { bins: ['0%'], counts: [vals.length] };
+    const w = (max - min) / nbins;
+    const counts = new Array(nbins).fill(0);
+    vals.forEach(v => { let i = Math.floor((v - min) / w); if (i >= nbins) i = nbins - 1; if (i < 0) i = 0; counts[i]++; });
+    const bins = [];
+    for (let i = 0; i < nbins; i++) bins.push((min + w * i + w / 2).toFixed(1) + '%');
+    return { bins, counts };
+}
+
+async function mountAnalyticsCharts(container, ticker, opts = {}) {
+    if (!container || typeof Chart === 'undefined') return;
+    const benchTicker = opts.benchTicker || null;
+    const benchName = opts.benchName || 'benchmark';
+    const rfPct = (opts.rfAnnualPct != null) ? opts.rfAnnualPct : 0;
+    let period = opts.defaultPeriod || '1y';
+
+    const cards = [
+        ['dd', 'Drawdown (caída desde máximos)'],
+        ['hist', 'Distribución de retornos diarios'],
+        ['vol', 'Volatilidad rodante (anualizada)'],
+        ['sharpe', 'Sharpe rodante'],
+        ['rel', `Rendimiento relativo vs ${benchName}`],
+    ];
+    container.innerHTML = `
+        <div class="pchart-ranges" style="margin-bottom:10px;">
+            ${ANALYTICS_PERIODS.map(([p, l]) => `<button type="button" class="pchart-range-btn" data-period="${p}">${l}</button>`).join('')}
+        </div>
+        <div class="deep-analytics-grid">
+            ${cards.map(([k, title]) => `<div class="card metric-card" style="margin:0;">
+                <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">${title}</div>
+                <div class="ad-canvas-wrap" style="position:relative; height:200px;"><canvas data-chart="${k}"></canvas></div>
+            </div>`).join('')}
+        </div>`;
+    const rangesEl = container.querySelector('.pchart-ranges');
+    const wrapOf = (k) => container.querySelector(`canvas[data-chart="${k}"]`);
+    const noteInto = (k, txt) => { const c = wrapOf(k); if (c) c.parentElement.innerHTML = `<p class="text-muted" style="font-size:12px; padding:20px 0; text-align:center;">${txt}</p>`; };
+
+    async function draw(p) {
+        period = p;
+        rangesEl.querySelectorAll('.pchart-range-btn').forEach(b => b.classList.toggle('active', b.dataset.period === p));
+        _destroyDeepCharts();
+        const base = window.API_BASE_URL || '/api';
+        const url = (t) => `${base}/asset/${encodeURIComponent(t)}/history?period=${p}&asset_type=auto`;
+        const [aR, bR] = await Promise.all([
+            fetch(url(ticker), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null),
+            benchTicker ? fetch(url(benchTicker), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
+        ]);
+        const cl = _clClose(aR && aR.history);
+        if (cl.length < 5) {
+            ['dd', 'hist', 'vol', 'sharpe', 'rel'].forEach(k => noteInto(k, 'Pocos datos para este rango.'));
+            return;
+        }
+        const labels = cl.map(x => x.date);
+        const rets = _dailyReturns(cl);
+
+        // 1) Drawdown
+        let peak = -Infinity;
+        const dd = cl.map(x => { peak = Math.max(peak, x.c); return (x.c / peak - 1) * 100; });
+        _deepCharts.push(new Chart(wrapOf('dd'), _adLine(labels, dd, '#C6473C', true, 'rgba(198,71,60,0.12)')));
+
+        // 2) Histogram of daily returns (%)
+        const { bins, counts } = _histogram(rets.map(r => r * 100), 21);
+        _deepCharts.push(new Chart(wrapOf('hist'), _adBar(bins, counts, '#2C4A6E')));
+
+        // 3/4) Rolling vol + Sharpe (annualized), window sized to the range
+        const W = Math.max(10, Math.min(60, Math.floor(cl.length / 4)));
+        if (rets.length > W + 2) {
+            const rollLabels = [], volS = [], shS = [];
+            for (let i = W; i < rets.length; i++) {
+                const w = rets.slice(i - W, i);
+                const sd = _std(w), annVol = sd * Math.sqrt(252), annMean = _mean(w) * 252;
+                volS.push(annVol * 100);
+                shS.push(annVol > 0 ? (annMean - rfPct / 100) / annVol : 0);
+                rollLabels.push(cl[i + 1] ? cl[i + 1].date : labels[i]);
+            }
+            _deepCharts.push(new Chart(wrapOf('vol'), _adLine(rollLabels, volS, '#C99A3E', true, 'rgba(201,154,62,0.10)')));
+            _deepCharts.push(new Chart(wrapOf('sharpe'), _adLine(rollLabels, shS, '#4A9B8E', false, 'rgba(74,155,142,0.10)')));
+        } else {
+            noteInto('vol', `Rango corto: se necesitan más sesiones para la ventana rodante.`);
+            noteInto('sharpe', `Rango corto: se necesitan más sesiones para la ventana rodante.`);
+        }
+
+        // 5) Relative performance vs benchmark (aligned by date)
+        const bcl = _clClose(bR && bR.history);
+        if (bcl.length > 2) {
+            const bmap = {}; bcl.forEach(x => { bmap[x.date] = x.c; });
+            const common = cl.filter(x => bmap[x.date] != null);
+            if (common.length > 2) {
+                const a0 = common[0].c, b0 = bmap[common[0].date];
+                const rel = common.map(x => ((x.c / a0) / (bmap[x.date] / b0) - 1) * 100);
+                _deepCharts.push(new Chart(wrapOf('rel'), _adLine(common.map(x => x.date), rel, '#2C4A6E', true, 'rgba(44,74,110,0.10)')));
+            } else { noteInto('rel', 'Sin fechas comunes con el benchmark en este rango.'); }
+        } else {
+            noteInto('rel', `Sin datos del benchmark (${benchName}).`);
+        }
+    }
+
+    rangesEl.querySelectorAll('.pchart-range-btn').forEach(b => b.addEventListener('click', () => draw(b.dataset.period)));
+    draw(period);
+}
+window.mountAnalyticsCharts = mountAnalyticsCharts;
