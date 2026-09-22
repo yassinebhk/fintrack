@@ -341,16 +341,33 @@ function renderTradingViewChart(data) {
         tvSeries = series;
     }
 
-    if (typeof addSMAOverlays === 'function') addSMAOverlays(chart, history);
     if (typeof attachCrosshairLegend === 'function') attachCrosshairLegend(chart, tvContainer, history);
 
     chart.timeScale().fitContent();
 
-    // Real buy/sell markers — same helper as the asset-detail page's price chart
-    // (defined in asset-detail.js, loaded on every page) so both charts show them
-    // consistently instead of duplicating the fetch+snap-to-bar logic twice.
+    // SMA with warm-up history (correct across short ranges), same as the
+    // asset-detail chart — computed over a longer series and clipped to the view.
+    if (typeof addSMAOverlays === 'function') {
+        const localChart = chart;
+        (async () => {
+            try {
+                const warmP = (typeof SMA_WARMUP !== 'undefined' && SMA_WARMUP[currentAssetPeriod]) || '5y';
+                let warm = history;
+                if (warmP !== currentAssetPeriod) {
+                    const at = data.asset_type || 'auto';
+                    const wr = await fetch(`${ASSET_API}/asset/${encodeURIComponent(data.ticker)}/history?period=${warmP}&asset_type=${at}`, { cache: 'no-store' });
+                    if (wr.ok) { const wd = await wr.json(); if ((wd.history || []).length > history.length) warm = wd.history; }
+                }
+                if (tvChart === localChart && history.length) addSMAOverlays(localChart, warm, history[0].date, history[history.length - 1].date);
+            } catch (e) { /* skip SMA rather than break the chart */ }
+        })();
+    }
+
+    // Real buy/sell markers — same helper as the asset-detail page's price chart.
+    // Passing chart + container enables the click-to-see-detail popup (fixes the
+    // grey "reconstructed" dot that otherwise showed nothing on click).
     if (typeof loadAssetDetailTradeMarkers === 'function' && data.ticker) {
-        loadAssetDetailTradeMarkers(data.ticker, tvSeries, history.map(h => h.date));
+        loadAssetDetailTradeMarkers(data.ticker, tvSeries, history.map(h => h.date), chart, tvContainer);
     }
 }
 
