@@ -165,6 +165,14 @@ class PortfolioService:
             currency = pos["currency"]
             broker = pos["broker"]
 
+            # pandas turns a NULL asset_name into NaN (a float, not None) — truthy,
+            # so `pos.get("asset_name") or ...` would return NaN itself instead of
+            # falling through, breaking any later string use (2026-09-22 incident:
+            # a position created without asset_name broke the daily summary this way).
+            asset_name = pos.get("asset_name")
+            if not isinstance(asset_name, str) or not asset_name:
+                asset_name = None
+
             pdata = prices.get(ticker, {})
             current_price = pdata.get("price")
             if current_price is None:
@@ -192,7 +200,7 @@ class PortfolioService:
                 "ticker": ticker,
                 # Prefer the stored broker/ISIN name; the live-price feed often returns
                 # the raw ISIN for obscure listings, which is unreadable in the tables.
-                "name": pos.get("asset_name") or pdata.get("name") or ticker,
+                "name": asset_name or pdata.get("name") or ticker,
                 "quantity": quantity,
                 "avg_price": avg_price,
                 "current_price": current_price,
