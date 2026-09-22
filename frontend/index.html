@@ -17,7 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260922watchpro">
+    <link rel="stylesheet" href="css/styles.css?v=20260922markers">
 </head>
 <body>
     <div id="loginGate" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:24px;">
@@ -800,7 +800,7 @@
 
                             <div class="asset-chart-container" style="height:auto;">
                                 <div id="assetDetailTvContainer" style="width: 100%;"></div>
-                                <p class="text-muted" style="font-size:11px; margin-top:6px;">🟢▲ tus compras · 🔴▼ tus ventas (fecha y precio reales) · ⚪ posición reconstruida sin historial de operaciones individuales (aproximado, no es tu compra real) · líneas discontinuas doradas/rojas = SMA50/SMA200.</p>
+                                <p class="text-muted" style="font-size:11px; margin-top:6px;">🟢▲ tus compras · 🔴▼ tus ventas — <strong>pincha una flecha</strong> para ver la operación (cantidad, precio y fecha) · ⚪ posición reconstruida (aproximada). Activa «📉 Medias» para superponer las medias móviles SMA 50/200.</p>
                                 <p id="assetDetailMarkerNote" class="text-muted" style="font-size:11px; margin-top:2px; display:none;"></p>
                                 <div id="assetDetailStatsStrip"></div>
                             </div>
@@ -2111,7 +2111,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/backtest.js?v=20260921export"></script>
     <script src="js/opportunities.js?v=20260921reorder"></script>
     <script src="js/asset-deep-analysis.js?v=20260922interact"></script>
-    <script src="js/asset-detail.js?v=20260922interact"></script>
+    <script src="js/asset-detail.js?v=20260922markers"></script>
     <script src="js/transactions.js?v=20260922interact"></script>
     <script src="js/polymarket.js?v=20260921equity"></script>
     <script src="js/daytrading.js?v=20260921equity"></script>

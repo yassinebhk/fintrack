@@ -335,7 +335,13 @@ async function renderAssetStatsStrip(ticker, containerEl) {
     }
 }
 
-async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
+function _timeToMs(t) {
+    if (t == null) return NaN;
+    if (typeof t === 'number') return t * 1000;               // intraday unix seconds
+    return Date.parse(String(t) + 'T00:00:00');               // daily 'YYYY-MM-DD'
+}
+
+async function loadAssetDetailTradeMarkers(ticker, series, historyDates, chart, canvasEl) {
     if (!series || !historyDates.length) return;
     try {
         // Chart bars only exist for trading days; a transaction on a weekend/holiday
@@ -344,17 +350,21 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
         const dates = historyDates.slice().sort();
         const snapToChart = (isoDate) => {
             let best = null;
-            for (const d of dates) {
-                if (d <= isoDate) best = d; else break;
-            }
+            for (const d of dates) { if (d <= isoDate) best = d; else break; }
             return best || dates[0];
         };
         const fmtQty = (n) => (n || 0).toLocaleString('es-ES', { maximumFractionDigits: 6 });
         const fmtPrice = (n, cur) => `${(n || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cur ? ' ' + cur : ''}`;
+        const fmtDate = (d) => { const x = new Date(d + 'T00:00:00'); return isNaN(x) ? d : x.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }); };
 
         const resp = await assetDetailFetch(`${ASSET_DETAIL_API}/transactions?ticker=${encodeURIComponent(ticker)}`, { cache: 'no-store' });
         if (resp.status === 401) return;
         const txs = await resp.json();
+
+        // Broker-style: markers carry NO text (labels overflow the chart). Details
+        // live in `byTime` and show in a popup when you click the marker's bar.
+        const byTime = {};
+        const addInfo = (time, s) => { (byTime[time] = byTime[time] || []).push(s); };
 
         let markers = (Array.isArray(txs) ? txs : [])
             .filter(t => t.type === 'buy' || t.type === 'sell')
@@ -362,24 +372,19 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
                 const day = (t.executed_at || '').slice(0, 10);
                 if (!day) return null;
                 const isBuy = t.type === 'buy';
+                const time = snapToChart(day);
+                addInfo(time, `${isBuy ? '🟢 Compra' : '🔴 Venta'} ${fmtQty(t.quantity)} @ ${fmtPrice(t.price, t.currency)} · ${fmtDate(day)}`);
                 return {
-                    time: snapToChart(day),
+                    time,
                     position: isBuy ? 'belowBar' : 'aboveBar',
                     color: isBuy ? '#4A9B8E' : '#C6473C',
                     shape: isBuy ? 'arrowUp' : 'arrowDown',
-                    text: `${isBuy ? 'Compra' : 'Venta'} ${fmtQty(t.quantity)} @ ${fmtPrice(t.price, t.currency)}`,
                 };
             })
             .filter(Boolean);
 
-        // No individual trade recorded (true for most positions reconstructed in
-        // bulk after the Neon DB incident — see position_data_integrity memory) —
-        // fall back to ONE marker at the position's creation date, using a
-        // distinct shape/color and explicit "≈ aprox." wording so it's never
-        // mistaken for a real logged trade.
-        // No individual trade recorded — fall back to ONE small marker at the
-        // position's creation date. We DON'T put the qty/price on the marker (a
-        // long label overlaps the chart, terrible); it goes in a clean note below.
+        // No individual trade recorded — fall back to ONE neutral dot at the
+        // position's creation date (also text-less; detail in the popup + a note).
         let syntheticNote = '';
         if (!markers.length) {
             try {
@@ -388,34 +393,57 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
                     const portfolio = await posResp.json();
                     const pos = portfolio.positions?.find(p => p.ticker === ticker);
                     if (pos && pos.created_at && pos.quantity > 0) {
-                        markers = [{
-                            time: snapToChart(pos.created_at.slice(0, 10)),
-                            position: 'belowBar',
-                            color: '#9C9689',
-                            shape: 'circle',
-                        }];
-                        syntheticNote = `⚪ Posición reconstruida: ≈${fmtQty(pos.quantity)} @ ${fmtPrice(pos.avg_price, pos.currency)} — no es tu fecha real de compra.`;
+                        const time = snapToChart(pos.created_at.slice(0, 10));
+                        markers = [{ time, position: 'belowBar', color: '#9C9689', shape: 'circle' }];
+                        const info = `⚪ Posición reconstruida: ≈${fmtQty(pos.quantity)} @ ${fmtPrice(pos.avg_price, pos.currency)} (no es tu fecha real de compra)`;
+                        addInfo(time, info);
+                        syntheticNote = info;
                     }
                 }
             } catch (e) { /* keep no markers rather than fail the whole chart */ }
         }
 
-        // With many trades the per-marker text labels pile up, overlapping each
-        // other, the crosshair legend and the caption below. Past a small count,
-        // keep only the arrows — the exact qty/price of each is in the "Tus
-        // aportaciones" table below.
-        const MAX_LABELS = 6;
-        const showLabels = markers.length <= MAX_LABELS;
-        if (!showLabels) markers = markers.map(m => ({ ...m, text: undefined }));
-
         markers.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
         if (markers.length) series.setMarkers(markers);
         _setTradeMarkerNote(syntheticNote
-            ? syntheticNote
-            : (showLabels ? '' : `ℹ️ ${markers.length} operaciones en este activo: se muestran solo las flechas para no saturar el gráfico. El detalle está en la tabla «Tus aportaciones» de abajo.`));
+            || (markers.length ? '💡 Pincha una flecha 🟢/🔴 del gráfico para ver la operación (cantidad, precio y fecha).' : ''));
+
+        if (chart && canvasEl && typeof chart.subscribeClick === 'function') {
+            _wireTradePopup(chart, canvasEl, byTime);
+        }
     } catch (err) {
         console.error('asset detail trade markers failed:', err);
     }
+}
+
+// Click a marker's bar → small popup with that trade's details (no text on the
+// chart itself, broker-style). Forgiving: matches the nearest trade within ~4 days.
+function _wireTradePopup(chart, canvasEl, byTime) {
+    let pop = canvasEl.querySelector('.trade-popup');
+    if (!pop) {
+        pop = document.createElement('div');
+        pop.className = 'trade-popup';
+        pop.style.display = 'none';
+        canvasEl.appendChild(pop);
+    }
+    const hide = () => { pop.style.display = 'none'; };
+    const keys = Object.keys(byTime);
+    chart.subscribeClick((param) => {
+        if (!param || param.time == null || !keys.length) { hide(); return; }
+        const clicked = _timeToMs(param.time);
+        let bestKey = null, bestDiff = Infinity;
+        for (const k of keys) { const diff = Math.abs(_timeToMs(k) - clicked); if (diff < bestDiff) { bestDiff = diff; bestKey = k; } }
+        if (bestKey == null || bestDiff > 4 * 86400000) { hide(); return; }  // must click near a marker
+        pop.innerHTML = byTime[bestKey].map(s => `<div>${s}</div>`).join('') + '<div class="trade-popup-close">✕</div>';
+        pop.style.display = 'block';
+        const w = canvasEl.clientWidth;
+        const pw = pop.offsetWidth || 240;
+        const x = param.point ? param.point.x : w / 2;
+        pop.style.left = Math.min(Math.max(8, x - pw / 2), Math.max(8, w - pw - 8)) + 'px';
+        pop.style.top = '8px';
+        const closeBtn = pop.querySelector('.trade-popup-close');
+        if (closeBtn) closeBtn.onclick = (e) => { e.stopPropagation(); hide(); };
+    });
 }
 
 // Show a small hint under the market chart (many-trades notice, or reconstructed-
@@ -462,6 +490,11 @@ function _priceChartMode() {
 }
 function _savePriceChartMode(m) { try { localStorage.setItem('fintrack_pchart_mode', m); } catch (e) { /* private mode */ } }
 
+// Moving averages (SMA50/200) are OFF by default — a cleaner, broker-like chart —
+// and toggled on demand (with an on-chart legend so they're never a mystery).
+function _priceChartSMA() { try { return localStorage.getItem('fintrack_pchart_sma') === 'on'; } catch (e) { return false; } }
+function _savePriceChartSMA(on) { try { localStorage.setItem('fintrack_pchart_sma', on ? 'on' : 'off'); } catch (e) { /* private mode */ } }
+
 function _drawPriceSeries(chart, history, timeKey, mode) {
     const hasOHLC = history.length > 0 && history[0].open !== undefined && history[0].high !== undefined;
     if (mode === 'candles' && hasOHLC) {
@@ -503,10 +536,15 @@ function mountPriceChart(container, ticker, opts = {}) {
             </div>
             <div class="pchart-right">
                 <span class="pchart-change" title="Variación en el rango mostrado"></span>
+                <span class="pchart-sma-legend" hidden>
+                    <span style="color:#C99A3E;">▬</span> SMA 50 · <span style="color:#C6473C;">▬</span> SMA 200
+                    <span class="text-muted">(medias móviles)</span>
+                </span>
                 <div class="pchart-mode" role="group" aria-label="Tipo de gráfico">
                     <button type="button" class="pchart-mode-btn" data-mode="candles" title="Velas japonesas (apertura · máximo · mínimo · cierre)">🕯 Velas</button>
                     <button type="button" class="pchart-mode-btn" data-mode="line" title="Línea de precio de cierre">📈 Línea</button>
                 </div>
+                <button type="button" class="pchart-mode-btn pchart-sma-btn" title="Mostrar/ocultar medias móviles (SMA 50 y 200): la media del precio de las últimas 50 y 200 sesiones. Ayudan a ver la tendencia.">📉 Medias</button>
                 <button type="button" class="pchart-expand" title="Ampliar a pantalla grande">⤢</button>
             </div>
         </div>
@@ -514,11 +552,17 @@ function mountPriceChart(container, ticker, opts = {}) {
     const rangesEl = container.querySelector('.pchart-ranges');
     const canvasEl = container.querySelector('.pchart-canvas');
     const changeEl = container.querySelector('.pchart-change');
-    const modeBtns = container.querySelectorAll('.pchart-mode-btn');
+    const modeBtns = container.querySelectorAll('.pchart-mode[role] .pchart-mode-btn');
+    const smaBtn = container.querySelector('.pchart-sma-btn');
+    const smaLegendEl = container.querySelector('.pchart-sma-legend');
+    let smaOn = _priceChartSMA();
     let chart = null;
     let resizeHandler = null;
 
-    const paintMode = () => modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    const paintMode = () => {
+        modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+        if (smaBtn) smaBtn.classList.toggle('active', smaOn);
+    };
 
     // Broker-style % change over the shown range (period label + Δ% + absolute).
     function setChange(history) {
@@ -563,13 +607,17 @@ function mountPriceChart(container, ticker, opts = {}) {
                 crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
             });
             const series = _drawPriceSeries(chart, history, timeKey, mode);
-            if (!useTime) addSMAOverlays(chart, history);  // SMA50/200 need daily bars
+            // SMA50/200 need daily bars, and are OFF by default (toggle) so the
+            // chart is clean; a legend explains them when shown.
+            const smaShown = smaOn && !useTime;
+            if (smaShown) addSMAOverlays(chart, history);
+            if (smaLegendEl) smaLegendEl.hidden = !smaShown;
             attachCrosshairLegend(chart, canvasEl, history, timeKey);
             chart.timeScale().fitContent();
             setChange(history);
             // Trade markers only make sense on the asset-detail chart, and only for
             // daily bars (a buy date snaps to a daily bar, not an intraday candle).
-            if (withMarkers && !useTime) loadAssetDetailTradeMarkers(ticker, series, history.map(h => h.date));
+            if (withMarkers && !useTime) loadAssetDetailTradeMarkers(ticker, series, history.map(h => h.date), chart, canvasEl);
             else if (withMarkers) _setTradeMarkerNote('');
             if (!resizeHandler) {
                 resizeHandler = () => { if (chart) chart.applyOptions({ width: canvasEl.clientWidth }); };
@@ -586,6 +634,9 @@ function mountPriceChart(container, ticker, opts = {}) {
     modeBtns.forEach(b => b.addEventListener('click', () => {
         mode = b.dataset.mode; _savePriceChartMode(mode); paintMode(); draw(currentPeriod);
     }));
+    if (smaBtn) smaBtn.addEventListener('click', () => {
+        smaOn = !smaOn; _savePriceChartSMA(smaOn); paintMode(); draw(currentPeriod);
+    });
     const expandBtn = container.querySelector('.pchart-expand');
     if (expandBtn) expandBtn.addEventListener('click', () => {
         if (!window.openChartModal) return;
