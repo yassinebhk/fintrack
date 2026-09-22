@@ -16,6 +16,7 @@ from app.models.ticker_mapping import TickerMapping
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.models.watchlist import Watchlist
+from app.models.watchlist_pin import WatchlistPin
 
 __all__ = [
     "AgentRun",
@@ -34,4 +35,5 @@ __all__ = [
     "Transaction",
     "User",
     "Watchlist",
+    "WatchlistPin",
 ]

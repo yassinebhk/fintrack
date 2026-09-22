@@ -10,15 +10,34 @@ from pydantic import BaseModel, Field
 from app.auth import get_current_user
 from app.db import session_scope
 from app.models.user import User
-from app.repositories import PositionRepository, TransactionRepository, WatchlistRepository
+from app.repositories import (
+    PositionRepository,
+    TransactionRepository,
+    WatchlistPinRepository,
+    WatchlistRepository,
+)
+from app.services.market import YahooFinanceService
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
+_yahoo = YahooFinanceService()
 
 
 class WatchIn(BaseModel):
     ticker: str = Field(min_length=1, max_length=32)
     name: str = Field(default="", max_length=128)
     note: str = Field(default="", max_length=280)
+
+
+class PinIn(BaseModel):
+    note: str | None = Field(default=None, max_length=280)
+
+
+def _pin_row(p) -> dict:
+    return {
+        "id": p.id, "ticker": p.ticker,
+        "pinned_at": p.pinned_at.isoformat(),
+        "price": p.price, "currency": p.currency, "note": p.note,
+    }
 
 
 def _setup(a: dict | None) -> str:
@@ -119,6 +138,44 @@ async def add_watchlist(payload: WatchIn, current_user: User = Depends(get_curre
 async def delete_watchlist(entry_id: int, current_user: User = Depends(get_current_user)) -> dict:
     async with session_scope() as s:
         ok = await WatchlistRepository(s, current_user.id).delete(entry_id)
+        if not ok:
+            raise HTTPException(status_code=404, detail="No encontrado")
+        return {"deleted": True}
+
+
+@router.get("/ids")
+async def list_watchlist_ids(current_user: User = Depends(get_current_user)) -> dict:
+    """Just {id, ticker} for every watchlist entry — no live analysis, so it's
+    fast enough to call on every page load to paint the ⭐ button's initial state."""
+    async with session_scope() as s:
+        entries = await WatchlistRepository(s, current_user.id).list_all()
+    return {"items": [{"id": e.id, "ticker": e.ticker} for e in entries]}
+
+
+@router.post("/{ticker}/pin", status_code=201)
+async def pin_ticker(ticker: str, payload: PinIn, current_user: User = Depends(get_current_user)) -> dict:
+    """Snapshot this ticker's price right now (captured server-side — more
+    trustworthy than whatever stale number the client last rendered), with an
+    optional note, so it can be compared against later."""
+    quote = await _yahoo.get_price(ticker.upper().strip())
+    price = quote.get("price") if quote else None
+    currency = quote.get("currency") if quote else None
+    async with session_scope() as s:
+        pin = await WatchlistPinRepository(s, current_user.id).create(ticker, price, currency, payload.note)
+        return _pin_row(pin)
+
+
+@router.get("/{ticker}/pins")
+async def list_pins(ticker: str, current_user: User = Depends(get_current_user)) -> dict:
+    async with session_scope() as s:
+        pins = await WatchlistPinRepository(s, current_user.id).list_for_ticker(ticker)
+    return {"items": [_pin_row(p) for p in pins]}
+
+
+@router.delete("/pins/{pin_id}")
+async def delete_pin(pin_id: int, current_user: User = Depends(get_current_user)) -> dict:
+    async with session_scope() as s:
+        ok = await WatchlistPinRepository(s, current_user.id).delete(pin_id)
         if not ok:
             raise HTTPException(status_code=404, detail="No encontrado")
         return {"deleted": True}
