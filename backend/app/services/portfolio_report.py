@@ -200,6 +200,22 @@ _NICE = {
 }
 
 
+def _us_market_open_now() -> bool:
+    """Rough NYSE/Nasdaq regular-hours check in local (Europe/Madrid) time — good
+    enough to decide whether a USD holding's "day change" is live or still
+    yesterday's close; doesn't need to be exact to the minute (open is 15:30 CET
+    or 16:30 CEST depending on DST, so checking against 15:00 is always safely
+    before either), and weekends have no session at all."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from app.config import get_settings
+
+    now = datetime.now(ZoneInfo(get_settings().timezone))
+    if now.weekday() >= 5:
+        return False
+    return now.hour >= 15
+
+
 def _short(pos: dict) -> str:
     t = (pos.get("ticker") or "").upper()
     nm = _NICE.get(t) or (pos.get("name") or t)
@@ -238,6 +254,19 @@ def build_summary_html(p: dict, excluded: set[str], targets: dict | None = None,
     hoy.append("─" * Wd)
     hoy.append(f"{'TOTAL':<10}{f'{daily:+.2f}€':>8}{f'{daily_pct:+.1f}%':>8}")
 
+    # Wall Street (NYSE/Nasdaq) opens at 15:30/16:30 CET depending on DST — before
+    # that, any USD-listed holding's "HOY" figure is necessarily still yesterday's
+    # already-closed session (Yahoo has no new trade to compare against), not a
+    # live number. Flag it so it isn't mistaken for what a live broker screen (e.g.
+    # Trade Republic, quoting the position on its own always-open venue) shows RIGHT
+    # NOW — the two can legitimately diverge and this isn't a bug in either.
+    us_open = _us_market_open_now()
+    if not us_open and any((x.get("currency") == "USD") for x in rows):
+        msg_note = ("\n<i>⚠️ Wall Street aún no ha abierto — el HOY de tus valores en USD "
+                     "es la sesión de ayer, no lo que veas en vivo en tu bróker.</i>")
+    else:
+        msg_note = ""
+
     # Table 2 — ACUMULADO (desde la compra): PUESTO → AHORA → P/L€ → P/L%.
     Wa = 33
     acum = [f"{'ACUMUL':<8}{'PUESTO':>6}{'AHORA':>6}{'P/L€':>7}{'P/L%':>6}", "─" * Wa]
@@ -254,6 +283,7 @@ def build_summary_html(p: dict, excluded: set[str], targets: dict | None = None,
             f"💰 P/L {pl:+.2f} {cur} ({pl_pct:+.2f}%)")
     msg = (head
            + "\n📈 <b>HOY</b> (variación del día)\n<pre>" + html_escape("\n".join(hoy)) + "</pre>"
+           + msg_note
            + "\n💰 <b>ACUMULADO</b> (desde la compra)\n<pre>" + html_escape("\n".join(acum)) + "</pre>")
 
     # Table 3 — TENDENCIA (momentum del PRECIO del activo, NO tu P/L). Aclara la
