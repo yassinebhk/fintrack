@@ -48,6 +48,36 @@ async def _current_price(ticker: str, asset_type: str) -> float | None:
     return p.get("price") if p else None
 
 
+async def _current_price_and_currency(ticker: str, asset_type: str) -> tuple[float | None, str]:
+    """Same as _current_price, but also returns the currency that price is
+    IN — crypto is always fetched pre-converted to EUR, but a stock/ETF's
+    price comes back in its own listing currency (USD for a US name), never
+    converted. Callers that receive a EUR amount from the user MUST convert
+    it to this currency before dividing by the price, or they'll silently
+    divide euros by a dollar-scale number (2026-09-22: exactly the bug that
+    corrupted TSM/MU/PLTR/SPCX/SNDK/BTEC.L/COPX.L — this fixes the source,
+    not just those positions)."""
+    if asset_type == "crypto":
+        p = await _coingecko.get_price(ticker, vs_currency="eur")
+        if p is None:
+            p = await _yahoo.get_price(f"{ticker.upper()}-EUR")
+        return (p.get("price") if p else None), "EUR"
+    p = await _yahoo.get_price(ticker)
+    if not p:
+        return None, "EUR"
+    return p.get("price"), (p.get("currency") or "EUR").upper()
+
+
+async def _eur_to_native(eur_amount: float, native_currency: str) -> float:
+    """How much of `native_currency` a euro amount is worth right now. A no-op
+    for EUR itself (avoids a pointless network call on the common case)."""
+    if native_currency == "EUR":
+        return eur_amount
+    from app.services.market.exchange_rates import ExchangeRateService
+    rate = await ExchangeRateService("EUR").get_rate("EUR", native_currency)
+    return eur_amount * rate
+
+
 @router.post("/{ticker}/contribute")
 async def contribute(
     ticker: str,
@@ -63,19 +93,25 @@ async def contribute(
     if pos is None:
         raise HTTPException(status_code=404, detail=f"Position {ticker} @ {payload.broker} not found")
 
-    price = await _current_price(ticker, pos.type)
+    price, native_ccy = await _current_price_and_currency(ticker, pos.type)
     if not price or price <= 0:
         raise HTTPException(status_code=502, detail=f"No se pudo obtener el precio actual de {ticker}")
 
-    shares_added = payload.eur_amount / price
+    # The user always types a euro amount; the price above is in the asset's
+    # OWN currency (e.g. USD for a US stock) — convert before dividing, or
+    # shares/avg_price come out silently wrong (euros treated as dollars).
+    native_amount = await _eur_to_native(payload.eur_amount, native_ccy)
+    shares_added = native_amount / price
     old_qty = pos.quantity
     old_cost = old_qty * pos.avg_price
     new_qty = old_qty + shares_added
-    # New average price weights the prior cost with the freshly contributed euros
-    new_avg = (old_cost + payload.eur_amount) / new_qty if new_qty > 0 else price
+    # New average price weights the prior cost with the freshly contributed amount
+    # (both in native_ccy — pos.avg_price already is, post-2026-09-22 currency fix)
+    new_avg = (old_cost + native_amount) / new_qty if new_qty > 0 else price
 
     pos.quantity = new_qty
     pos.avg_price = new_avg
+    pos.currency = native_ccy
     await session.flush()
 
     # Record the contribution as a buy transaction for the audit trail
@@ -85,7 +121,7 @@ async def contribute(
             ticker=ticker,
             quantity=shares_added,
             price=price,
-            currency=pos.currency,
+            currency=native_ccy,
             broker=payload.broker,
             executed_at=datetime.now(timezone.utc),
             notes=f"Aportación de {payload.eur_amount:.2f} € ({shares_added:.6f} part. @ {price:.4f})",
@@ -228,31 +264,37 @@ async def register_movement(
                 )
 
         asset_type = asset_type or "stock"
-        price = await _current_price(ticker, asset_type)
+        price, native_ccy = await _current_price_and_currency(ticker, asset_type)
         if not price or price <= 0:
             raise HTTPException(
                 status_code=502,
                 detail=f"No encontré un precio de mercado fiable para {ticker}. "
                        f"Revisa el ISIN/ticker o el tipo de activo.",
             )
-        shares_added = payload.eur_amount / price
+        # The user always types a euro amount; price above is in the asset's OWN
+        # currency (USD for a US stock) — convert before dividing, or shares end
+        # up silently wrong (2026-09-22: this is the bug that corrupted SNDK
+        # both times it was contributed to through this endpoint).
+        native_amount = await _eur_to_native(payload.eur_amount, native_ccy)
+        shares_added = native_amount / price
 
         if existing:
             old_cost = existing.quantity * existing.avg_price
             existing.quantity += shares_added
-            existing.avg_price = (old_cost + payload.eur_amount) / existing.quantity
+            existing.avg_price = (old_cost + native_amount) / existing.quantity
+            existing.currency = native_ccy
             new_qty = existing.quantity
         else:
             await repo.upsert(
                 ticker=ticker, quantity=shares_added, avg_price=price,
-                type=asset_type, currency="EUR", broker=payload.broker,
+                type=asset_type, currency=native_ccy, broker=payload.broker,
                 isin=isin, asset_name=asset_name, source="manual_movement",
             )
             new_qty = shares_added
 
         await tx_repo.add(
             type="buy", ticker=ticker, quantity=shares_added, price=price,
-            currency="EUR", broker=payload.broker, executed_at=executed,
+            currency=native_ccy, broker=payload.broker, executed_at=executed,
             notes=f"Aportación {payload.eur_amount:.2f}€" + ("" if existing else " (nueva posición)"),
         )
         await session.flush()
@@ -266,17 +308,18 @@ async def register_movement(
     elif action == "retirar":
         if not existing:
             raise HTTPException(status_code=404, detail=f"No tienes {ticker} en {payload.broker} para retirar")
-        price = await _current_price(ticker, existing.type)
+        price, native_ccy = await _current_price_and_currency(ticker, existing.type)
         if not price or price <= 0:
             raise HTTPException(status_code=502, detail=f"No encontré precio para {ticker}")
-        shares_removed = min(existing.quantity, payload.eur_amount / price)
+        native_amount = await _eur_to_native(payload.eur_amount, native_ccy)
+        shares_removed = min(existing.quantity, native_amount / price)
         existing.quantity -= shares_removed
         closed = existing.quantity <= 1e-9
         if closed:
             await repo.delete(ticker, payload.broker)
         await tx_repo.add(
             type="sell", ticker=ticker, quantity=shares_removed, price=price,
-            currency="EUR", broker=payload.broker, executed_at=executed,
+            currency=native_ccy, broker=payload.broker, executed_at=executed,
             notes=f"Retirada {payload.eur_amount:.2f}€" + (" (posición cerrada)" if closed else ""),
         )
         await session.flush()
