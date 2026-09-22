@@ -993,6 +993,20 @@ body::before {
     color: #B5822E;
 }
 
+/* Flags a position priced in a foreign (non-EUR) currency right next to its
+   ticker — the source of the "why don't my numbers match my broker" confusion
+   when it's missing (2026-09-22). */
+.currency-badge {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.62rem;
+    padding: 1px 5px;
+    border-radius: 4px;
+    letter-spacing: 0.03em;
+    background: #FBE9E7;
+    color: #B5482E;
+}
+
 .type-badge.bond,
 .type-badge.commodity {
     background: var(--positive-bg);

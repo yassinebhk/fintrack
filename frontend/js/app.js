@@ -472,15 +472,15 @@ function updatePositionsTable(positions) {
                     <div class="ticker-icon">${icon}</div>
                     <div class="ticker-info">
                         <span class="ticker-symbol">${assetName}</span>
-                        <span class="ticker-name">${pos.ticker}</span>
+                        <span class="ticker-name">${pos.ticker}${pos.currency && pos.currency !== 'EUR' ? ` <span class="currency-badge" title="Cotiza en ${pos.currency}, no en euros">${pos.currency}</span>` : ''}</span>
                     </div>
                 </div>
             </td>
             <td><span class="type-badge ${pos.type}">${typeName}</span></td>
             <td><span class="broker-name">${pos.broker}</span></td>
             <td class="text-right mono">${formatNumber(pos.quantity, pos.type === 'crypto' ? 6 : 2)}</td>
-            <td class="text-right mono">${formatNumber(pos.avg_price)}</td>
-            <td class="text-right mono">${formatNumber(pos.current_price)}</td>
+            <td class="text-right mono">${formatCurrency(pos.avg_price, pos.currency)}</td>
+            <td class="text-right mono">${formatCurrency(pos.current_price, pos.currency)}</td>
             <td class="text-right" data-spark-ticker="${pos.ticker}" data-spark-broker="${pos.broker}"></td>
             <td class="text-right mono">${formatCurrency(pos.market_value, pos.currency)}</td>
             <td class="text-right mono ${pos.gain_loss >= 0 ? 'value-positive' : 'value-negative'}">
