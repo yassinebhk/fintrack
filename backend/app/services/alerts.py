@@ -1,5 +1,6 @@
 """Rules engine — evaluates portfolio + news and emits Alert rows + Telegram pushes."""
 
+import re
 from datetime import datetime, timedelta, timezone
 
 from loguru import logger
@@ -25,6 +26,19 @@ CRYPTO_MOVE_CRIT_PCT = 15.0
 
 DRAWDOWN_THRESHOLD_PCT = -15.0
 DEDUPE_WINDOW_HOURS = 24
+
+# Search theme for thematic/sector ETFs whose own ticker never appears in news
+# (nobody publishes headlines about "USPY.DE") — 2026-09-22, added after a
+# Zscaler guidance miss dragged the whole cyber sector down and this engine
+# had zero coverage for USPY.DE holders. Tried per-constituent-company search
+# first (top holdings individually) — it mostly surfaced stale/generic stories
+# (insider-sale filings, week-old rallies), not the actual event. A SECTOR-level
+# query ("cybersecurity stocks fall today") reliably found the real, same-day
+# story instead, so that's the approach here: one search per held sector ETF,
+# not one per constituent.
+SECTOR_ETF_THEME: dict[str, str] = {
+    "USPY.DE": "cybersecurity stocks",
+}
 
 # Public app URL for deep-links in push alerts. The frontend hash router honors
 # #asset/<ticker> (opens that asset's detail) and #<page> (e.g. #news).
@@ -206,6 +220,68 @@ class AlertsEngine:
                              "urls": [it.get("url") for it in top]},
                     dedupe_key=f"news_bearish:{ticker}:{today_str}",  # max 1/asset/day
                     link=_asset_link(ticker),
+                    link_text="Ver el activo en detalle",
+                )
+            )
+
+        # Rule 4b: sector-ETF proxy. A held ETF's own ticker never appears in
+        # news (nobody publishes headlines about "USPY.DE"), and the generic
+        # macro news feed (Rule 4, above) only tags big index/commodity moves,
+        # never a single mid-cap company's earnings/guidance — so neither one
+        # would have caught e.g. Zscaler's 2026-09-22 guidance miss dragging
+        # the whole cyber sector down. One search per held sector ETF, themed
+        # ("cybersecurity stocks fall today") rather than per constituent
+        # company — tested both: per-company search mostly surfaced stale/
+        # generic stories (insider-sale filings, week-old rallies) and missed
+        # the actual event, while the sector-level query reliably found the
+        # real, same-day story.
+        #
+        # A headline only counts as a hit if it states an explicit % move
+        # ("Moved Down by 3.32%") — tried a bearish-keyword list first and real
+        # headlines phrase a decline too indirectly ("narrow leadership",
+        # "investors have deserted") for a fixed word list to catch reliably
+        # OR to rule out false positives; an explicit number is unambiguous.
+        # Requires >=2 DIFFERENT companies (by user's choice, 2026-09-22) —
+        # one name's move might be company-specific, several at once reads as
+        # a real sector day. NOTE: tested against the actual 2026-09-22 cyber
+        # selloff and this free search only surfaced ONE such headline that
+        # day (Cisco) even though ~6 sector names were down — the >=2 bar is a
+        # deliberate noise/signal tradeoff, not a guarantee every real
+        # sector-wide move gets caught.
+        _PCT_DOWN_RE = re.compile(
+            r"\b(down|falls?|drops?|declin\w*|sinks?|tumbles?|slides?|slumps?|plunges?)\b.{0,25}?"
+            r"(\d{1,2}(?:\.\d+)?)\s*%|(\d{1,2}(?:\.\d+)?)\s*%.{0,25}?"
+            r"\b(down|falls?|drops?|declin\w*|sinks?|tumbles?|slides?|slumps?|plunges?)\b",
+            re.IGNORECASE,
+        )
+        from app.services import websearch as ws
+        for etf_ticker, theme in SECTOR_ETF_THEME.items():
+            if etf_ticker not in held_tickers or etf_ticker in excluded:
+                continue
+            try:
+                results = await ws.search(f"{theme} fall today", max_results=8, days=1)
+            except Exception as exc:
+                logger.warning("sector news search failed for {}: {}", etf_ticker, exc)
+                continue
+            hits = [r for r in results if _PCT_DOWN_RE.search(r.get("title") or "")]
+            if len(hits) < 2:
+                continue
+            top = hits[:4]
+            lines = [f"• {h.get('title', '')}" + (f"\n  {h.get('url')}" if h.get("url") else "") for h in top]
+            label = _friendly_label(etf_ticker, self._name_by_tk)
+            body = (
+                f"{len(hits)} titulares de hoy con caídas concretas en el sector que compone "
+                f"{label}:\n\n" + "\n".join(lines)
+            )
+            created.append(
+                await self._maybe_create(
+                    kind="news_bearish_sector",
+                    severity="warning",
+                    title=f"📰 Movimiento bajista en el sector de {label}",
+                    body=body,
+                    payload={"ticker": etf_ticker, "urls": [h.get("url") for h in top]},
+                    dedupe_key=f"news_bearish_sector:{etf_ticker}:{today_str}",
+                    link=_asset_link(etf_ticker),
                     link_text="Ver el activo en detalle",
                 )
             )
