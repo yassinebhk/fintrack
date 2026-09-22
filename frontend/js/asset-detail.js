@@ -377,6 +377,10 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
         // fall back to ONE marker at the position's creation date, using a
         // distinct shape/color and explicit "≈ aprox." wording so it's never
         // mistaken for a real logged trade.
+        // No individual trade recorded — fall back to ONE small marker at the
+        // position's creation date. We DON'T put the qty/price on the marker (a
+        // long label overlaps the chart, terrible); it goes in a clean note below.
+        let syntheticNote = '';
         if (!markers.length) {
             try {
                 const posResp = await assetDetailFetch(`${ASSET_DETAIL_API}/portfolio`);
@@ -389,40 +393,38 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates) {
                             position: 'belowBar',
                             color: '#9C9689',
                             shape: 'circle',
-                            text: `≈ ${fmtQty(pos.quantity)} @ ${fmtPrice(pos.avg_price, pos.currency)} (posición reconstruida, no tu fecha real de compra)`,
                         }];
+                        syntheticNote = `⚪ Posición reconstruida: ≈${fmtQty(pos.quantity)} @ ${fmtPrice(pos.avg_price, pos.currency)} — no es tu fecha real de compra.`;
                     }
                 }
             } catch (e) { /* keep no markers rather than fail the whole chart */ }
         }
 
         // With many trades the per-marker text labels pile up, overlapping each
-        // other, the crosshair legend and the caption/buttons below. Past a small
-        // count, keep only the arrows (you still see WHERE you bought/sold) — the
-        // exact qty/price of each is in the "Tus aportaciones" table below.
+        // other, the crosshair legend and the caption below. Past a small count,
+        // keep only the arrows — the exact qty/price of each is in the "Tus
+        // aportaciones" table below.
         const MAX_LABELS = 6;
         const showLabels = markers.length <= MAX_LABELS;
         if (!showLabels) markers = markers.map(m => ({ ...m, text: undefined }));
 
         markers.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
         if (markers.length) series.setMarkers(markers);
-        _setTradeMarkerNote(showLabels ? 0 : markers.length);
+        _setTradeMarkerNote(syntheticNote
+            ? syntheticNote
+            : (showLabels ? '' : `ℹ️ ${markers.length} operaciones en este activo: se muestran solo las flechas para no saturar el gráfico. El detalle está en la tabla «Tus aportaciones» de abajo.`));
     } catch (err) {
         console.error('asset detail trade markers failed:', err);
     }
 }
 
-// Toggle the "many trades → arrows only" hint shown under the market chart.
-function _setTradeMarkerNote(count) {
+// Show a small hint under the market chart (many-trades notice, or reconstructed-
+// position detail). Pass '' to hide it.
+function _setTradeMarkerNote(msg) {
     const note = document.getElementById('assetDetailMarkerNote');
     if (!note) return;
-    if (count) {
-        note.textContent = `ℹ️ ${count} operaciones en este activo: se muestran solo las flechas para no saturar el gráfico. El detalle (cantidad y precio de cada una) está en la tabla «Tus aportaciones» de abajo.`;
-        note.style.display = '';
-    } else {
-        note.textContent = '';
-        note.style.display = 'none';
-    }
+    if (msg) { note.textContent = msg; note.style.display = ''; }
+    else { note.textContent = ''; note.style.display = 'none'; }
 }
 
 function loadAssetDetailMarketChart(ticker) {
@@ -442,7 +444,7 @@ function loadAssetDetailMarketChart(ticker) {
 // [period, short label, tooltip]. "Hoy" = today's live session (5-min candles);
 // the others are trailing windows ending today.
 const PRICE_CHART_PERIODS = [
-    ['1d', 'Hoy', 'Sesión de hoy (velas de 5 min, casi en tiempo real)'],
+    ['1d', '1D', 'Última sesión de bolsa, intradía (velas de 5 min). Es hoy si el mercado está abierto; si aún no ha abierto, la última jornada hábil.'],
     ['5d', '1S', 'Última semana (5 días de cotización)'],
     ['1mo', '1M', 'Último mes'],
     ['3mo', '3M', 'Últimos 3 meses'],
@@ -567,7 +569,7 @@ function mountPriceChart(container, ticker, opts = {}) {
             // Trade markers only make sense on the asset-detail chart, and only for
             // daily bars (a buy date snaps to a daily bar, not an intraday candle).
             if (withMarkers && !useTime) loadAssetDetailTradeMarkers(ticker, series, history.map(h => h.date));
-            else if (withMarkers) _setTradeMarkerNote(0);
+            else if (withMarkers) _setTradeMarkerNote('');
             if (!resizeHandler) {
                 resizeHandler = () => { if (chart) chart.applyOptions({ width: canvasEl.clientWidth }); };
                 window.addEventListener('resize', resizeHandler);

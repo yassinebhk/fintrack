@@ -584,6 +584,7 @@ function updateTopMovers(positions) {
 // second click on any day reuses them instead of re-fetching.
 let _dashDailySummaries = null;
 let _dashTxAll = null;
+let _dashPortfolioHistory = [];   // set by createPortfolioChart, used by the day-detail popup
 
 async function _ensureDayDetailData() {
     if (!_dashDailySummaries) {
@@ -641,7 +642,35 @@ async function showDayDetail(dateStr, chartValue) {
             html += `<p class="text-muted" style="font-size:11.5px; margin:0 0 12px;">Sin desglose de posiciones archivado para este día — se archiva de ahora en adelante (mismo criterio que en Resumen diario).</p>`;
         }
     } else {
-        html += `<p class="text-muted" style="font-size:12px; margin-bottom:12px;">Sin snapshot detallado guardado para este día. Valor leído del gráfico: <strong>${fmtEur(chartValue)}</strong>.</p>`;
+        // No archived per-position snapshot for this day — still show something
+        // useful (value + change vs the previous point + change since the start of
+        // the loaded history), computed from the chart's own series, instead of a
+        // bare "no snapshot" message that reads like "no history".
+        const hist = _dashPortfolioHistory || [];
+        const idx = hist.findIndex(h => (h.date || '').slice(0, 10) === dateStr);
+        const val = idx >= 0 ? hist[idx].value : chartValue;
+        const prev = idx > 0 ? hist[idx - 1].value : null;
+        const first = hist.length ? hist[0].value : null;
+        const dchg = (prev != null && prev) ? val - prev : null;
+        const dpct = (prev != null && prev) ? (val / prev - 1) * 100 : null;
+        const tchg = (first != null && first) ? val - first : null;
+        const tpct = (first != null && first) ? (val / first - 1) * 100 : null;
+        const pctStr = (p) => (p == null ? '' : ` <span style="font-size:12px;">(${p >= 0 ? '+' : ''}${p.toFixed(2)}%)</span>`);
+        html += `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+            <div style="background:rgba(43,40,34,0.03); border-radius:8px; padding:10px 12px; flex:1; min-width:130px;">
+                <div style="font-size:11px; color:var(--text-secondary);">Valor cartera</div>
+                <div style="font-size:18px; font-weight:700;">${fmtEur(val)}</div>
+            </div>
+            <div style="background:rgba(43,40,34,0.03); border-radius:8px; padding:10px 12px; flex:1; min-width:130px;">
+                <div style="font-size:11px; color:var(--text-secondary);">Cambio vs. punto anterior</div>
+                <div style="font-size:18px; font-weight:700;" class="${cls(dchg)}">${fmtSigned(dchg)}${pctStr(dpct)}</div>
+            </div>
+            <div style="background:rgba(43,40,34,0.03); border-radius:8px; padding:10px 12px; flex:1; min-width:130px;">
+                <div style="font-size:11px; color:var(--text-secondary);">Desde el inicio del rango</div>
+                <div style="font-size:18px; font-weight:700;" class="${cls(tchg)}">${fmtSigned(tchg)}${pctStr(tpct)}</div>
+            </div>
+        </div>
+        <p class="text-muted" style="font-size:11.5px; margin:0 0 12px;">El desglose por posición de este día se archiva de ahora en adelante (aparecerá aquí en los próximos días); el de hoy sí lo tienes en <strong>Resumen diario</strong>.</p>`;
     }
 
     const typeLabel = { buy: '🟢 Compra', sell: '🔴 Venta', dividend: '💰 Dividendo', deposit: '⬆️ Ingreso', withdrawal: '⬇️ Retirada', fee: '💸 Comisión' };
@@ -697,6 +726,7 @@ async function showLiveSummary() {
 function createPortfolioChart(history) {
     const ctx = document.getElementById('portfolioChart');
     if (!ctx) return;
+    _dashPortfolioHistory = Array.isArray(history) ? history : [];
     
     if (charts.portfolio && typeof charts.portfolio.destroy === 'function') {
         charts.portfolio.destroy();
