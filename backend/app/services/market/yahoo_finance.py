@@ -496,8 +496,24 @@ class YahooFinanceService:
             state = info.get("marketState")
             if state not in ("PRE", "POST", "POSTPOST"):
                 return None
-            price = info.get("preMarketPrice") if state == "PRE" else info.get("postMarketPrice")
-            prev = info.get("regularMarketPrice")
+            regular = info.get("regularMarketPrice")
+            regular_prev = info.get("regularMarketPreviousClose")
+            if state == "PRE":
+                price = info.get("preMarketPrice")
+                # No same-broker-comparable "today" reference exists yet (the
+                # regular session hasn't opened) — pin previous_close to price
+                # itself so day_change comes out at 0, not a number that only
+                # matches Yahoo's own composite. See
+                # PortfolioService._boost_extended_hours for the full reason.
+                prev = price
+            else:
+                # POST/POSTPOST: the regular session already closed, so a real,
+                # broker-comparable "today's change" exists — use it. Falls
+                # back to the regular close itself if no after-hours print
+                # exists yet (thin post-market volume), same live-price intent
+                # as the PRE branch.
+                price = info.get("postMarketPrice") or regular
+                prev = regular_prev
             if not price or not prev:
                 return None
             return {

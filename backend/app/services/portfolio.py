@@ -125,15 +125,20 @@ class PortfolioService:
         with no exchange suffix (a plain "TSM"/"MU", never "VVSM.DE"/"BTEC.L")
         — non-US listings have no pre/post session to fetch.
 
-        Deliberately does NOT report a "today" change while pre/post-market:
-        previous_close is set equal to the live price, so day_change/
-        day_change_pct come out at exactly 0 downstream. There's no single
-        broker-agnostic reference for "today's move" before NYSE actually
-        opens — European brokers (TR/Revolut/...) price US stocks through
-        their own market maker on a different schedule/venue, so a % here
-        computed against NYSE's last regular close doesn't match what any
-        specific broker shows and reads as a false gain/loss (confirmed with
-        Yassine 2026-09-23: showed -7€ on TSM his own broker didn't show).
+        Reports a "today" change ONLY once there's a real, broker-comparable
+        reference for it — get_extended_quote() itself decides that: during
+        PRE it pins previous_close to the live price (day_change comes out at
+        0 — there's no single broker-agnostic reference for "today's move"
+        before NYSE actually opens; European brokers price US stocks through
+        their own market maker on a different schedule/venue, so a % against
+        NYSE's last regular close doesn't match what any specific broker
+        shows and reads as a false gain/loss — confirmed with Yassine
+        2026-09-23: showed -7€ on TSM his own broker didn't show). During
+        POST/POSTPOST the regular session has actually closed, so its real
+        close-to-close change IS valid and gets reported (bug found the same
+        day: this used to zero it out here too, silently hiding a real -35€
+        day from the portfolio total after close — fixed by trusting
+        get_extended_quote()'s own previous_close instead of overriding it).
         Once market_state flips to REGULAR the base Yahoo price/previous_close
         (an actual same-session NYSE comparison) is used untouched."""
         candidates = [t for t in tickers if t in prices and "." not in t]
@@ -145,9 +150,9 @@ class PortfolioService:
                 continue
             entry = prices[ticker]
             entry["price"] = quote["price"]
-            entry["previous_close"] = quote["price"]
-            entry["change"] = 0.0
-            entry["change_percent"] = 0.0
+            entry["previous_close"] = quote["previous_close"]
+            entry["change"] = quote["change"]
+            entry["change_percent"] = quote["change_percent"]
             entry["market_state"] = quote["market_state"]
 
     async def _crypto_price_yahoo(self, ticker: str) -> dict | None:
