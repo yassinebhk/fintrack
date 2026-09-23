@@ -48,6 +48,8 @@ class PortfolioService:
         self.base_currency = (base_currency or settings.base_currency).upper()
         self.yahoo = YahooFinanceService()
         self.coingecko = CoinGeckoService()
+        from app.services.market.finnhub import FinnhubClient
+        self.finnhub = FinnhubClient()
         self.fx = ExchangeRateService(self.base_currency)
         self._prices_cache: dict[str, dict] = {}
 
@@ -85,6 +87,7 @@ class PortfolioService:
 
         if stocks_etfs:
             prices.update(await self.yahoo.get_prices(stocks_etfs))
+            await self._boost_with_finnhub(stocks_etfs, prices)
         if cryptos:
             # Yahoo first, concurrently: no rate limit, and CoinGecko's free tier
             # 429s hard enough that get_prices()'s batch retry-sleep (up to 60s
@@ -102,6 +105,30 @@ class PortfolioService:
 
         self._prices_cache = prices
         return prices
+
+    async def _boost_with_finnhub(self, tickers: list[str], prices: dict[str, dict]) -> None:
+        """Overrides Yahoo's price/change for US-exchange-listed tickers with
+        Finnhub's live quote (free tier — real-time, including pre-market and
+        after-hours, not just the 15:30-22:00 CEST regular session). Closes the
+        "stale until Wall Street opens" gap: outside regular hours Yahoo just
+        keeps repeating the last close, Finnhub reflects the actual pre/post-
+        market trade. Only tried for tickers with no exchange suffix (a plain
+        "TSM"/"MU", never "VVSM.DE"/"BTEC.L") — those are foreign listings the
+        free tier 403s on anyway, so this skips the wasted call rather than
+        discovering the 403 every time. Yahoo's price/name/currency stand
+        unchanged for anything Finnhub doesn't cover or has no fresher data for."""
+        candidates = [t for t in tickers if t in prices and "." not in t]
+        if not candidates:
+            return
+        results = await asyncio.gather(*(self.finnhub.get_quote(t) for t in candidates))
+        for ticker, quote in zip(candidates, results):
+            if not quote:
+                continue
+            entry = prices[ticker]
+            entry["price"] = quote["price"]
+            entry["previous_close"] = quote["previous_close"]
+            entry["change"] = quote["change"]
+            entry["change_percent"] = quote["change_percent"]
 
     async def _crypto_price_yahoo(self, ticker: str) -> dict | None:
         """Yahoo fallback for a crypto price in EUR. Tries -EUR, then -USD converted to EUR."""
