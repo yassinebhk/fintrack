@@ -912,6 +912,81 @@ function closeChartModal() {
 window.openChartModal = openChartModal;
 window.closeChartModal = closeChartModal;
 
+// ===== Beneficio/Pérdida en el tiempo (dashboard) =====
+// Uses the same daily snapshots as the value chart, but plots value-vs-invested
+// and cumulative P/L (€ and %). Toggle between the three views.
+let _pnlView = 'value';
+let _pnlData = null;
+
+async function loadPnlChart() {
+    try {
+        const r = await fetch(`${CONFIG.API_BASE_URL}/portfolio/daily-summaries?days=365`, { cache: 'no-store' });
+        const d = r.ok ? await r.json() : { summaries: [] };
+        // daily-summaries comes newest-first; the chart needs oldest-first.
+        _pnlData = (d.summaries || []).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+        renderPnlChart();
+    } catch (e) { /* leave the card empty rather than break the dashboard */ }
+}
+
+function setPnlView(view) {
+    _pnlView = view;
+    document.querySelectorAll('.pnl-view-btn').forEach(b => b.classList.toggle('active', b.dataset.pnlview === view));
+    renderPnlChart();
+}
+
+function renderPnlChart() {
+    const ctx = document.getElementById('pnlChart');
+    if (!ctx || !_pnlData || !_pnlData.length) return;
+    if (charts.pnl && typeof charts.pnl.destroy === 'function') charts.pnl.destroy();
+
+    const labels = _pnlData.map(s => s.date);
+    let datasets, yFmt, isPct = false, showLegend = false;
+
+    if (_pnlView === 'value') {
+        showLegend = true;
+        datasets = [
+            { label: 'Valor', data: _pnlData.map(s => s.total_value), borderColor: '#2C4A6E', backgroundColor: 'rgba(44, 74, 110, 0.12)', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+            { label: 'Aportado', data: _pnlData.map(s => s.total_cost), borderColor: '#746E63', backgroundColor: 'transparent', borderDash: [5, 4], fill: false, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+        ];
+        yFmt = (v) => formatCurrency(v, 'EUR');
+    } else {
+        isPct = _pnlView === 'pnlpct';
+        const vals = _pnlData.map(s => isPct ? s.total_gain_loss_pct : s.total_gain_loss);
+        const up = (vals[vals.length - 1] || 0) >= 0;
+        datasets = [{
+            label: isPct ? 'P/L %' : 'P/L €', data: vals,
+            borderColor: up ? '#4A9B8E' : '#C6473C',
+            backgroundColor: up ? 'rgba(74, 155, 142, 0.15)' : 'rgba(198, 71, 60, 0.15)',
+            fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
+        }];
+        yFmt = isPct ? (v) => (+v).toFixed(1) + '%' : (v) => formatCurrency(v, 'EUR');
+    }
+
+    charts.pnl = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: showLegend, labels: { color: '#746E63', boxWidth: 12 } },
+                tooltip: {
+                    backgroundColor: '#EFEBE3', titleColor: '#746E63', bodyColor: '#2B2822',
+                    borderColor: '#D8D0C0', borderWidth: 1, padding: 12,
+                    callbacks: {
+                        title: (c) => formatDate(c[0].label),
+                        label: (c) => `${c.dataset.label}: ${isPct ? (c.raw >= 0 ? '+' : '') + (+c.raw).toFixed(2) + '%' : formatCurrency(c.raw, 'EUR')}`,
+                    },
+                },
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#9C9689', maxTicksLimit: 8, callback: function (v) { return new Date(this.getLabelForValue(v)).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }); } } },
+                y: { grid: { color: '#EFEBE3' }, ticks: { color: '#9C9689', callback: yFmt } },
+            },
+        },
+    });
+}
+
 function createDoughnutChart(canvasId, data, legendId) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
@@ -1243,6 +1318,7 @@ async function loadDashboard() {
         if (historyData.history && historyData.history.length > 0) {
             createPortfolioChart(historyData.history);
         }
+        loadPnlChart();  // Beneficio/Pérdida en el tiempo (own fetch of daily snapshots)
         
         updateStatus(true);
         loadTaxSummaryTiles(); // fire-and-forget: FIFO reconstruction, don't block the rest of the dashboard

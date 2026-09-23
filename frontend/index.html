@@ -274,6 +274,21 @@
                                 <button class="btn-secondary" style="padding:4px 10px; font-size:12px;" onclick="showLiveSummary()" title="El mismo resumen que se envía a Telegram, calculado ahora mismo">🔴 Ver resumen en tiempo real</button>
                             </div>
                         </div>
+
+                        <div class="card card-chart">
+                            <div class="card-header">
+                                <h3>Beneficio / Pérdida en el tiempo</h3>
+                                <div class="chart-controls">
+                                    <button class="chart-btn pnl-view-btn active" data-pnlview="value" onclick="setPnlView('value')" title="Valor de tu cartera frente al dinero que has aportado">Valor vs Aportado</button>
+                                    <button class="chart-btn pnl-view-btn" data-pnlview="pnl" onclick="setPnlView('pnl')" title="Beneficio o pérdida acumulado en euros">P/L €</button>
+                                    <button class="chart-btn pnl-view-btn" data-pnlview="pnlpct" onclick="setPnlView('pnlpct')" title="Beneficio o pérdida acumulado en porcentaje">P/L %</button>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="pnlChart"></canvas>
+                            </div>
+                            <p class="text-muted" style="font-size:11px; margin:4px 0 0;">💡 «Valor vs Aportado»: la línea sólida es lo que vale tu cartera hoy; la discontinua, el dinero que has metido — la distancia entre ellas es tu beneficio. Cambia la vista arriba para verlo en € o %.</p>
+                        </div>
                     </section>
 
                     <!-- Day Detail Modal -->
@@ -2116,7 +2131,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="js/info-glossary.js?v=20260921dividendos"></script>
-    <script src="js/app.js?v=20260923measfix"></script>
+    <script src="js/app.js?v=20260923pnl"></script>
     <script src="js/ticker.js?v=20260912a"></script>
     <script src="js/calculators.js?v=20260921fire"></script>
     <script src="js/news.js?v=20260921tally"></script>
