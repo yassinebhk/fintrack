@@ -472,6 +472,48 @@ class YahooFinanceService:
         results = await asyncio.gather(*(self.get_price(t) for t in tickers))
         return {t: r for t, r in zip(tickers, results) if r}
 
+    async def get_extended_quote(self, ticker: str) -> dict | None:
+        """Live pre-market / after-hours quote via yfinance's `.info` (which
+        Yahoo populates with `marketState` + `preMarketPrice`/`postMarketPrice`
+        for US-exchange tickers — fields the fast chart API in `_fetch_api`
+        doesn't carry). Verified live 2026-09-23: preMarketTime tracked the
+        wall clock to within seconds. Returns None whenever there's nothing to
+        add — regular session (the chart API price is already right), fully
+        closed (no fresher print exists), or a non-US listing (no pre/post
+        session at all, e.g. .DE/.L/.SG — those correctly hold their last
+        regular-session close outside exchange hours; that's not stale data,
+        it's the market being shut)."""
+        key = f"ext:{ticker.upper()}"
+        if self._fresh(key):
+            return self._cache.get(key)
+
+        def _work() -> dict | None:
+            try:
+                info = yf.Ticker(ticker).info
+            except Exception as exc:
+                logger.debug("extended quote for {} failed: {}", ticker, exc)
+                return None
+            state = info.get("marketState")
+            if state not in ("PRE", "POST", "POSTPOST"):
+                return None
+            price = info.get("preMarketPrice") if state == "PRE" else info.get("postMarketPrice")
+            prev = info.get("regularMarketPrice")
+            if not price or not prev:
+                return None
+            return {
+                "price": float(price),
+                "previous_close": float(prev),
+                "change": float(price) - float(prev),
+                "change_percent": (float(price) - float(prev)) / float(prev) * 100,
+                "market_state": state,
+            }
+
+        loop = asyncio.get_event_loop()
+        res = await loop.run_in_executor(self._executor, _work)
+        self._cache[key] = res
+        self._expiry[key] = datetime.now() + timedelta(minutes=3)
+        return res
+
     async def _fetch_history_api(self, ticker: str, period: str = "1y") -> list[dict] | None:
         mapped = await self._resolve_ticker(ticker)
         url = f"{self.BASE_URL}/v8/finance/chart/{mapped}"
