@@ -353,7 +353,13 @@ async def import_pdf(
         # Deterministic path: a Revolut trading statement is parsed without the
         # LLM (no Gemini quota / 429), writing the full trade history AND the
         # rebuilt positions so per-asset history + 'aportaciones' get populated.
+        # The "Trade - Market/Limit/Stop" markers this checks for are unique to
+        # Revolut's fixed export format, so this content-based detection is more
+        # trustworthy than whatever the user picked in the broker dropdown —
+        # override it rather than mislabeling real Revolut data under a
+        # different broker (seen in production: a user selected "MyInvestor").
         if looks_like_revolut(text):
+            broker = "Revolut"
             txs, meta = parse_statement_transactions(text, broker)
             if txs:
                 added, rows = await _import_transactions(
