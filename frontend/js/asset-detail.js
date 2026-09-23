@@ -388,6 +388,7 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates, chart, 
                     position: isBuy ? 'belowBar' : 'aboveBar',
                     color: isBuy ? '#4A9B8E' : '#C6473C',
                     shape: isBuy ? 'arrowUp' : 'arrowDown',
+                    size: 2,  // bigger, broker-style markers (default 1 was too small)
                 };
             })
             .filter(Boolean);
@@ -403,7 +404,7 @@ async function loadAssetDetailTradeMarkers(ticker, series, historyDates, chart, 
                     const pos = portfolio.positions?.find(p => p.ticker === ticker);
                     if (pos && pos.created_at && pos.quantity > 0) {
                         const time = snapToChart(pos.created_at.slice(0, 10));
-                        markers = [{ time, position: 'belowBar', color: '#9C9689', shape: 'circle' }];
+                        markers = [{ time, position: 'belowBar', color: '#9C9689', shape: 'circle', size: 2 }];
                         addInfo(time, {
                             kind: 'recon',
                             qty: '≈' + fmtQty(pos.quantity),
