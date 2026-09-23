@@ -87,33 +87,55 @@ class PortfolioService:
             prices.update(await self.yahoo.get_prices(stocks_etfs))
             await self._boost_extended_hours(stocks_etfs, prices)
         if cryptos:
-            # Yahoo first, concurrently: no rate limit, and CoinGecko's free tier
-            # 429s hard enough that get_prices()'s batch retry-sleep (up to 60s
-            # across 3 attempts) was blocking the ENTIRE portfolio load behind it.
-            # CoinGecko stays only as a fallback for whatever Yahoo has no market for.
-            yahoo_results = await asyncio.gather(*(self._crypto_price_yahoo(t) for t in cryptos))
-            yahoo_prices = {t: yp for t, yp in zip(cryptos, yahoo_results) if yp}
-            prices.update(yahoo_prices)
-            missing = [c for c in cryptos if c not in yahoo_prices]
-            if missing:
-                crypto_prices = await self.coingecko.get_prices(missing, vs_currency=self.base_currency.lower())
-                prices.update(crypto_prices)
-                for ticker, price in crypto_prices.items():
-                    logger.info("crypto {} price via CoinGecko fallback: {}", ticker, price["price"])
+            # Kraken's own public ticker first: it's the exchange these are
+            # actually held on, so its price is exactly what the user's Kraken
+            # balance is worth — no "which composite is right" ambiguity like
+            # with Yahoo/CoinGecko. Only covers the small set of pairs Kraken
+            # lists in EUR; anything else falls through to the existing chain.
+            kraken_prices: dict[str, dict] = {}
+            if self.base_currency == "EUR":
+                from app.services.brokers.kraken import get_public_prices
+                kraken_prices = await get_public_prices(cryptos)
+                prices.update(kraken_prices)
+            remaining = [c for c in cryptos if c not in kraken_prices]
+            if remaining:
+                # Yahoo next, concurrently: no rate limit, and CoinGecko's free tier
+                # 429s hard enough that get_prices()'s batch retry-sleep (up to 60s
+                # across 3 attempts) was blocking the ENTIRE portfolio load behind it.
+                # CoinGecko stays only as a fallback for whatever Yahoo has no market for.
+                yahoo_results = await asyncio.gather(*(self._crypto_price_yahoo(t) for t in remaining))
+                yahoo_prices = {t: yp for t, yp in zip(remaining, yahoo_results) if yp}
+                prices.update(yahoo_prices)
+                missing = [c for c in remaining if c not in yahoo_prices]
+                if missing:
+                    crypto_prices = await self.coingecko.get_prices(missing, vs_currency=self.base_currency.lower())
+                    prices.update(crypto_prices)
+                    for ticker, price in crypto_prices.items():
+                        logger.info("crypto {} price via CoinGecko fallback: {}", ticker, price["price"])
 
         self._prices_cache = prices
         return prices
 
     async def _boost_extended_hours(self, tickers: list[str], prices: dict[str, dict]) -> None:
-        """Overrides Yahoo's regular-session price/change with its own
-        pre-market/after-hours print for US-exchange-listed tickers, closing
-        the "stale until Wall Street opens" gap (verified live, see
-        YahooFinanceService.get_extended_quote). Only tried for tickers with
-        no exchange suffix (a plain "TSM"/"MU", never "VVSM.DE"/"BTEC.L") —
-        non-US listings have no pre/post session to fetch. Yahoo's regular
-        price/name/currency stand unchanged whenever there's no fresher
-        pre/post-market print (i.e. during the regular session, or while the
-        market's fully closed)."""
+        """Overrides Yahoo's regular-session price with its own pre-market/
+        after-hours print for US-exchange-listed tickers, closing the "stale
+        until Wall Street opens" gap for VALUATION (verified live, see
+        YahooFinanceService.get_extended_quote) — current_price/market_value/
+        gain_loss downstream all use this live print. Only tried for tickers
+        with no exchange suffix (a plain "TSM"/"MU", never "VVSM.DE"/"BTEC.L")
+        — non-US listings have no pre/post session to fetch.
+
+        Deliberately does NOT report a "today" change while pre/post-market:
+        previous_close is set equal to the live price, so day_change/
+        day_change_pct come out at exactly 0 downstream. There's no single
+        broker-agnostic reference for "today's move" before NYSE actually
+        opens — European brokers (TR/Revolut/...) price US stocks through
+        their own market maker on a different schedule/venue, so a % here
+        computed against NYSE's last regular close doesn't match what any
+        specific broker shows and reads as a false gain/loss (confirmed with
+        Yassine 2026-09-23: showed -7€ on TSM his own broker didn't show).
+        Once market_state flips to REGULAR the base Yahoo price/previous_close
+        (an actual same-session NYSE comparison) is used untouched."""
         candidates = [t for t in tickers if t in prices and "." not in t]
         if not candidates:
             return
@@ -123,9 +145,9 @@ class PortfolioService:
                 continue
             entry = prices[ticker]
             entry["price"] = quote["price"]
-            entry["previous_close"] = quote["previous_close"]
-            entry["change"] = quote["change"]
-            entry["change_percent"] = quote["change_percent"]
+            entry["previous_close"] = quote["price"]
+            entry["change"] = 0.0
+            entry["change_percent"] = 0.0
             entry["market_state"] = quote["market_state"]
 
     async def _crypto_price_yahoo(self, ticker: str) -> dict | None:

@@ -62,6 +62,69 @@ def normalize_kraken_asset(asset: str) -> str:
     return upper
 
 
+# Kraken's public Ticker endpoint renames the requested pair to its own
+# canonical result key — pre-2014 "grandfathered" assets (BTC, ETH) get X/Z
+# ISO-4217-style prefixes on both legs, newer assets don't. Verified live
+# 2026-09-23 against a real multi-pair request; hardcoded for the small,
+# curated set of crypto this app actually holds (same pattern as
+# KRAKEN_ASSET_MAP above).
+KRAKEN_PAIR_REQUEST = {
+    "BTC": "XBTEUR", "ETH": "ETHEUR", "SOL": "SOLEUR",
+    "DOGE": "XDGEUR", "PEPE": "PEPEEUR",
+}
+KRAKEN_PAIR_RESULT_KEY = {
+    "BTC": "XXBTZEUR", "ETH": "XETHZEUR", "SOL": "SOLEUR",
+    "DOGE": "XDGEUR", "PEPE": "PEPEEUR",
+}
+
+
+async def get_public_prices(tickers: list[str]) -> dict[str, dict]:
+    """Kraken's own live last-trade price (public endpoint, no auth/API key
+    needed) for held crypto — matches exactly what the Kraken app/exchange
+    itself shows, since it IS the exchange the position is actually held on.
+    Unlike Yahoo/CoinGecko (third-party composites that can legitimately
+    diverge from any one venue), there's no "which feed is right" ambiguity
+    here. EUR pairs only; best-effort, returns {} on any failure."""
+    candidates = {t: KRAKEN_PAIR_REQUEST[t] for t in tickers if t.upper() in KRAKEN_PAIR_REQUEST}
+    if not candidates:
+        return {}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{KRAKEN_API_URL}/0/public/Ticker",
+                params={"pair": ",".join(candidates.values())},
+            )
+            if resp.status_code != 200:
+                return {}
+            data = resp.json()
+    except Exception as exc:
+        logger.debug("Kraken public ticker fetch failed: {}", exc)
+        return {}
+    if data.get("error"):
+        return {}
+    result = data.get("result", {})
+    out: dict[str, dict] = {}
+    for ticker in candidates:
+        row = result.get(KRAKEN_PAIR_RESULT_KEY[ticker])
+        if not row:
+            continue
+        try:
+            price = float(row["c"][0])
+            open_price = float(row["o"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        out[ticker] = {
+            "ticker": ticker,
+            "price": price,
+            "previous_close": open_price,
+            "change": price - open_price,
+            "change_percent": (price - open_price) / open_price * 100 if open_price else 0.0,
+            "currency": "EUR",
+            "name": ticker,
+        }
+    return out
+
+
 class KrakenAuthError(RuntimeError):
     pass
 
