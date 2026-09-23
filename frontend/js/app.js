@@ -1288,7 +1288,7 @@ function handlePeriodChange(period) {
     currentPeriod = period === 'all' ? 'all' : parseInt(period);
     
     // Update active button
-    document.querySelectorAll('.chart-btn').forEach(btn => {
+    document.querySelectorAll('.chart-btn[data-period]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.period === String(period));
     });
     
@@ -1388,7 +1388,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Period buttons
-    document.querySelectorAll('.chart-btn').forEach(btn => {
+    document.querySelectorAll('.chart-btn[data-period]').forEach(btn => {
         btn.addEventListener('click', () => handlePeriodChange(btn.dataset.period));
     });
     
