@@ -137,10 +137,25 @@ class AlertsEngine:
             ))
 
         # Rule 2b: tickers tracked in plans/watchlist that AREN'T in the synced portfolio
-        # (e.g. the tactical ETFs just bought in Trade Republic / MyInvestor). Price via Yahoo.
+        # (e.g. the tactical ETFs just bought in Trade Republic / MyInvestor, or a
+        # scheduled-catalyst name like MIRM ahead of its FDA date). Price via Yahoo —
+        # for a plain US ticker, try the extended-hours-aware quote FIRST (same fix
+        # as _boost_extended_hours in portfolio.py, 2026-09-24: the plain get_price()
+        # can show a stale/misleading previous_close outside the regular session,
+        # exactly the kind of gap Yassine wants closed for a binary FDA-date name).
         for tk, label in (await self._watchlist_extra(held_tickers)).items():
             try:
-                price = await self._scanner().yahoo.get_price(tk)
+                price = None
+                if "." not in tk:
+                    ext = await self._scanner().yahoo.get_extended_quote(tk)
+                    if ext:
+                        # get_extended_quote only ever returns non-None for a
+                        # US-exchange ticker (that's what PRE/POST/POSTPOST
+                        # means) — USD is always correct here.
+                        price = {"price": ext["price"], "change_percent": ext["change_percent"],
+                                 "currency": "USD", "name": label}
+                if price is None:
+                    price = await self._scanner().yahoo.get_price(tk)
             except Exception as exc:
                 logger.debug("alerts watchlist price {} failed: {}", tk, exc)
                 continue
@@ -608,7 +623,16 @@ class AlertsEngine:
                     created.append(res)
 
     async def _watchlist_extra(self, held: set[str]) -> dict[str, str]:
-        """Plan/watchlist tickers not already in the portfolio. Returns {ticker: label}."""
+        """Plan/watchlist tickers not already in the portfolio. Returns {ticker: label}.
+
+        Was "plans" only — the actual Watchlist table (added to via the app's
+        watchlist feature, e.g. IONQ/AR/VIST added there 2026-09-23/24 after
+        research sessions) was invisible to this rule: those tickers showed
+        their live setup on the watchlist PAGE, but nobody was proactively
+        alerted on a big move. Added 2026-09-24 after Yassine asked for an
+        urgent push the moment a tracked catalyst (Mirum's FDA date) actually
+        moves the price — same "signal existed, nobody was told" pattern as
+        the position_review rule above."""
         out: dict[str, str] = {}
         try:
             from app.services import plans
@@ -620,6 +644,19 @@ class AlertsEngine:
                         out[tk] = h.get("label") or tk
         except Exception as exc:
             logger.debug("alerts watchlist load failed: {}", exc)
+        try:
+            from app.auth import get_owner_user_id_cached
+            from app.db import session_scope
+            from app.repositories import WatchlistRepository
+            owner_id = await get_owner_user_id_cached()
+            async with session_scope() as s:
+                entries = await WatchlistRepository(s, owner_id).list_all()
+            for e in entries:
+                tk = (e.ticker or "").strip().upper()
+                if tk and tk not in held and tk not in out:
+                    out[tk] = e.name or tk
+        except Exception as exc:
+            logger.debug("alerts watchlist-table load failed: {}", exc)
         return out
 
     async def _eval_move(self, *, ticker, name, asset_type, broker, pct, price,
