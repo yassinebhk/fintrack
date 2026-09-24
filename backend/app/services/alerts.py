@@ -340,6 +340,81 @@ class AlertsEngine:
         except Exception as exc:
             logger.debug("macro-shock rule failed: {}", exc)
 
+        # Rule 6: position-review escalation. review_portfolio() already computes
+        # a per-holding VIGILAR/REDUCIR/ROTAR signal with real reasons (technical
+        # + a real catalyst-brief from actual news) — but it only lived on the
+        # "¿Vender o mantener?" page, nobody was proactively told. Added
+        # 2026-09-24 after Yassine found out about SNDK's -22% drawdown +
+        # AI-slowdown risk himself instead of from the app, despite the signal
+        # already existing there the day before. Distinguishes a routine
+        # drawdown-only flag from real, stacked reasons (Yassine's explicit ask:
+        # "es importante si es un simple vigilar o hay grandes indicios") — a
+        # ROTAR, 2+ stacked reasons, or an unfavorable news verdict get the
+        # stronger framing; a lone drawdown trigger with neutral/favorable news
+        # stays low-key. Concentration-driven REDUCIR is framed separately (it's
+        # a sizing flag, not "this will fall").
+        try:
+            from app.auth import get_owner_user_id_cached
+            from app.services.position_review import review_portfolio
+            owner_id = await get_owner_user_id_cached()
+            review = await review_portfolio(owner_id, force=False)
+            for r in review.get("reviews", []):
+                signal = r.get("signal")
+                if signal not in ("VIGILAR", "REDUCIR", "ROTAR"):
+                    continue
+                if r.get("immaterial") or r.get("materiality") != "alta":
+                    continue
+                ticker = r["ticker"]
+                reasons = r.get("reasons") or []
+                if not reasons:
+                    continue
+                brief = r.get("catalyst_brief") or {}
+                verdict = brief.get("verdict")
+                label = _friendly_label(ticker, self._name_by_tk, r.get("name", ""))
+                concentration_only = (
+                    signal == "REDUCIR" and len(reasons) == 1
+                    and "Concentración alta" in reasons[0]
+                )
+                if concentration_only:
+                    title = f"Demasiado peso en una sola posición: {label}"
+                    body = (reasons[0] +
+                            "\n\n➡ Qué hacer: no es que vaya a bajar, es un aviso de reparto de riesgo. "
+                            "Valora si te incomoda tener tanto en un solo activo.")
+                    severity = "info"
+                else:
+                    strong = signal == "ROTAR" or len(reasons) >= 2 or verdict == "desfavorable"
+                    reason_lines = "\n".join(f"• {x}" for x in reasons)
+                    if strong:
+                        title = f"Motivos reales para {signal.lower()}: {label}"
+                        news_line = ("\n• Los catalizadores/noticias recientes también apuntan a riesgo — "
+                                     "revisa el detalle en la app."
+                                     if verdict == "desfavorable" else "")
+                        body = (f"No es solo que haya bajado de precio — hay varias señales apuntando en la "
+                                f"misma dirección:\n{reason_lines}{news_line}\n\n"
+                                "➡ Qué hacer: revísalo en la app antes de decidir; esto no es una orden "
+                                "automática de vender.")
+                        severity = "critical" if signal == "ROTAR" else "warning"
+                    else:
+                        title = f"Vigilancia rutinaria: {label}"
+                        body = (f"{reason_lines}\n\n"
+                                "De momento es solo el precio — no hay una tendencia rota ni noticias "
+                                "negativas detrás. No hace falta actuar, solo tenerlo en el radar.")
+                        severity = "info"
+                created.append(
+                    await self._maybe_create(
+                        kind="position_review",
+                        severity=severity,
+                        title=title,
+                        body=body,
+                        payload={"ticker": ticker, "signal": signal, "materiality": r.get("materiality")},
+                        dedupe_key=f"position_review:{ticker}:{signal}:{today_str}",
+                        link=_asset_link(ticker),
+                        link_text="Ver la posición en detalle",
+                    )
+                )
+        except Exception as exc:
+            logger.debug("position-review alert rule failed: {}", exc)
+
         return await self._deliver_batch([c for c in created if c is not None])
 
     async def _deliver_batch(self, alerts: list[dict]) -> list[dict]:
