@@ -360,9 +360,24 @@ async def create_position(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     repo = PositionRepository(session, current_user.id)
-    existing = await repo.get(payload.ticker.upper(), payload.broker)
+    ticker = payload.ticker.upper()
+    existing = await repo.get(ticker, payload.broker)
     if existing is not None:
-        raise HTTPException(status_code=400, detail=f"Position {payload.ticker} @ {payload.broker} already exists")
+        raise HTTPException(status_code=400, detail=f"Position {ticker} @ {payload.broker} already exists")
+    # Validate the ticker resolves to a real, live-priceable instrument BEFORE
+    # saving — this form takes ticker/type/currency as raw typed fields with no
+    # auto-detection, so a company name typed where a ticker symbol belongs
+    # (e.g. "CELESTICA" instead of "CLS") used to save silently and never get a
+    # live price again (found 2026-09-25: a real position + its trailing stop
+    # both went dark this way). Reject early with a clear, specific message
+    # instead of a value that will just quietly never price.
+    price, _ = await _current_price_and_currency(ticker, payload.type)
+    if price is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"No se reconoce '{ticker}' como símbolo de bolsa real. "
+                    "Usa el ticker (ej. CLS), no el nombre de la empresa (ej. Celestica)."),
+        )
     pos = await repo.upsert(**payload.model_dump(), source="manual")
     return {"message": "Position created", "id": pos.id, "ticker": pos.ticker}
 
