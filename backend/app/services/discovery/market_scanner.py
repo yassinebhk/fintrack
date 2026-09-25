@@ -294,17 +294,17 @@ class MarketScanner:
 
     # Curated 2026-09-25 after Yassine asked to track "the world's best asset
     # managers" for candidate ideas: verified with real sourced numbers (not
-    # reputation) across two research passes, deliberately EXCLUDING several
-    # famous names with real, documented recent underperformance — Klarman
-    # (~4%/yr 2014-2024, a decade of mediocrity), Ackman (2026 YTD -9.1%,
-    # history of huge drawdowns), Pabrai and Akre (both real recent
-    # underperformance vs S&P), Horos AM (track-record-continuity red flag —
-    # its own marketing predates the firm's 2018 founding), True Value
-    # (5-year return NEGATIVE, Morningstar 2 stars). Kept the ones whose
-    # LONG-term numbers hold up, not just a hot recent stretch:
-    #   - Buffett/Berkshire, Li Lu/Himalaya, Gayner/Markel: US 13F filers,
-    #     tracked live via Dataroma (free, public, structured HTML — verified
-    #     working 2026-09-25, no auth/JS needed).
+    # reputation) across two research passes. Originally kept only the 4
+    # "cleanest" names (no documented recent stumble); Yassine then asked for
+    # more names shown, including famous ones with a real recent rough patch —
+    # HONESTLY LABELED, not hidden. Horos AM (track-record-continuity red
+    # flag) and True Value (5-year return negative, Morningstar 2 stars)
+    # stay excluded: unlike the ones below, those two have no long-run
+    # redeeming number to balance the recent problem against.
+    #   - Buffett/Berkshire, Li Lu/Himalaya, Gayner/Markel, Klarman/Baupost,
+    #     Ackman/Pershing Square, Pabrai: all US 13F filers, tracked live via
+    #     Dataroma (free, public, structured HTML — verified working
+    #     2026-09-25, no auth/JS needed).
     #   - Magallanes (Iván Martín): 10.27%/yr over 10 years, a real down year
     #     (2022 -1.81%) but never a Cobas/azValor-style multi-year crash.
     #     No live feed exists (CNMV doesn't mandate 13F-style disclosure for
@@ -315,6 +315,9 @@ class MarketScanner:
         "BRK": "Warren Buffett (Berkshire Hathaway)",
         "HC": "Li Lu (Himalaya Capital)",
         "MKL": "Tom Gayner (Markel)",
+        "BAUPOST": "Seth Klarman (Baupost Group)",
+        "psc": "Bill Ackman (Pershing Square)",
+        "PI": "Mohnish Pabrai (Pabrai Funds)",
     }
     # (ticker, name) — Magallanes Iberian Equity top holdings, snapshot 2026-09-25.
     _MAGALLANES_HOLDINGS: list[tuple[str, str]] = [
