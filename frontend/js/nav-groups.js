@@ -13,7 +13,7 @@
 const NAV_GROUPS = {
     cartera:      { label: 'Cartera',      icon: '💼', pages: [['portfolio-manager', 'Posiciones'], ['transactions', 'Transacciones'], ['journal', 'Diario'], ['goals', 'Objetivos']] },
     analisis:     { label: 'Análisis',     icon: '📈', pages: [['analysis', 'Mercado'], ['position-review', '¿Vender o mantener?'], ['daily-summary', 'Resumen diario'], ['calculators', 'Calculadoras']] },
-    inteligencia: { label: 'Inteligencia', icon: '🧠', pages: [['opportunities', 'Oportunidades'], ['ai-advisor', 'Asesor IA'], ['news', 'Noticias']] },
+    inteligencia: { label: 'Recomendaciones', icon: '💡', pages: [['opportunities', 'Oportunidades'], ['superinvestors', 'Superinversores'], ['ai-advisor', 'Asesor IA'], ['news', 'Noticias']] },
     labs:         { label: 'Labs',         icon: '🧪', pages: [['scorecard', 'Eficacia'], ['daytrading', 'Trading Diario'], ['backtest', 'Backtest Lab'], ['polymarket', 'Polymarket Lab']] },
     aprender:     { label: 'Aprender',     icon: '📚', pages: [['learn', 'Guía'], ['docs', 'Documentación']] },
 };

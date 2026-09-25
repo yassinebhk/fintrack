@@ -2045,6 +2045,37 @@ body::before {
 }
 .analyze-chip:hover { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
 
+/* 🏆 Superinversores — carteras de gestores de valor */
+.si-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+.si-card { margin: 0; }
+.si-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.si-holdings { list-style: none; margin: 0; padding: 0; }
+.si-holding {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-primary);
+    font-size: 13.5px;
+}
+.si-holding:last-child { border-bottom: none; }
+.si-weight {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-primary);
+    background: rgba(44, 74, 110, 0.08);
+    border-radius: 6px;
+    padding: 1px 7px;
+    white-space: nowrap;
+}
+
 /* Watchlist rich per-asset panel (conclusion + mini-chart + what-if) */
 .watch-panel-grid {
     display: grid;

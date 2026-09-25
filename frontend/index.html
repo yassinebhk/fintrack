@@ -17,7 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260922smafix">
+    <link rel="stylesheet" href="css/styles.css?v=20260925si">
 </head>
 <body>
     <div id="loginGate" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:24px;">
@@ -84,11 +84,12 @@
                 </li>
 
                 <li class="nav-group" data-group="inteligencia">
-                    <span class="nav-icon">🧠</span>
-                    <span class="nav-label">Inteligencia</span>
+                    <span class="nav-icon">💡</span>
+                    <span class="nav-label">Recomendaciones</span>
                     <span class="nav-caret">›</span>
                     <ul class="nav-subitems" hidden>
                         <li class="nav-item" data-page="opportunities"><span class="nav-icon">💡</span><span class="nav-label">Oportunidades</span></li>
+                        <li class="nav-item" data-page="superinvestors"><span class="nav-icon">🏆</span><span class="nav-label">Superinversores</span></li>
                         <li class="nav-item" data-page="ai-advisor"><span class="nav-icon">🤖</span><span class="nav-label">Asesor IA</span></li>
                         <li class="nav-item" data-page="news"><span class="nav-icon">📰</span><span class="nav-label">Noticias</span></li>
                     </ul>
@@ -1621,6 +1622,16 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
                 </div>
 
                 <!-- Opportunities Page -->
+                <div class="page page-superinvestors" id="page-superinvestors">
+                    <section class="manager-header">
+                        <div>
+                            <h2>🏆 Superinversores</h2>
+                            <p>Qué tienen en cartera los mejores gestores de valor del mundo (informes 13F públicos) — ideas de largo plazo.</p>
+                        </div>
+                    </section>
+                    <div id="superinvestorsContent"></div>
+                </div>
+
                 <div class="page page-opportunities" id="page-opportunities">
                     <section class="manager-header">
                         <div>
@@ -2147,6 +2158,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
     <script src="js/daytrading.js?v=20260921equity"></script>
     <script src="js/journal.js?v=20260921filter"></script>
     <script src="js/watchlist.js?v=20260922watchpro"></script>
+    <script src="js/superinvestors.js?v=20260925a"></script>
     <script src="js/goals.js?v=20260921real"></script>
     <script src="js/alerts.js?v=20260921real"></script>
     <script src="js/export-utils.js?v=20260913export"></script>
@@ -2162,7 +2174,7 @@ VWCE.DE, 20, 100, etf, MyInvestor"></textarea>
             });
         }
     </script>
-    <script src="js/pages.js?v=20260922nav"></script>
-    <script src="js/nav-groups.js?v=20260922nav"></script>
+    <script src="js/pages.js?v=20260925si"></script>
+    <script src="js/nav-groups.js?v=20260925si"></script>
 </body>
 </html>

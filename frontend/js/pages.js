@@ -1918,6 +1918,7 @@ function initNavigation() {
                 'ai-advisor': 'Asesor IA',
                 'news': 'Noticias',
                 'opportunities': 'Oportunidades',
+                'superinvestors': 'Superinversores',
                 'scorecard': 'Eficacia',
                 'backtest': 'Backtest',
                 'polymarket': 'Polymarket Lab',
