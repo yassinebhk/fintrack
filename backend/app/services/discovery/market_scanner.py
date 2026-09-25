@@ -167,6 +167,11 @@ class MarketScanner:
         # Merge in dynamic Yahoo screener candidates (genuinely fresh names)
         for tk, info in (await self._screener_candidates()).items():
             candidates.setdefault(tk, info)
+        # Merge in current top holdings of a curated list of long-run-reliable
+        # fund managers (real research from people who dedicate real money to
+        # it) — see _superinvestor_candidates for the selection rationale.
+        for tk, info in (await self._superinvestor_candidates()).items():
+            candidates.setdefault(tk, info)
 
         # This now only ever runs on the GitHub-Actions 7GB runner (see
         # opportunities-scan.yml), not the 512MB Render/VM free tier the original
@@ -286,6 +291,96 @@ class MarketScanner:
         except Exception as exc:
             logger.debug("screeners unavailable: {}", exc)
             return {}
+
+    # Curated 2026-09-25 after Yassine asked to track "the world's best asset
+    # managers" for candidate ideas: verified with real sourced numbers (not
+    # reputation) across two research passes, deliberately EXCLUDING several
+    # famous names with real, documented recent underperformance — Klarman
+    # (~4%/yr 2014-2024, a decade of mediocrity), Ackman (2026 YTD -9.1%,
+    # history of huge drawdowns), Pabrai and Akre (both real recent
+    # underperformance vs S&P), Horos AM (track-record-continuity red flag —
+    # its own marketing predates the firm's 2018 founding), True Value
+    # (5-year return NEGATIVE, Morningstar 2 stars). Kept the ones whose
+    # LONG-term numbers hold up, not just a hot recent stretch:
+    #   - Buffett/Berkshire, Li Lu/Himalaya, Gayner/Markel: US 13F filers,
+    #     tracked live via Dataroma (free, public, structured HTML — verified
+    #     working 2026-09-25, no auth/JS needed).
+    #   - Magallanes (Iván Martín): 10.27%/yr over 10 years, a real down year
+    #     (2022 -1.81%) but never a Cobas/azValor-style multi-year crash.
+    #     No live feed exists (CNMV doesn't mandate 13F-style disclosure for
+    #     Spanish funds) — top holdings below are a manual snapshot from its
+    #     public fund factsheet; needs a periodic manual refresh, unlike the
+    #     Dataroma names above which update themselves every filing.
+    _SUPERINVESTOR_DATAROMA: dict[str, str] = {
+        "BRK": "Warren Buffett (Berkshire Hathaway)",
+        "HC": "Li Lu (Himalaya Capital)",
+        "MKL": "Tom Gayner (Markel)",
+    }
+    # (ticker, name) — Magallanes Iberian Equity top holdings, snapshot 2026-09-25.
+    _MAGALLANES_HOLDINGS: list[tuple[str, str]] = [
+        ("MT", "ArcelorMittal"),
+        ("AT4B.MC", "Atalaya Mining"),
+        ("ACX.MC", "Acerinox"),
+        ("MEL.MC", "Meliá Hotels"),
+        ("SEM.LS", "Semapa"),
+    ]
+
+    async def _superinvestor_candidates(self) -> dict[str, dict]:
+        """Current top holdings of a curated list of long-run-reliable fund
+        managers (see selection rationale above) — real research from people
+        who dedicate real money and time to it, merged in as CANDIDATES for
+        the same objective quant scoring everything else gets. Never treated
+        as a buy signal on its own: a manager's pick that doesn't hold up
+        under the fundamentals/momentum/insider checks below gets filtered
+        out exactly like anything else in the universe. Best-effort — one
+        manager's page failing doesn't block the rest."""
+        found: dict[str, dict] = {}
+
+        def _fetch_dataroma() -> dict[str, dict]:
+            import re
+            import httpx
+            out: dict[str, dict] = {}
+            row_re = re.compile(
+                r'class="stock"><a[^>]*>([A-Z.\-]+)<span> - ([^<]+)</span></a></td>\s*'
+                r'<td>([\d.]+)</td>'
+            )
+            for slug, label in self._SUPERINVESTOR_DATAROMA.items():
+                try:
+                    resp = httpx.get(
+                        f"https://www.dataroma.com/m/holdings.php?m={slug}",
+                        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+                        timeout=15.0,
+                    )
+                    if resp.status_code != 200:
+                        continue
+                    for ticker, name, weight in row_re.findall(resp.text):
+                        # Skip non-US-listed tickers Yahoo won't resolve cleanly
+                        # from a bare symbol (Dataroma lists some ADRs/foreign
+                        # names with odd suffixes); a plain ticker is enough
+                        # here since these are all US-exchange 13F holdings.
+                        out.setdefault(ticker, {
+                            "name": f"{name.strip()} ({label}, {weight}%)",
+                            "cat": f"gestora · {label}",
+                            "region": "EEUU",
+                        })
+                except Exception as exc:
+                    logger.debug("dataroma fetch failed for {}: {}", slug, exc)
+            return out
+
+        try:
+            loop = asyncio.get_event_loop()
+            found.update(await loop.run_in_executor(None, _fetch_dataroma))
+        except Exception as exc:
+            logger.debug("superinvestor dataroma scan failed: {}", exc)
+
+        for ticker, name in self._MAGALLANES_HOLDINGS:
+            found.setdefault(ticker, {
+                "name": f"{name} (Magallanes)",
+                "cat": "gestora · Magallanes (Iván Martín)",
+                "region": "Europa",
+            })
+        return found
 
     async def scan_themes(self) -> list[dict]:
         """Momentum snapshot of all reference themes, sorted by 3-month return."""
