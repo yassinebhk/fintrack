@@ -1,13 +1,15 @@
 name: opportunities-scan
 
-# The heavy 130+ instrument universe scan OOMs Render's 512MB free tier. Run it
-# here on GitHub's 7GB runner instead: scan + score everything with the project's
-# own code, then POST the scored result to the backend, which does the light part
-# (LLM analyst + enrichment) and serves it.
+# The heavy universe scan (now thousands of instruments, see market_scanner.py)
+# would OOM the small VM. Run it here on GitHub's 7GB runner instead: scan +
+# score everything with the project's own code, then POST the scored result to
+# the backend, which does the light part (LLM analyst + enrichment) and serves
+# it. (Project moved off Render to a self-hosted GCP VM — see deployment docs —
+# the secrets below now point there, not at the old Render URL.)
 #
-# Required GitHub Secrets (same as the transcripts workflow):
-#   FINTRACK_INGEST_SECRET  — same value as CREATORS_INGEST_SECRET in Render env
-#   FINTRACK_API_URL        — e.g. https://fintrack-front.onrender.com/api
+# Required GitHub Secrets:
+#   FINTRACK_INGEST_SECRET  — same value as CREATORS_INGEST_SECRET in the VM's backend/.env
+#   FINTRACK_API_URL        — https://personalfintrack.duckdns.org/api
 #   FINNHUB_API_KEY         — same value as FINNHUB_API_KEY in backend/.env
 #                             (optional data provider: insider sentiment judge —
 #                             without it that judge just silently doesn't vote)
