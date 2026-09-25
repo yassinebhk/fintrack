@@ -68,9 +68,26 @@ jobs:
               return obj
 
           async def main():
+              # The owner's own watchlist/positions (2026-09-25) — a ticker they're
+              # already tracking should always compete for a slot on the same
+              # objective terms as everything else, not silently miss out just
+              # because it's in neither the curated universe nor a screener.
+              # Best-effort: if this fails, the scan still runs on the static
+              # universe + screeners exactly as before.
+              extra_tickers = {}
+              try:
+                  api = os.environ["API_URL"].rstrip("/")
+                  resp = httpx.get(f"{api}/opportunities/scan-tickers",
+                                    params={"secret": os.environ["INGEST_SECRET"]}, timeout=30)
+                  resp.raise_for_status()
+                  extra_tickers = resp.json().get("tickers", {})
+                  print(f"scan-tickers -> {len(extra_tickers)} extra tickers from watchlist/positions")
+              except Exception as exc:
+                  print(f"scan-tickers fetch failed (continuing without it): {exc}")
+
               sc = MarketScanner()
               themes, crypto = await asyncio.gather(
-                  sc.scan_universe(), sc.scan_crypto_basket()
+                  sc.scan_universe(extra_tickers=extra_tickers), sc.scan_crypto_basket()
               )
               scored = [t for t in themes if t.get("factors")]
               print(f"Scanned {len(themes)} themes ({len(scored)} scored), {len(crypto)} crypto")

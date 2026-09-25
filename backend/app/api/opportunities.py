@@ -77,6 +77,47 @@ async def send_telegram(secret: str = "") -> dict:
     return {"status": "sent"}
 
 
+@router.get("/scan-tickers")
+async def scan_tickers(secret: str = "") -> dict:
+    """Tickers the GitHub-Actions scan worker should ALWAYS score, on top of the
+    curated universe + Yahoo screeners — the owner's own watchlist and open
+    positions. Found 2026-09-25: Celestica (CLS) was a genuinely strong pick
+    (real growth, cheap forward PE, unanimous analyst buy) that Yassine had to
+    find by hand, because it was in neither the curated universe nor any
+    screener category, so it never got scored and could never surface in
+    Oportunidades. A ticker the user is already watching or holding is exactly
+    the kind of thing that SHOULD compete for a slot, not silently miss out.
+
+    Same shared secret as ingest-scan (the worker never touches user auth, and
+    this only ever returns tickers/names — never quantities, prices or
+    anything an outside party could act on)."""
+    if not _INGEST_SECRET or secret != _INGEST_SECRET:
+        raise HTTPException(status_code=401, detail="invalid secret")
+    from app.auth import get_owner_user_id_cached
+    from app.db import session_scope
+    from app.repositories import PositionRepository, WatchlistRepository
+
+    owner_id = await get_owner_user_id_cached()
+    if not owner_id:
+        return {"tickers": {}}
+    out: dict[str, dict] = {}
+    async with session_scope() as s:
+        for w in await WatchlistRepository(s, owner_id).list_all():
+            tk = (w.ticker or "").upper()
+            if tk:
+                out[tk] = {"name": w.name or tk, "cat": "watchlist", "region": ""}
+        for p in await PositionRepository(s, owner_id).list_all():
+            if p.type == "crypto":
+                continue  # scored separately by scan_crypto_basket(), needs a -EUR/-USD
+                          # suffix scan_universe()'s stock-oriented fetch doesn't add —
+                          # a bare "BTC" here would either fail to resolve or, worse,
+                          # silently resolve to an unrelated stock of that symbol.
+            tk = (p.ticker or "").upper()
+            if tk:
+                out.setdefault(tk, {"name": p.asset_name or tk, "cat": "cartera", "region": ""})
+    return {"tickers": out}
+
+
 @router.post("/ingest-scan")
 async def ingest_scan(payload: ScanIn, secret: str = "") -> dict:
     """Receive a pre-computed (already scored) universe scan from the GitHub-Actions

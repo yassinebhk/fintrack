@@ -156,10 +156,21 @@ class MarketScanner:
         logger.info("crypto basket scan: {} of {} priced", len(items), len(self.CRYPTO_BASKET))
         return items
 
-    async def scan_universe(self, exclude_tickers: set[str] | None = None) -> list[dict]:
+    async def scan_universe(
+        self, exclude_tickers: set[str] | None = None,
+        extra_tickers: dict[str, dict] | None = None,
+    ) -> list[dict]:
         """Scan the wide curated universe + Yahoo screeners, score everything with the
         quant engine, and return the ranking. This is what surfaces instruments the
-        user doesn't know — chosen by statistics, not by the LLM."""
+        user doesn't know — chosen by statistics, not by the LLM.
+
+        `extra_tickers` (2026-09-25): the caller's own watchlist/positions —
+        Celestica (CLS) was a genuinely strong pick Yassine found by hand
+        because it was in neither the curated universe nor any screener
+        category, so it never got scored and could never surface here.
+        Anything the user is already watching or holding should always
+        compete for a slot on the same objective terms as everything else,
+        not silently miss out for lack of a matching static list entry."""
         from app.services.discovery.universe import universe_meta
 
         exclude = {t.upper() for t in (exclude_tickers or set())}
@@ -171,6 +182,8 @@ class MarketScanner:
         # fund managers (real research from people who dedicate real money to
         # it) — see _superinvestor_candidates for the selection rationale.
         for tk, info in (await self._superinvestor_candidates()).items():
+            candidates.setdefault(tk, info)
+        for tk, info in (extra_tickers or {}).items():
             candidates.setdefault(tk, info)
 
         # This now only ever runs on the GitHub-Actions 7GB runner (see
